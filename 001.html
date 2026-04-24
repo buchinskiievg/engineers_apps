@@ -1,0 +1,1909 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Voltage Drop Calculator · IEC 60364-5-52</title>
+<meta name="description" content="Multi-feeder voltage drop calculator per IEC 60364-5-52 Annex D. Unlimited connections, built-in cable library, regional presets, single combined Word report." />
+<style>
+  :root {
+    --bg:        #c8ccd1;
+    --bg-soft:   #d8dbdf;
+    --panel:     #eef0f2;
+    --panel-2:   #ffffff;
+    --ink:       #000000;
+    --ink-soft:  #1a1a1a;
+    --muted:     #3a3f44;
+    --line:      #8a8f94;
+    --line-soft: #b4b9bd;
+    --btn:       #3c4043;
+    --btn-hover: #23272a;
+    --btn-ink:   #ffffff;
+    --btn-ghost-bg: #d8dbdf;
+    --chip-bg:   #3c4043;
+    --chip-ink:  #ffffff;
+    --tab-bg:    #b7bbc0;
+    --tab-active-bg: #eef0f2;
+    --ok-bg:     #d6e9dc;
+    --ok-ink:    #0c5826;
+    --warn-bg:   #f4e4c1;
+    --warn-ink:  #6b4a00;
+    --err-bg:    #f2cdcf;
+    --err-ink:   #7f1a10;
+    --mono:      "Arial Narrow", Arial, sans-serif;
+    --sans:      "Arial Narrow", Arial, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --math:      "Cambria Math", "STIX Two Math", Cambria, Georgia, serif;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; font-family: var(--sans); color: var(--ink);
+    background: var(--bg); line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .container { max-width: 1280px; margin: 0 auto; padding: 22px 16px 48px; }
+
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .chip {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+    padding: 3px 9px; border-radius: 2px;
+    background: var(--chip-bg); color: var(--chip-ink);
+  }
+  h1 { margin: 0 0 4px; font-size: 24px; font-weight: 700; color: var(--ink); letter-spacing: -0.01em; }
+  .sub { color: var(--muted); font-size: 13.5px; max-width: 900px; }
+  .rule { height: 1px; background: var(--line); margin: 14px 0 18px; }
+
+  .header-top { display: flex; justify-content: space-between; gap: 20px; align-items: flex-start; }
+  .header-left { flex: 1; min-width: 0; }
+  .header-right {
+    text-align: right; font-size: 12px; color: var(--ink-soft);
+    line-height: 1.35; flex-shrink: 0;
+  }
+  .author-name { font-weight: 700; color: var(--ink); }
+  .author-email a, .author-wa-hint a { color: var(--ink-soft); text-decoration: none; }
+  .author-email a:hover, .author-wa-hint a:hover { text-decoration: underline; }
+  .author-wa-hint { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .author-links { display: flex; gap: 6px; justify-content: flex-end; margin-top: 6px; }
+  .author-links a {
+    display: inline-flex; width: 28px; height: 28px; border-radius: 3px;
+    background: var(--btn); align-items: center; justify-content: center;
+    text-decoration: none;
+  }
+  .author-links a:hover { background: var(--btn-hover); }
+  .author-links svg { width: 16px; height: 16px; fill: #fff; }
+
+  .toolbar { display: flex; align-items: center; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .toolbar-spacer { flex: 1; }
+  .toolbar button { height: 32px; padding: 0 14px; font-size: 12.5px; line-height: 1; display: inline-flex; align-items: center; }
+
+  /* Ad slots — ready for drop-in ad-network or affiliate code. */
+  .ad-row {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+    margin: 14px 0 4px;
+  }
+  @media (max-width: 760px) { .ad-row { grid-template-columns: 1fr; } }
+  .ad-slot {
+    min-height: 90px;
+    border: 1px dashed var(--line);
+    border-radius: 3px;
+    background: repeating-linear-gradient(
+      45deg,
+      transparent 0 10px,
+      rgba(58, 63, 68, 0.05) 10px 20px
+    );
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+  }
+  .ad-slot:hover { border-color: var(--btn); }
+  .ad-placeholder {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    font-family: "Arial Narrow", Arial, sans-serif;
+    color: var(--muted); text-align: center; padding: 8px;
+  }
+  .ad-placeholder-title {
+    font-weight: 700; font-size: 12px; color: var(--ink-soft);
+    letter-spacing: 0.04em; text-transform: uppercase;
+  }
+  .ad-placeholder-sub { font-size: 11px; color: var(--muted); }
+  .ad-placeholder-sub code {
+    font-family: "Consolas", monospace; font-size: 10.5px;
+    background: #fff; padding: 0 4px; border-radius: 2px; border: 1px solid var(--line-soft);
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+  }
+  .panel-title {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--muted); margin: 0 0 10px;
+  }
+  .panel-title::before {
+    content: ""; width: 6px; height: 6px; background: var(--btn); border-radius: 1px;
+  }
+  .panel-title .right { margin-left: auto; font-size: 12px; font-weight: 600;
+                        color: var(--ink); letter-spacing: 0; text-transform: none; display: flex; gap: 6px; }
+
+  label {
+    display: flex; align-items: flex-end;
+    font-size: 12px; color: var(--ink-soft); font-weight: 700;
+    margin: 0 0 2px;
+    min-height: 32px; line-height: 1.25;
+  }
+  input, select {
+    width: 100%; height: 30px; padding: 4px 8px;
+    font-family: "Arial Narrow", Arial, sans-serif; font-size: 13.5px;
+    color: var(--ink); background: var(--panel-2);
+    border: 1px solid var(--line); border-radius: 2px;
+    outline: none; transition: border-color .12s, box-shadow .12s;
+    text-overflow: ellipsis;
+  }
+  /* Give native selects room for the arrow so long option text doesn't overlap it. */
+  select { padding-right: 26px; }
+  optgroup { font-weight: 700; color: var(--muted); font-style: normal; }
+  optgroup > option { font-weight: 400; color: var(--ink); }
+  input:focus, select:focus {
+    border-color: var(--btn);
+    box-shadow: 0 0 0 2px rgba(60, 64, 67, 0.2);
+    background: #fff;
+  }
+  input[readonly], input:disabled, select:disabled {
+    background: var(--bg-soft); color: var(--muted);
+  }
+  select { cursor: pointer; }
+
+  .row { display: grid; gap: 10px; margin-bottom: 10px; }
+  .row > div { display: flex; flex-direction: column; }
+  .row > div > :last-child { margin-top: auto; }
+  .row-2 { grid-template-columns: 1fr 1fr; }
+  .row-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .row-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+  .row-5 { grid-template-columns: repeat(5, 1fr); }
+  @media (max-width: 840px) {
+    .row-3, .row-4, .row-5 { grid-template-columns: 1fr 1fr; }
+  }
+
+  .btns { display: flex; gap: 8px; flex-wrap: wrap; }
+  button {
+    padding: 8px 14px; font-size: 12.5px; font-weight: 600;
+    border-radius: 2px; border: 1px solid transparent; cursor: pointer;
+    font-family: var(--sans); transition: background .1s, border-color .1s;
+  }
+  .btn-primary { background: var(--btn); color: var(--btn-ink); }
+  .btn-primary:hover { background: var(--btn-hover); }
+  .btn-ghost { background: var(--btn-ghost-bg); color: var(--ink); border-color: var(--line); }
+  .btn-ghost:hover { border-color: var(--btn); }
+  .btn-sm { padding: 4px 10px; font-size: 11.5px; }
+  .btn-xs { padding: 2px 8px; font-size: 11px; }
+  .btn-danger { background: #ffffff; color: var(--err-ink); border-color: var(--line); }
+  .btn-danger:hover { background: var(--err-bg); border-color: var(--err-ink); }
+  .btn-lg { padding: 10px 18px; font-size: 13px; }
+
+  /* Tabs */
+  .tabs-bar {
+    display: flex; align-items: stretch; gap: 2px;
+    border-bottom: 1px solid var(--line);
+    margin: -14px -16px 14px; padding: 0 10px;
+    background: var(--bg-soft);
+    flex-wrap: wrap;
+  }
+  .tab {
+    padding: 9px 14px; font-size: 12.5px; font-weight: 600;
+    background: var(--tab-bg); color: var(--ink);
+    border: 1px solid var(--line); border-bottom: 0;
+    border-top-left-radius: 4px; border-top-right-radius: 4px;
+    cursor: pointer; margin-top: 6px;
+    display: flex; align-items: center; gap: 8px;
+    max-width: 260px;
+  }
+  .tab:hover { background: #cbcfd4; }
+  .tab.active {
+    background: var(--tab-active-bg);
+    border-color: var(--line);
+    margin-bottom: -1px; padding-bottom: 10px;
+  }
+  .tab .tab-label {
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;
+  }
+  .tab .tab-close {
+    background: transparent; border: 0; color: var(--muted); font-size: 14px;
+    padding: 0 3px; cursor: pointer; font-weight: 700;
+  }
+  .tab .tab-close:hover { color: var(--err-ink); }
+  .tab-add {
+    padding: 9px 12px; font-size: 12.5px; font-weight: 600;
+    background: transparent; color: var(--muted); border: 1px dashed var(--line);
+    border-bottom: 0;
+    border-top-left-radius: 4px; border-top-right-radius: 4px;
+    cursor: pointer; margin-top: 6px;
+  }
+  .tab-add:hover { color: var(--ink); border-color: var(--btn); }
+
+  /* Tab header */
+  .tab-head {
+    display: flex; gap: 10px; align-items: end; margin-bottom: 8px;
+  }
+  .tab-head label { margin-top: 0; }
+  .tab-head input { font-weight: 600; }
+  .tab-head button { height: 30px; padding: 0 14px; }
+
+  /* Segment card */
+  .seg {
+    background: var(--panel-2); border: 1px solid var(--line);
+    border-radius: 3px; padding: 12px 14px; margin-bottom: 10px;
+  }
+  .seg-head {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px dashed var(--line-soft);
+  }
+  .seg-head .num {
+    display: inline-block; min-width: 22px; padding: 1px 6px; text-align: center;
+    background: var(--btn); color: var(--btn-ink); border-radius: 2px;
+    font-family: var(--mono); font-size: 11px; font-weight: 700; margin-right: 8px;
+  }
+  .seg-head .name-input { width: 260px; display: inline-block; }
+  .seg-result {
+    margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line-soft);
+    font-family: var(--mono); font-size: 12.5px;
+    display: flex; gap: 14px; flex-wrap: wrap; color: var(--ink-soft);
+  }
+  .seg-result b { color: var(--ink); }
+
+  /* Tab totals */
+  .total {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+  }
+  .total .cell {
+    background: var(--panel-2); border: 1px solid var(--line);
+    padding: 9px 11px; border-radius: 3px;
+  }
+  .total .cell .k {
+    font-size: 10.5px; color: var(--muted); font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .total .cell .v {
+    font-family: var(--mono); font-size: 17px; font-weight: 700; color: var(--ink);
+    margin-top: 3px;
+  }
+  .verdict {
+    margin-top: 10px; padding: 8px 11px; border-radius: 3px;
+    font-size: 12.5px; font-weight: 700; letter-spacing: 0.02em;
+    border: 1px solid transparent; font-family: var(--mono);
+  }
+  .verdict.ok   { background: var(--ok-bg);   color: var(--ok-ink);   border-color: #86b69a; }
+  .verdict.warn { background: var(--warn-bg); color: var(--warn-ink); border-color: #c99c3c; }
+  .verdict.err  { background: var(--err-bg);  color: var(--err-ink);  border-color: #b6605a; }
+
+  /* Overview table */
+  .overview table, .tests table {
+    width: 100%; border-collapse: collapse;
+    font-size: 12px; font-family: var(--mono);
+    background: var(--panel-2);
+  }
+  .overview th, .overview td, .tests th, .tests td {
+    padding: 7px 9px; border: 1px solid var(--line-soft);
+    text-align: left; vertical-align: top;
+  }
+  .overview th, .tests th {
+    color: var(--ink); font-weight: 700;
+    font-family: var(--sans); font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.05em;
+    background: var(--bg-soft); border-color: var(--line);
+  }
+  .overview .ok,   .tests .pass { color: var(--ok-ink); font-weight: 700; }
+  .overview .fail, .tests .fail { color: var(--err-ink); font-weight: 700; }
+
+  .formula {
+    font-family: var(--math); font-size: 14.5px; color: var(--ink);
+    background: var(--panel-2); padding: 8px 12px; border-radius: 2px;
+    border: 1px solid var(--line-soft); margin: 4px 0 8px;
+    text-align: center;
+  }
+
+  footer {
+    margin-top: 24px; padding-top: 14px; border-top: 1px solid var(--line);
+    color: var(--ink-soft); font-size: 12px;
+  }
+  footer a { color: var(--ink); text-decoration: underline; }
+  footer .disclaimer {
+    background: #f4e4c1; border: 1px solid #c99c3c;
+    color: #3a2e00; padding: 10px 14px; border-radius: 3px;
+    font-size: 12px; line-height: 1.5;
+  }
+  footer .foot-links {
+    margin-top: 10px; color: var(--muted);
+    display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+  }
+
+  .pill {
+    display: inline-block; padding: 1px 7px; border-radius: 10px;
+    font-size: 10.5px; font-weight: 600; letter-spacing: 0.03em;
+    background: var(--bg-soft); color: var(--muted); border: 1px solid var(--line-soft);
+  }
+  .hint { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .action-row {
+    display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="header-top">
+        <div class="header-left">
+          <div class="chips">
+            <span class="chip">Calculator #001</span>
+            <span class="chip">IEC 60364-5-52 (LV)</span>
+            <span class="chip">IEC 60502-2 (MV)</span>
+            <span class="chip">up to 33 kV</span>
+            <span class="chip">Multi-feeder</span>
+          </div>
+          <h1>Voltage Drop Calculator — LV &amp; MV up to 33 kV</h1>
+          <div class="sub">
+            Multi-feeder, multi-segment voltage drop per IEC 60364-5-52 Annex D (LV)
+            and IEC 60502-2 / IEC 60287 (MV, up to 33 kV inclusive).<br>
+            Segments can mix single-phase, three-phase, and DC on the same bus.
+            All computation runs in your browser &mdash; no data leaves the page.
+          </div>
+        </div>
+        <div class="header-right">
+          <div class="author-name">Developed by Eng. Evgenii Buchinskii</div>
+          <div class="author-email"><a href="mailto:buchinskii.evg@gmail.com">buchinskii.evg@gmail.com</a></div>
+          <div class="author-wa-hint">
+            Join the discussion —<br>
+            <a href="https://chat.whatsapp.com/JW3utOLN0J46EMWArIJsY8" target="_blank" rel="noopener">Electrical Designers Middle East</a>
+          </div>
+          <div class="author-links">
+            <a href="https://www.linkedin.com/in/evgenii-buchinskii-20351a2a6" target="_blank" rel="noopener" title="LinkedIn — Evgenii Buchinskii">
+              <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-label="LinkedIn"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+            </a>
+            <a href="https://chat.whatsapp.com/JW3utOLN0J46EMWArIJsY8" target="_blank" rel="noopener" title="WhatsApp group — Electrical Designers Middle East (tap to join)">
+              <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-label="WhatsApp"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
+            </a>
+          </div>
+        </div>
+      </div>
+      <div class="toolbar">
+        <button class="btn-primary" id="docxBtn">Download combined .docx report</button>
+        <button class="btn-ghost" id="calcBtn">Recalculate</button>
+        <span class="toolbar-spacer"></span>
+        <button class="btn-ghost" id="resetBtn">Reset project</button>
+      </div>
+
+      <!--
+        Advertising slots. Each container is a drop-in target for a banner
+        (728×90 leaderboard, 970×90 super-banner, or responsive HTML from an
+        ad network). To enable: replace the inner .ad-placeholder with the
+        ad network's script block (e.g. Google AdSense <ins> tag, affiliate
+        iframe, or a custom <img>/<a> pair). Do NOT remove the wrapping
+        .ad-slot container — layout depends on it.
+      -->
+      <div class="ad-row" aria-label="Advertisements">
+        <div class="ad-slot"
+             id="ad-slot-top-left"
+             data-ad-format="leaderboard"
+             data-ad-size="728x90"
+             data-ad-network=""
+             data-ad-unit="">
+          <div class="ad-placeholder">
+            <span class="ad-placeholder-title">Advertisement slot #1</span>
+            <span class="ad-placeholder-sub">728 × 90 leaderboard · replace <code>.ad-placeholder</code> with ad network code</span>
+          </div>
+        </div>
+        <div class="ad-slot"
+             id="ad-slot-top-right"
+             data-ad-format="leaderboard"
+             data-ad-size="728x90"
+             data-ad-network=""
+             data-ad-unit="">
+          <div class="ad-placeholder">
+            <span class="ad-placeholder-title">Advertisement slot #2</span>
+            <span class="ad-placeholder-sub">728 × 90 leaderboard · replace <code>.ad-placeholder</code> with ad network code</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="rule"></div>
+    </header>
+
+    <!-- Project Settings ------------------------------------------------- -->
+    <section class="panel">
+      <div class="panel-title">Project settings (applied to all feeders)</div>
+
+      <div class="row row-4">
+        <div>
+          <label>Region preset</label>
+          <select id="region">
+            <option value="uae">UAE (DEWA/ADDC) — 400/230 V, 50 Hz, 50 °C</option>
+            <option value="uae-et">UAE — tropical 45 °C</option>
+            <option value="ksa">KSA (SEC) — 400/230 V, 60 Hz, 45 °C</option>
+            <option value="qatar">Qatar (Kahramaa) — 415/240 V, 50 Hz, 50 °C</option>
+            <option value="kuwait">Kuwait (MEW) — 415/240 V, 50 Hz, 50 °C</option>
+            <option value="uk">United Kingdom — 400/230 V, 50 Hz, 30 °C</option>
+            <option value="eu">EU — 400/230 V, 50 Hz, 30 °C</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+        <div>
+          <label>System</label>
+          <select id="system">
+            <option value="3ph">Three-phase (line-to-line)</option>
+            <option value="1ph">Single-phase (phase-neutral)</option>
+            <option value="dc">DC</option>
+          </select>
+        </div>
+        <div>
+          <label>Nominal voltage U (IEC 60038 scale)</label>
+          <select id="U-std">
+            <option value="230">230 V (LV 1-ph)</option>
+            <option value="240">240 V (LV 1-ph, legacy)</option>
+            <option value="277">277 V (LV 1-ph, series II)</option>
+            <option value="400" selected>400 V (LV 3-ph, series I)</option>
+            <option value="415">415 V (LV 3-ph, legacy UK/GCC)</option>
+            <option value="480">480 V (LV 3-ph, series II)</option>
+            <option value="525">525 V</option>
+            <option value="600">600 V</option>
+            <option value="690">690 V (LV)</option>
+            <option value="1000">1000 V (LV limit)</option>
+            <option value="3300">3.3 kV (MV)</option>
+            <option value="6600">6.6 kV (MV)</option>
+            <option value="10000">10 kV (MV)</option>
+            <option value="11000">11 kV (MV)</option>
+            <option value="13800">13.8 kV (MV, series II)</option>
+            <option value="15000">15 kV (MV)</option>
+            <option value="20000">20 kV (MV)</option>
+            <option value="22000">22 kV (MV)</option>
+            <option value="33000">33 kV (MV)</option>
+            <option value="35000">35 kV (MV)</option>
+            <option value="custom">Custom…</option>
+          </select>
+        </div>
+        <div>
+          <label>Custom U, V</label>
+          <input id="U" type="number" value="400" step="1" disabled />
+        </div>
+      </div>
+
+      <div class="row row-4">
+        <div>
+          <label>Frequency, Hz</label>
+          <select id="freq">
+            <option value="50" selected>50 Hz</option>
+            <option value="60">60 Hz</option>
+            <option value="400">400 Hz (aviation)</option>
+          </select>
+        </div>
+        <div>
+          <label>Allowable limit ΔU%</label>
+          <select id="limit"></select>
+        </div>
+        <div>
+          <label>Ambient temperature θ<sub>a</sub>, °C</label>
+          <select id="ambient"></select>
+        </div>
+        <div>
+          <label>Conductor operating temp θ<sub>op</sub>, °C</label>
+          <select id="theta-op"></select>
+        </div>
+      </div>
+    </section>
+
+    <!-- Feeders (tabs) ---------------------------------------------------- -->
+    <section class="panel">
+      <div class="tabs-bar" id="tabsBar"></div>
+      <div id="tabContent"></div>
+    </section>
+
+    <!-- Glossary -->
+    <section class="panel">
+      <div class="panel-title">Glossary &amp; abbreviations</div>
+      <div id="glossaryBody" class="overview" style="overflow-x:auto"></div>
+      <div class="hint" style="margin-top:8px">
+        Input data schema is compatible with Calculator #002 (short-circuit IEC 60909):
+        identical field names for <code>U</code>, <code>freq</code>, <code>system</code>,
+        <code>region</code>, <code>segments/elements[].L</code>, <code>.series</code>,
+        <code>.S</code>, <code>.R_km</code>, <code>.X_km</code>, <code>.material</code>,
+        <code>.n_parallel</code>, <code>.theta_ref_R</code>. Future calculators in the
+        series will follow the same contract.
+      </div>
+    </section>
+
+    <!-- Validation tests -------------------------------------------------- -->
+    <section class="panel tests">
+      <div class="panel-title">Built-in validation tests</div>
+      <table>
+        <thead>
+          <tr>
+            <th>#</th><th>Case</th><th>Method</th>
+            <th>Expected ΔU%</th><th>Computed</th><th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="testBody"></tbody>
+      </table>
+      <div class="hint" style="margin-top:8px">
+        Reference values cross-checked with Schneider Electric Electrical Installation
+        Guide (chapter G), ABB Electrical Installation Handbook, and IEC 60228 α values.
+      </div>
+    </section>
+
+    <footer>
+      <div class="disclaimer">
+        <strong>Disclaimer.</strong> This calculator is provided “as is” for
+        educational and preliminary design purposes only. The author,
+        Eng. Evgenii Buchinskii, bears no responsibility, liability or warranty
+        of any kind (express or implied) for decisions made based on its output.
+        Before using the generated report, verify every input, formula,
+        intermediate value and final result against the applicable standard and
+        project-specific conditions. Final designs must be checked and signed
+        off by a qualified engineer.
+      </div>
+    </footer>
+  </div>
+
+<!-- Shared datalists ------------------------------------------------------ -->
+<datalist id="std-I">
+  <option value="6"/><option value="10"/><option value="13"/><option value="16"/>
+  <option value="20"/><option value="25"/><option value="32"/><option value="40"/>
+  <option value="50"/><option value="63"/><option value="80"/><option value="100"/>
+  <option value="125"/><option value="160"/><option value="200"/><option value="250"/>
+  <option value="315"/><option value="400"/><option value="500"/><option value="630"/>
+  <option value="800"/><option value="1000"/><option value="1250"/><option value="1600"/>
+  <option value="2000"/><option value="2500"/><option value="3200"/>
+</datalist>
+<datalist id="std-PF">
+  <option value="0.70"/><option value="0.75"/><option value="0.80"/><option value="0.85"/>
+  <option value="0.90"/><option value="0.95"/><option value="0.98"/><option value="1.00"/>
+</datalist>
+
+<script src="https://unpkg.com/docx@8.5.0/build/index.umd.js"></script>
+<script src="https://unpkg.com/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+<script>
+"use strict";
+
+// ============================================================================
+// CONSTANTS — standard values and physics
+// ============================================================================
+
+// IEC 60228 preferred cross-sections (mm²)
+const STD_S = [0.5, 0.75, 1, 1.5, 2.5, 4, 6, 10, 16, 25, 35, 50, 70, 95, 120,
+               150, 185, 240, 300, 400, 500, 630, 800, 1000];
+
+// Standard MCB / MCCB ratings (A)
+const STD_I = [6, 10, 13, 16, 20, 25, 32, 40, 50, 63, 80, 100, 125, 160, 200,
+               250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3200];
+
+// Standard power factors
+const STD_PF = [0.70, 0.75, 0.80, 0.85, 0.90, 0.95, 0.98, 1.00];
+
+// Voltage drop limits: 0.5..5.0 step 0.5, then 6..15 step 1
+const STD_LIMIT = [];
+for (let v = 0.5; v <= 5.0 + 1e-9; v += 0.5) STD_LIMIT.push(+v.toFixed(1));
+for (let v = 6;   v <= 15;           v += 1)   STD_LIMIT.push(v);
+
+// Ambient temperatures: -50..+50 step 5
+const STD_AMBIENT = [];
+for (let t = -50; t <= 50; t += 5) STD_AMBIENT.push(t);
+
+// Conductor operating temperatures: 0..200 step 5 (covers HTLS conductors)
+const STD_THETA = [];
+for (let t = 0; t <= 200; t += 5) STD_THETA.push(t);
+
+// Temperature coefficients (per °C) — IEC 60228
+const ALPHA = { cu: 0.00393, al: 0.00403 };
+
+// IEC 60364-5-52 Annex D resistivity at operating temperature (mΩ·mm²/m)
+const RHO_IEC = { cu: 22.5, al: 36.0 };
+
+// ============================================================================
+// CABLE LIBRARY
+// R_θ (Ω/km) at declared operating temperature, X (Ω/km), Iz (A) informative.
+// Compiled from BS 5467 / BS 7889 / BS 6004, Prysmian / Ducab LV tables.
+// ============================================================================
+
+const CABLE_DB = {
+  // --- Low-voltage insulated cables (0.6/1 kV, Uo/U) -------------------
+  "LV 0.6/1 kV — Cu / XLPE / SWA / PVC (BS 5467, multicore)": {
+    material: "cu", insulation: "xlpe", theta_op: 90,
+    1.5:  [15.43, 0.107,  23], 2.5:  [ 9.44, 0.101,  31],
+    4:    [ 5.88, 0.098,  40], 6:    [ 3.93, 0.092,  51],
+    10:   [ 2.33, 0.086,  70], 16:   [ 1.47, 0.082,  94],
+    25:   [ 0.927, 0.075, 123], 35:  [ 0.668, 0.072, 151],
+    50:   [ 0.494, 0.069, 182], 70:  [ 0.342, 0.068, 231],
+    95:   [ 0.247, 0.065, 280], 120: [ 0.195, 0.065, 324],
+    150:  [ 0.158, 0.065, 371], 185: [ 0.126, 0.065, 424],
+    240:  [ 0.0963, 0.064, 500], 300: [ 0.0767, 0.064, 576],
+    400:  [ 0.0614, 0.065, 656],
+  },
+  "LV 0.6/1 kV — Cu / XLPE / LSZH (BS 7889, unarmoured multicore)": {
+    material: "cu", insulation: "xlpe", theta_op: 90,
+    1.5:  [15.43, 0.110,  19], 2.5:  [ 9.44, 0.106,  26],
+    4:    [ 5.88, 0.102,  35], 6:    [ 3.93, 0.097,  45],
+    10:   [ 2.33, 0.091,  63], 16:   [ 1.47, 0.086,  85],
+    25:   [ 0.927, 0.082, 112], 35:  [ 0.668, 0.079, 138],
+    50:   [ 0.494, 0.076, 168], 70:  [ 0.342, 0.074, 213],
+    95:   [ 0.247, 0.072, 258], 120: [ 0.195, 0.070, 299],
+    150:  [ 0.158, 0.070, 344], 185: [ 0.126, 0.069, 392],
+    240:  [ 0.0963, 0.068, 461], 300: [ 0.0767, 0.068, 530],
+  },
+  "LV 0.6/1 kV — Cu / PVC / PVC (BS 6004, NYM-type)": {
+    material: "cu", insulation: "pvc", theta_op: 70,
+    1.5:  [14.48, 0.110,  17], 2.5:  [ 8.87, 0.106,  23],
+    4:    [ 5.52, 0.102,  30], 6:    [ 3.69, 0.097,  38],
+    10:   [ 2.19, 0.091,  52], 16:   [ 1.38, 0.086,  69],
+    25:   [ 0.870, 0.082,  91], 35:  [ 0.627, 0.079, 112],
+    50:   [ 0.463, 0.076, 135], 70:  [ 0.321, 0.074, 171],
+    95:   [ 0.232, 0.072, 207], 120: [ 0.183, 0.070, 239],
+    150:  [ 0.148, 0.070, 275], 185: [ 0.118, 0.069, 314],
+    240:  [ 0.0905, 0.068, 369], 300: [ 0.0720, 0.068, 424],
+  },
+  "LV 0.6/1 kV — Al / XLPE / SWA / PVC (BS 5467, multicore)": {
+    material: "al", insulation: "xlpe", theta_op: 90,
+    16:   [ 2.43, 0.086,  73], 25:  [ 1.53, 0.077,  97],
+    35:   [ 1.11, 0.074, 120], 50:  [ 0.818, 0.071, 146],
+    70:   [ 0.565, 0.068, 186], 95:  [ 0.408, 0.066, 226],
+    120:  [ 0.323, 0.064, 261], 150: [ 0.263, 0.064, 299],
+    185:  [ 0.210, 0.064, 341], 240: [ 0.160, 0.063, 403],
+    300:  [ 0.128, 0.063, 464], 400: [ 0.102, 0.063, 529],
+    500:  [ 0.0823, 0.063, 602], 630: [ 0.0649, 0.063, 684],
+  },
+  // --- Medium-voltage cables (IEC 60502-2) -----------------------------
+  "MV 6/10 kV — Cu / XLPE single-core (IEC 60502-2)": {
+    material: "cu", insulation: "xlpe", theta_op: 90,
+    50:   [0.494, 0.158, 265], 70:  [0.342, 0.150, 325],
+    95:   [0.247, 0.142, 390], 120: [0.195, 0.136, 445],
+    150:  [0.158, 0.131, 500], 185: [0.126, 0.125, 565],
+    240:  [0.0964, 0.120, 655], 300: [0.0767, 0.116, 745],
+    400:  [0.0614, 0.112, 840], 500: [0.0493, 0.108, 950],
+    630:  [0.0391, 0.105, 1070],
+  },
+  "MV 6/10 kV — Al / XLPE single-core (IEC 60502-2)": {
+    material: "al", insulation: "xlpe", theta_op: 90,
+    50:   [0.822, 0.158, 205], 70:  [0.568, 0.150, 250],
+    95:   [0.411, 0.142, 301], 120: [0.325, 0.136, 343],
+    150:  [0.265, 0.131, 388], 185: [0.211, 0.125, 440],
+    240:  [0.161, 0.120, 514], 300: [0.129, 0.116, 583],
+    400:  [0.102, 0.112, 666], 500: [0.0822, 0.108, 759],
+    630:  [0.0649, 0.105, 860],
+  },
+  "MV 12/20 kV — Cu / XLPE single-core (IEC 60502-2)": {
+    material: "cu", insulation: "xlpe", theta_op: 90,
+    50:   [0.494, 0.172, 260], 70:  [0.342, 0.164, 320],
+    95:   [0.247, 0.156, 385], 120: [0.195, 0.150, 440],
+    150:  [0.158, 0.144, 495], 185: [0.126, 0.138, 560],
+    240:  [0.0964, 0.132, 650], 300: [0.0767, 0.128, 740],
+    400:  [0.0614, 0.123, 835], 500: [0.0493, 0.119, 945],
+    630:  [0.0391, 0.116, 1060],
+  },
+  "MV 12/20 kV — Al / XLPE single-core (IEC 60502-2)": {
+    material: "al", insulation: "xlpe", theta_op: 90,
+    50:   [0.822, 0.172, 200], 70:  [0.568, 0.164, 245],
+    95:   [0.411, 0.156, 295], 120: [0.325, 0.150, 338],
+    150:  [0.265, 0.144, 383], 185: [0.211, 0.138, 435],
+    240:  [0.161, 0.132, 508], 300: [0.129, 0.128, 577],
+    400:  [0.102, 0.123, 660], 500: [0.0822, 0.119, 752],
+    630:  [0.0649, 0.116, 853],
+  },
+  "MV 18/30 kV — Cu / XLPE single-core (IEC 60502-2, up to 33 kV)": {
+    material: "cu", insulation: "xlpe", theta_op: 90,
+    50:   [0.494, 0.186, 255], 70:  [0.342, 0.178, 315],
+    95:   [0.247, 0.170, 378], 120: [0.195, 0.163, 432],
+    150:  [0.158, 0.156, 487], 185: [0.126, 0.150, 550],
+    240:  [0.0964, 0.145, 640], 300: [0.0767, 0.140, 727],
+    400:  [0.0614, 0.137, 822], 500: [0.0493, 0.132, 930],
+    630:  [0.0391, 0.129, 1045],
+  },
+  "MV 18/30 kV — Al / XLPE single-core (IEC 60502-2, up to 33 kV)": {
+    material: "al", insulation: "xlpe", theta_op: 90,
+    50:   [0.822, 0.186, 198], 70:  [0.568, 0.178, 242],
+    95:   [0.411, 0.170, 293], 120: [0.325, 0.163, 335],
+    150:  [0.265, 0.156, 380], 185: [0.211, 0.150, 432],
+    240:  [0.161, 0.145, 503], 300: [0.129, 0.140, 571],
+    400:  [0.102, 0.137, 654], 500: [0.0822, 0.132, 744],
+    630:  [0.0649, 0.129, 845],
+  },
+
+  // --- Insulated self-supporting aerial bundled (СИП / ABC) ------------
+  "LV 0.6/1 kV — ABC aerial bundled cable (IEC 62219)": {
+    material: "al", insulation: "xlpe", theta_op: 90,
+    16:  [ 1.91,  0.100,  82], 25:  [ 1.20,  0.098, 105],
+    35:  [ 0.868, 0.097, 130], 50:  [ 0.641, 0.095, 160],
+    70:  [ 0.443, 0.093, 200], 95:  [ 0.320, 0.092, 245],
+    120: [ 0.253, 0.091, 285], 150: [ 0.206, 0.090, 325],
+  },
+
+  // --- Bare overhead conductors (неизолированные) ----------------------
+  // X values are typical for distribution geometry; adjust for actual spacing.
+  "LV/MV — AAC bare overhead, all-aluminium (IEC 61089 AL1)": {
+    material: "al", insulation: "none", theta_op: 75,
+    16:  [ 1.91,  0.380, 110], 25:  [ 1.20,  0.370, 145],
+    35:  [ 0.868, 0.360, 180], 50:  [ 0.641, 0.350, 220],
+    70:  [ 0.443, 0.340, 275], 95:  [ 0.320, 0.335, 335],
+    120: [ 0.253, 0.330, 385], 150: [ 0.206, 0.325, 440],
+    185: [ 0.164, 0.320, 500], 240: [ 0.125, 0.315, 590],
+    300: [ 0.100, 0.310, 680], 400: [ 0.0778, 0.305, 810],
+    500: [ 0.0605, 0.300, 935], 630: [ 0.0469, 0.295, 1080],
+  },
+  "LV/MV — AAAC bare overhead, Al-alloy (IEC 61089 AL2/AL3)": {
+    material: "al", insulation: "none", theta_op: 80,
+    16:  [ 2.15,  0.380, 105], 25:  [ 1.35,  0.370, 135],
+    35:  [ 0.975, 0.360, 170], 50:  [ 0.720, 0.350, 210],
+    70:  [ 0.498, 0.340, 265], 95:  [ 0.360, 0.335, 320],
+    120: [ 0.285, 0.330, 365], 150: [ 0.231, 0.325, 420],
+    185: [ 0.184, 0.320, 475], 240: [ 0.140, 0.315, 560],
+    300: [ 0.113, 0.310, 650], 400: [ 0.0874, 0.305, 775],
+    500: [ 0.0680, 0.300, 895], 630: [ 0.0527, 0.295, 1030],
+  },
+  "LV/MV/HV — ACSR bare overhead, Al with steel core (IEC 61089)": {
+    material: "al", insulation: "none", theta_op: 75,
+    25:  [ 1.28,  0.374, 150], 35:  [ 0.901, 0.365, 185],
+    50:  [ 0.658, 0.353, 230], 70:  [ 0.444, 0.343, 290],
+    95:  [ 0.330, 0.335, 350], 120: [ 0.261, 0.330, 400],
+    150: [ 0.212, 0.324, 460], 185: [ 0.170, 0.319, 525],
+    240: [ 0.128, 0.314, 625], 300: [ 0.105, 0.309, 720],
+    400: [ 0.0770, 0.304, 870], 500: [ 0.0620, 0.299, 1000],
+    630: [ 0.0490, 0.294, 1150],
+  },
+  "LV — Cu bare overhead, legacy (IEC 61089 CU)": {
+    material: "cu", insulation: "none", theta_op: 75,
+    10:  [ 2.19,  0.380,  85], 16:  [ 1.38,  0.375, 120],
+    25:  [ 0.870, 0.370, 160], 35:  [ 0.627, 0.360, 200],
+    50:  [ 0.463, 0.350, 245], 70:  [ 0.321, 0.340, 310],
+    95:  [ 0.232, 0.335, 380], 120: [ 0.183, 0.330, 440],
+    150: [ 0.148, 0.325, 505],
+  },
+
+  // --- High-temperature overhead (HTLS) --------------------------------
+  // R given at declared operating temperature (e.g. 180 °C for ACSS).
+  "HV — HTLS ACSS, high-temperature low-sag (up to 200 °C)": {
+    material: "al", insulation: "none", theta_op: 180,
+    120: [ 0.376, 0.330,  650], 150: [ 0.305, 0.325,  745],
+    185: [ 0.245, 0.320,  860], 240: [ 0.185, 0.314, 1020],
+    300: [ 0.152, 0.309, 1175], 400: [ 0.111, 0.304, 1420],
+    500: [ 0.0900, 0.299, 1615], 630: [ 0.0720, 0.294, 1850],
+  },
+  "HV — HTLS TACSR, thermal-resistant Al alloy (up to 150 °C)": {
+    material: "al", insulation: "none", theta_op: 150,
+    95:  [ 0.363, 0.335,  480], 120: [ 0.287, 0.330,  555],
+    150: [ 0.233, 0.324,  640], 185: [ 0.187, 0.319,  735],
+    240: [ 0.141, 0.314,  865], 300: [ 0.115, 0.309, 1000],
+    400: [ 0.0847, 0.304, 1200], 500: [ 0.0682, 0.299, 1380],
+    630: [ 0.0540, 0.294, 1580],
+  },
+
+  "Manual — any voltage class (enter R and X directly)": { manual: true },
+};
+
+// ============================================================================
+// REGION PRESETS
+// ============================================================================
+
+const REGIONS = {
+  "uae":    { U: 400, freq: 50, ambient: 50, limit: 5, system: "3ph", theta: 90 },
+  "uae-et": { U: 400, freq: 50, ambient: 45, limit: 5, system: "3ph", theta: 90 },
+  "ksa":    { U: 400, freq: 60, ambient: 45, limit: 5, system: "3ph", theta: 90 },
+  "qatar":  { U: 415, freq: 50, ambient: 50, limit: 5, system: "3ph", theta: 90 },
+  "kuwait": { U: 415, freq: 50, ambient: 50, limit: 5, system: "3ph", theta: 90 },
+  "uk":     { U: 400, freq: 50, ambient: 30, limit: 5, system: "3ph", theta: 70 },
+  "eu":     { U: 400, freq: 50, ambient: 30, limit: 5, system: "3ph", theta: 70 },
+  "custom": null,
+};
+
+function labelRegion(code) {
+  return {
+    "uae":    "UAE (DEWA/ADDC)",
+    "uae-et": "UAE — tropical 45 °C",
+    "ksa":    "Saudi Arabia (SEC)",
+    "qatar":  "Qatar (Kahramaa)",
+    "kuwait": "Kuwait (MEW)",
+    "uk":     "United Kingdom",
+    "eu":     "European Union",
+    "custom": "Custom",
+  }[code] || code;
+}
+
+// ============================================================================
+// CALCULATION
+// ============================================================================
+
+function correctR(R_at_theta, from_theta, to_theta, material) {
+  const a = ALPHA[material] || ALPHA.cu;
+  const num = 1 + a * (to_theta - 20);
+  const den = 1 + a * (from_theta - 20);
+  return R_at_theta * num / den;
+}
+
+function effectiveSystem(seg, globals) { return seg.system || globals.system; }
+function effectiveU(seg, globals)      { return seg.U || globals.U; }
+
+function computeSegment(seg, globals) {
+  const mat  = seg.material || "cu";
+  const sys  = effectiveSystem(seg, globals);
+  const U    = effectiveU(seg, globals);
+  const nP   = Math.max(1, Math.round(seg.n_parallel || 1));
+  const R_kmT = correctR(seg.R_km, seg.theta_ref_R || 20, globals.theta_op, mat);
+  const X_km  = seg.X_km;
+  // Parallel conductors: impedance per phase reduced by 1/n
+  const R_mO  = (R_kmT * seg.L) / nP;
+  const X_mO  = (X_km  * seg.L) / nP;
+  const sinp  = Math.sqrt(Math.max(0, 1 - seg.cosphi * seg.cosphi));
+  const b     = sys === "3ph" ? Math.sqrt(3) : 2;          // 1ph / DC both use b=2
+  const dU_mV = b * seg.I * (R_mO * seg.cosphi + (sys === "dc" ? 0 : X_mO) * sinp);
+  const dU    = dU_mV / 1000;
+  const dU_pct = (dU / U) * 100;
+  return { R_mO, X_mO, sinp, b, dU, dU_pct, R_kmT, sys, U, nP };
+}
+
+function computeFeeder(tab, globals) {
+  const segResults = tab.segments.map(s => computeSegment(s, globals));
+  const dU_total = segResults.reduce((a, r) => a + r.dU, 0);
+  // Percentage is summed per segment (each relative to its own voltage),
+  // which is the correct aggregation when voltage changes across the chain.
+  const dU_pct   = segResults.reduce((a, r) => a + r.dU_pct, 0);
+  // Source voltage shown = the first segment's U if set, else globals.U
+  const U_src    = (tab.segments[0] && tab.segments[0].U) || globals.U;
+  // Voltage at load = last segment's U minus drop in the last segment
+  // (approximation — only meaningful for uniform-voltage chains)
+  const last = tab.segments[tab.segments.length - 1];
+  const lastR = segResults[segResults.length - 1];
+  const U_last = (last && last.U) || globals.U;
+  const U_load = U_last - (lastR ? lastR.dU : 0);
+  return { segResults, dU_total, dU_pct, U_src, U_load };
+}
+
+function computeProject(state) {
+  const globals = {
+    U: state.U, freq: state.freq, ambient: state.ambient,
+    theta_op: state.theta_op, system: state.system, limit: state.limit,
+  };
+  const feeders = state.tabs.map(t => ({ tab: t, ...computeFeeder(t, globals) }));
+  return { globals, feeders };
+}
+
+// ============================================================================
+// STATE
+// ============================================================================
+
+let state, nextTabId, nextSegId;
+
+function makeSegment(name, L, series, S, cosphi, I) {
+  const cable = CABLE_DB[series];
+  const row = cable && !cable.manual ? cable[S] : null;
+  return {
+    id: nextSegId++, name, L, series, S,
+    material: cable && !cable.manual ? cable.material : "cu",
+    R_km: row ? row[0] : 0.342,
+    X_km: row ? row[1] : 0.068,
+    Iz:   row ? row[2] : null,
+    theta_ref_R: cable && !cable.manual ? cable.theta_op : 20,
+    cosphi, I, manualRX: !cable || cable.manual,
+    n_parallel: 1,
+  };
+}
+
+function makeDefaultFeeder(name = "Feeder") {
+  return {
+    id: nextTabId++,
+    name,
+    segments: [
+      makeSegment("Main feeder", 50, "LV 0.6/1 kV — Cu / XLPE / SWA / PVC (BS 5467, multicore)", 70, 0.80, 200),
+    ],
+  };
+}
+
+function initState() {
+  nextTabId = 1; nextSegId = 1;
+  state = {
+    region: "uae", system: "3ph", U: 400, freq: 50, limit: 5,
+    ambient: 50, theta_op: 90,
+    tabs: [
+      makeDefaultFeeder("Feeder 1 — Main LV panel"),
+    ],
+    activeTab: "overview",
+  };
+}
+
+// ============================================================================
+// TABS UI
+// ============================================================================
+
+function renderTabs() {
+  const bar = document.getElementById("tabsBar");
+  bar.innerHTML = "";
+
+  // Overview tab — always first, never closeable
+  const ov = document.createElement("button");
+  ov.className = "tab" + (state.activeTab === "overview" ? " active" : "");
+  ov.innerHTML = `<span class="tab-label">Overview</span>`;
+  ov.addEventListener("click", () => { state.activeTab = "overview"; renderTabs(); renderTabContent(); });
+  bar.appendChild(ov);
+
+  state.tabs.forEach(t => {
+    const btn = document.createElement("button");
+    btn.className = "tab" + (t.id === state.activeTab ? " active" : "");
+    btn.dataset.id = t.id;
+    btn.innerHTML = `<span class="tab-label" title="${escapeHtml(t.name)}">${escapeHtml(t.name)}</span>
+                     <span class="tab-close" title="Remove feeder">&times;</span>`;
+    btn.addEventListener("click", e => {
+      if (e.target.classList.contains("tab-close")) return;
+      state.activeTab = t.id;
+      renderTabs(); renderTabContent();
+    });
+    btn.querySelector(".tab-close").addEventListener("click", e => {
+      e.stopPropagation();
+      removeTab(t.id);
+    });
+    bar.appendChild(btn);
+  });
+  const add = document.createElement("button");
+  add.className = "tab-add";
+  add.textContent = "+ New feeder";
+  add.addEventListener("click", addTab);
+  bar.appendChild(add);
+}
+
+function addTab() {
+  const next = makeDefaultFeeder(`Feeder ${state.tabs.length + 1}`);
+  state.tabs.push(next);
+  state.activeTab = next.id;
+  renderAll();
+}
+
+function duplicateTab(id) {
+  const src = state.tabs.find(t => t.id === id);
+  if (!src) return;
+  const clone = JSON.parse(JSON.stringify(src));
+  clone.id = nextTabId++;
+  clone.name = src.name + " (copy)";
+  clone.segments = clone.segments.map(s => ({ ...s, id: nextSegId++ }));
+  const idx = state.tabs.findIndex(t => t.id === id);
+  state.tabs.splice(idx + 1, 0, clone);
+  state.activeTab = clone.id;
+  renderAll();
+}
+
+function removeTab(id) {
+  if (state.tabs.length <= 1) return; // keep at least one
+  const idx = state.tabs.findIndex(t => t.id === id);
+  if (idx < 0) return;
+  state.tabs.splice(idx, 1);
+  if (state.activeTab === id) state.activeTab = "overview";
+  renderAll();
+}
+
+// ============================================================================
+// ACTIVE TAB CONTENT (feeder editor)
+// ============================================================================
+
+function renderTabContent() {
+  const host = document.getElementById("tabContent");
+
+  if (state.activeTab === "overview") {
+    host.innerHTML = `
+      <div class="panel-title" style="margin-top:6px">Project overview — all feeders</div>
+      <div class="overview">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th><th>Feeder</th><th>Segments</th>
+              <th>Total ΔU, V</th><th>Total ΔU%</th><th>Limit</th><th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="overviewBody"></tbody>
+        </table>
+      </div>
+      <div class="hint" style="margin-top:8px">
+        Use the feeder tabs above to edit each connection. The Word report (top toolbar)
+        includes project settings, per-feeder summary, and a step-by-step calculation
+        for every segment.
+      </div>
+    `;
+    renderOverview();
+    return;
+  }
+
+  const tab = state.tabs.find(t => t.id === state.activeTab);
+  if (!tab) { host.innerHTML = ""; return; }
+  host.innerHTML = `
+    <div class="tab-head">
+      <div style="flex:1">
+        <label>Feeder name</label>
+        <input id="tabName" value="${escapeHtml(tab.name)}" />
+      </div>
+      <div>
+        <button class="btn-ghost btn-sm" id="dupTab" title="Duplicate this feeder with all its segments">⎘ Duplicate feeder</button>
+      </div>
+      <div>
+        <button class="btn-ghost btn-sm" id="addSeg">+ Add element</button>
+      </div>
+    </div>
+    <div id="segments"></div>
+
+    <div class="formula">
+      ΔU<sub>seg</sub> = b · I · ( R · cos φ + X · sin φ ) &nbsp;|&nbsp;
+      ΔU<sub>feeder</sub> = Σ ΔU<sub>seg</sub>
+    </div>
+
+    <div class="total" id="tabTotal"></div>
+    <div class="verdict ok" id="tabVerdict" style="display:none"></div>
+  `;
+  document.getElementById("tabName").addEventListener("input", e => {
+    tab.name = e.target.value;
+    renderTabs();
+  });
+  document.getElementById("dupTab").addEventListener("click", () => duplicateTab(tab.id));
+  document.getElementById("addSeg").addEventListener("click", () => {
+    tab.segments.push(makeSegment(`Segment ${tab.segments.length + 1}`, 20,
+      "LV 0.6/1 kV — Cu / XLPE / SWA / PVC (BS 5467, multicore)",25, 0.85, 80));
+    renderSegments();
+    renderTabTotals();
+  });
+  renderSegments();
+  renderTabTotals();
+}
+
+function renderSegments() {
+  const tab = state.tabs.find(t => t.id === state.activeTab);
+  const host = document.getElementById("segments");
+  host.innerHTML = "";
+  tab.segments.forEach((seg, idx) => host.appendChild(renderSegment(tab, seg, idx)));
+}
+
+function renderSegment(tab, seg, idx) {
+  const wrap = document.createElement("div");
+  wrap.className = "seg";
+
+  // Group cable series into CABLE (insulated) / OHL (bare + HTLS) / OTHER
+  const groups = { CABLE: [], OHL: [], OTHER: [] };
+  Object.keys(CABLE_DB).forEach(k => {
+    if (k.startsWith("Manual")) groups.OTHER.push(k);
+    else if (k.includes("bare overhead") || k.includes("HTLS")) groups.OHL.push(k);
+    else groups.CABLE.push(k);
+  });
+  const seriesOptions = Object.entries(groups)
+    .filter(([_, items]) => items.length > 0)
+    .map(([label, items]) => `<optgroup label="${label}">${
+      items.map(k => `<option value="${escapeHtml(k)}" ${k === seg.series ? "selected" : ""}>${escapeHtml(k)}</option>`).join("")
+    }</optgroup>`)
+    .join("");
+
+  // S options — from cable library if available, else IEC 60228
+  const cable = CABLE_DB[seg.series];
+  const libSizes = cable && !cable.manual
+    ? Object.keys(cable).filter(k => !isNaN(Number(k))).map(Number).sort((a,b) => a-b)
+    : null;
+  const sizeList = libSizes || STD_S;
+  const sOptions = sizeList.map(s =>
+    `<option value="${s}" ${Number(s) === Number(seg.S) ? "selected" : ""}>${s}</option>`).join("");
+
+  wrap.innerHTML = `
+    <div class="seg-head">
+      <div>
+        <span class="num">${idx + 1}</span>
+        <input class="name-input" data-f="name" value="${escapeHtml(seg.name)}" placeholder="Element name" />
+      </div>
+      <div>
+        <button class="btn-ghost btn-xs" data-act="up"   ${idx === 0 ? "disabled" : ""}>↑</button>
+        <button class="btn-ghost btn-xs" data-act="down" ${idx === tab.segments.length - 1 ? "disabled" : ""}>↓</button>
+        <button class="btn-danger btn-xs" data-act="del">Remove</button>
+      </div>
+    </div>
+
+    <div class="row row-4">
+      <div>
+        <label>Cable series</label>
+        <select data-f="series">${seriesOptions}</select>
+      </div>
+      <div>
+        <label>Pick standard S, mm² (IEC 60228)</label>
+        <select data-f="S_pick">
+          <option value="">— pick from list —</option>
+          ${sOptions}
+        </select>
+      </div>
+      <div>
+        <label>Cross-section S, mm² (editable)</label>
+        <input data-f="S" type="number" step="0.1" min="0" value="${seg.S}" />
+      </div>
+      <div>
+        <label>Length L, m</label>
+        <input data-f="L" type="number" step="0.1" min="0" value="${seg.L}" />
+      </div>
+    </div>
+
+    <div class="row row-4">
+      <div>
+        <label>Material</label>
+        <select data-f="material" ${cable && !cable.manual ? "disabled" : ""}>
+          <option value="cu" ${seg.material === "cu" ? "selected" : ""}>Copper</option>
+          <option value="al" ${seg.material === "al" ? "selected" : ""}>Aluminium</option>
+        </select>
+      </div>
+      <div>
+        <label>R at θ<sub>ref</sub>, Ω/km <span class="pill">${seg.theta_ref_R} °C</span></label>
+        <input data-f="R_km" type="number" step="0.0001" value="${seg.R_km}" ${seg.manualRX ? "" : "readonly"} />
+      </div>
+      <div>
+        <label>X, Ω/km</label>
+        <input data-f="X_km" type="number" step="0.001" value="${seg.X_km}" ${seg.manualRX ? "" : "readonly"} />
+      </div>
+      <div>
+        <label>R/X override</label>
+        <select data-f="manualRX">
+          <option value="false" ${seg.manualRX ? "" : "selected"}>Use library values</option>
+          <option value="true"  ${seg.manualRX ? "selected" : ""}>Manual entry</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row row-4">
+      <div>
+        <label>Power factor cos φ</label>
+        <input data-f="cosphi" type="number" list="std-PF" step="0.01" min="0" max="1" value="${seg.cosphi}" />
+      </div>
+      <div>
+        <label>Design current I, A</label>
+        <input data-f="I" type="number" list="std-I" step="0.1" min="0" value="${seg.I}" />
+      </div>
+      <div>
+        <label>Parallel conductors n</label>
+        <input data-f="n_parallel" type="number" step="1" min="1" value="${seg.n_parallel || 1}" />
+      </div>
+      <div>
+        <label>Ampacity total (n · Iz), A</label>
+        <input type="text" value="${seg.Iz ? ((seg.n_parallel || 1) * seg.Iz) : '—'}" readonly />
+      </div>
+    </div>
+
+    <div class="row row-4">
+      <div>
+        <label>System for this segment</label>
+        <select data-f="system">
+          <option value=""    ${!seg.system ? "selected" : ""}>Inherit from project (${state.system})</option>
+          <option value="3ph" ${seg.system === "3ph" ? "selected" : ""}>Three-phase (line-to-line)</option>
+          <option value="1ph" ${seg.system === "1ph" ? "selected" : ""}>Single-phase (phase-neutral)</option>
+          <option value="dc"  ${seg.system === "dc"  ? "selected" : ""}>DC</option>
+        </select>
+      </div>
+      <div>
+        <label>Voltage U for this segment</label>
+        <select data-f="U_pick">
+          <option value=""       ${!seg.U ? "selected" : ""}>Inherit from project (${state.U} V)</option>
+          <option value="230"    ${seg.U == 230    ? "selected" : ""}>230 V (LV 1-ph)</option>
+          <option value="400"    ${seg.U == 400    ? "selected" : ""}>400 V (LV 3-ph)</option>
+          <option value="415"    ${seg.U == 415    ? "selected" : ""}>415 V (LV 3-ph GCC)</option>
+          <option value="690"    ${seg.U == 690    ? "selected" : ""}>690 V (LV)</option>
+          <option value="3300"   ${seg.U == 3300   ? "selected" : ""}>3.3 kV (MV)</option>
+          <option value="6600"   ${seg.U == 6600   ? "selected" : ""}>6.6 kV (MV)</option>
+          <option value="11000"  ${seg.U == 11000  ? "selected" : ""}>11 kV (MV)</option>
+          <option value="22000"  ${seg.U == 22000  ? "selected" : ""}>22 kV (MV)</option>
+          <option value="33000"  ${seg.U == 33000  ? "selected" : ""}>33 kV (MV)</option>
+          <option value="custom" ${seg.U && ![230,400,415,690,3300,6600,11000,22000,33000].includes(Number(seg.U)) ? "selected" : ""}>Custom…</option>
+        </select>
+      </div>
+      <div>
+        <label>Custom U, V</label>
+        <input data-f="U_custom" type="number" step="1" min="0" value="${seg.U || ""}" placeholder="(inherit)" />
+      </div>
+      <div>
+        <label>Effective b · U for this segment</label>
+        <input type="text" readonly value="b = ${(seg.system || state.system) === '3ph' ? '√3' : '2'}, U = ${seg.U || state.U} V" />
+      </div>
+    </div>
+
+    <div class="seg-result" data-role="segResult">—</div>
+  `;
+
+  wrap.querySelectorAll("[data-f]").forEach(el => {
+    el.addEventListener("input",  () => onSegField(tab, seg, el));
+    el.addEventListener("change", () => onSegField(tab, seg, el));
+  });
+  wrap.querySelectorAll("[data-act]").forEach(el => {
+    el.addEventListener("click", () => onSegAction(tab, seg.id, el.dataset.act));
+  });
+
+  return wrap;
+}
+
+function onSegField(tab, seg, el) {
+  const f = el.dataset.f;
+  const v = el.value;
+
+  if (f === "series") {
+    seg.series = v;
+    const cable = CABLE_DB[v];
+    if (cable && !cable.manual) {
+      seg.material = cable.material;
+      seg.theta_ref_R = cable.theta_op;
+      const sizes = Object.keys(cable).filter(k => !isNaN(Number(k))).map(Number).sort((a,b)=>a-b);
+      if (!sizes.includes(Number(seg.S))) seg.S = sizes[Math.floor(sizes.length/2)];
+      const row = cable[seg.S];
+      if (row) { seg.R_km = row[0]; seg.X_km = row[1]; seg.Iz = row[2]; }
+      seg.manualRX = false;
+    } else {
+      seg.manualRX = true;
+      seg.theta_ref_R = 20;
+      seg.Iz = null;
+    }
+    renderSegments(); renderTabTotals(); renderOverview();
+  } else if (f === "S") {
+    seg.S = parseFloat(v);
+    const cable = CABLE_DB[seg.series];
+    if (cable && !cable.manual && cable[seg.S]) {
+      const row = cable[seg.S];
+      seg.R_km = row[0]; seg.X_km = row[1]; seg.Iz = row[2];
+    } else if (!cable || cable.manual) {
+      seg.Iz = null;
+    }
+    renderTabTotals();
+  } else if (f === "S_pick") {
+    if (!v) return;
+    seg.S = parseFloat(v);
+    const cable = CABLE_DB[seg.series];
+    if (cable && !cable.manual && cable[seg.S]) {
+      const row = cable[seg.S];
+      seg.R_km = row[0]; seg.X_km = row[1]; seg.Iz = row[2];
+    }
+    renderSegments(); renderTabTotals();
+  } else if (f === "manualRX") {
+    seg.manualRX = v === "true";
+    if (seg.manualRX) seg.theta_ref_R = 20;
+    else {
+      const cable = CABLE_DB[seg.series];
+      if (cable && !cable.manual) {
+        seg.theta_ref_R = cable.theta_op;
+        const row = cable[seg.S];
+        if (row) { seg.R_km = row[0]; seg.X_km = row[1]; seg.Iz = row[2]; }
+      }
+    }
+    renderSegments(); renderTabTotals(); renderOverview();
+  } else if (f === "material") { seg.material = v; renderTabTotals(); }
+    else if (f === "name")      { seg.name = v; }
+    else if (f === "system")    {
+      seg.system = v || null;
+      renderSegments(); renderTabTotals();
+    }
+    else if (f === "U_pick") {
+      if (v === "") { seg.U = null; }
+      else if (v === "custom") {
+        // leave seg.U as-is; user will edit custom field
+      } else { seg.U = parseFloat(v); }
+      renderSegments(); renderTabTotals();
+    }
+    else if (f === "U_custom") {
+      seg.U = v === "" ? null : parseFloat(v);
+      renderTabTotals();
+    }
+    else { seg[f] = parseFloat(v); renderTabTotals(); }
+}
+
+function onSegAction(tab, segId, act) {
+  const idx = tab.segments.findIndex(s => s.id === segId);
+  if (idx < 0) return;
+  if (act === "del" && tab.segments.length > 1) {
+    tab.segments.splice(idx, 1);
+  } else if (act === "up" && idx > 0) {
+    [tab.segments[idx-1], tab.segments[idx]] = [tab.segments[idx], tab.segments[idx-1]];
+  } else if (act === "down" && idx < tab.segments.length - 1) {
+    [tab.segments[idx], tab.segments[idx+1]] = [tab.segments[idx+1], tab.segments[idx]];
+  }
+  renderSegments(); renderTabTotals(); renderOverview();
+}
+
+function renderTabTotals() {
+  const tab = state.tabs.find(t => t.id === state.activeTab);
+  if (!tab) return;
+  const globals = { U: state.U, system: state.system, theta_op: state.theta_op };
+  const f = computeFeeder(tab, globals);
+  const fmt = (n, d=3) => isFinite(n) ? n.toFixed(d) : "—";
+
+  // Per-segment lines (each uses its own system/voltage)
+  const wraps = document.querySelectorAll(".seg");
+  wraps.forEach((w, i) => {
+    const r = f.segResults[i];
+    const bLbl = r.sys === "3ph" ? "√3" : "2";
+    const slot = w.querySelector('[data-role="segResult"]');
+    slot.innerHTML =
+      `sys=<b>${r.sys}</b> · U=<b>${r.U}</b> V · ` +
+      `n=<b>${r.nP}</b> · ` +
+      `R=<b>${fmt(r.R_mO, 2)}</b> mΩ · ` +
+      `X=<b>${fmt(r.X_mO, 2)}</b> mΩ · ` +
+      `b=<b>${bLbl}</b> · ` +
+      `ΔU=<b>${fmt(r.dU, 3)}</b> V · ` +
+      `ΔU%=<b>${fmt(r.dU_pct, 2)}</b> %`;
+  });
+
+  // Tab totals cards
+  document.getElementById("tabTotal").innerHTML = `
+    <div class="cell"><div class="k">Source voltage</div><div class="v">${fmt(f.U_src, 1)} V</div></div>
+    <div class="cell"><div class="k">Total ΔU (feeder)</div><div class="v">${fmt(f.dU_total, 3)} V</div></div>
+    <div class="cell"><div class="k">Total ΔU% (Σ per-seg)</div><div class="v">${fmt(f.dU_pct, 2)} %</div></div>
+    <div class="cell"><div class="k">Voltage at load</div><div class="v">${fmt(f.U_load, 2)} V</div></div>
+  `;
+
+  const v = document.getElementById("tabVerdict");
+  v.style.display = "block";
+  if (f.dU_pct <= state.limit) {
+    v.className = "verdict ok";
+    v.textContent = `PASS — feeder ΔU% = ${fmt(f.dU_pct, 2)}% ≤ ${state.limit}% limit`;
+  } else if (f.dU_pct <= state.limit * 1.1) {
+    v.className = "verdict warn";
+    v.textContent = `MARGINAL — feeder ΔU% = ${fmt(f.dU_pct, 2)}% slightly above ${state.limit}% limit.`;
+  } else {
+    v.className = "verdict err";
+    v.textContent = `FAIL — feeder ΔU% = ${fmt(f.dU_pct, 2)}% exceeds ${state.limit}% limit.`;
+  }
+}
+
+// ============================================================================
+// PROJECT OVERVIEW (all feeders)
+// ============================================================================
+
+function renderOverview() {
+  const tbody = document.getElementById("overviewBody");
+  if (!tbody) return; // only rendered on overview tab
+  const { feeders } = computeProject(state);
+  tbody.innerHTML = "";
+  feeders.forEach((f, i) => {
+    const pass = f.dU_pct <= state.limit;
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${i + 1}</td>
+      <td>${escapeHtml(f.tab.name)}</td>
+      <td>${f.tab.segments.length}</td>
+      <td>${f.dU_total.toFixed(3)}</td>
+      <td>${f.dU_pct.toFixed(2)} %</td>
+      <td>${state.limit} %</td>
+      <td class="${pass ? "ok" : "fail"}">${pass ? "PASS" : "FAIL"}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+// ============================================================================
+// GLOBAL SETTINGS WIRING
+// ============================================================================
+
+function applyRegion(code) {
+  state.region = code;
+  const r = REGIONS[code];
+  if (!r) return;
+  state.U = r.U; state.freq = r.freq; state.ambient = r.ambient;
+  state.limit = r.limit; state.system = r.system; state.theta_op = r.theta;
+  syncGlobalsUi();
+}
+
+function syncGlobalsUi() {
+  document.getElementById("region").value = state.region;
+  document.getElementById("system").value = state.system;
+  document.getElementById("freq").value = String(state.freq);
+  document.getElementById("limit").value = String(state.limit);
+  document.getElementById("ambient").value = String(state.ambient);
+  document.getElementById("theta-op").value = String(state.theta_op);
+  const stdSel = document.getElementById("U-std");
+  const knownU = Array.from(stdSel.options).map(o => o.value);
+  if (knownU.includes(String(state.U))) {
+    stdSel.value = String(state.U);
+    document.getElementById("U").disabled = true;
+    document.getElementById("U").value = state.U;
+  } else {
+    stdSel.value = "custom";
+    document.getElementById("U").disabled = false;
+    document.getElementById("U").value = state.U;
+  }
+}
+
+function wireGlobals() {
+  document.getElementById("region").addEventListener("change", e => { applyRegion(e.target.value); renderAll(); });
+  document.getElementById("system").addEventListener("change", e => { state.system = e.target.value; renderAll(); });
+  document.getElementById("freq").addEventListener("change", e => { state.freq = parseFloat(e.target.value); });
+  document.getElementById("limit").addEventListener("change", e => { state.limit = parseFloat(e.target.value); renderAll(); });
+  document.getElementById("ambient").addEventListener("change", e => { state.ambient = parseFloat(e.target.value); });
+  document.getElementById("theta-op").addEventListener("change", e => { state.theta_op = parseFloat(e.target.value); renderAll(); });
+
+  document.getElementById("U-std").addEventListener("change", e => {
+    const v = e.target.value;
+    if (v === "custom") {
+      document.getElementById("U").disabled = false;
+      document.getElementById("U").focus();
+    } else {
+      state.U = parseFloat(v);
+      document.getElementById("U").disabled = true;
+      document.getElementById("U").value = state.U;
+      renderAll();
+    }
+  });
+  document.getElementById("U").addEventListener("input", e => { state.U = parseFloat(e.target.value) || state.U; renderAll(); });
+
+  document.getElementById("calcBtn").addEventListener("click", renderAll);
+  document.getElementById("docxBtn").addEventListener("click", downloadDocx);
+  document.getElementById("resetBtn").addEventListener("click", () => { initState(); syncGlobalsUi(); renderAll(); });
+}
+
+function renderAll() {
+  renderTabs();
+  renderTabContent();
+  renderOverview();
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  }[c]));
+}
+
+// ============================================================================
+// VALIDATION TESTS
+// ============================================================================
+
+const TESTS = [
+  {
+    name: "3-phase 400 V, I = 100 A, cos φ = 0.8, Cu 35 mm², L = 100 m (θ = 70 °C, ρ = 22.5)",
+    method: "IEC 60364-5-52 Annex D",
+    expected_pct: 2.43, tol: 0.02,
+    run: () => {
+      const s = { L:100, S:35, material:"cu", cosphi:0.8, I:100,
+                  R_km: RHO_IEC.cu / 35, X_km: 0.08, theta_ref_R: 70 };
+      const g = { U:400, system:"3ph", theta_op:70 };
+      return (computeSegment(s, g).dU / 400) * 100;
+    },
+  },
+];
+
+function runTests() {
+  const tbody = document.getElementById("testBody");
+  tbody.innerHTML = "";
+  TESTS.forEach((t, i) => {
+    const computed = t.run();
+    const ok = Math.abs(computed - t.expected_pct) <= t.tol;
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${i + 1}</td>
+      <td>${t.name}</td>
+      <td>${t.method}</td>
+      <td>${t.expected_pct.toFixed(2)}</td>
+      <td>${computed.toFixed(2)}</td>
+      <td class="${ok ? "pass" : "fail"}">${ok ? "PASS" : "FAIL"}</td>`;
+    tbody.appendChild(row);
+  });
+}
+
+// ============================================================================
+// COMBINED .docx REPORT
+// ============================================================================
+
+// Classify what's actually used in the project so the references list
+// only shows documents that were directly relevant to the calculation.
+function projectUsage(state) {
+  const u = {
+    lvCables: false, mvCables: false,     // insulated LV / MV cables only
+    barOverhead: false, htls: false, abc: false,
+    manual: false,
+  };
+  state.tabs.forEach(t => t.segments.forEach(s => {
+    const U = (s.U || state.U);
+    const series = s.series || "";
+
+    // Manual — classify by actual voltage, treated as an insulated cable
+    if (series.startsWith("Manual")) {
+      u.manual = true;
+      if (U <= 1000) u.lvCables = true; else u.mvCables = true;
+      return;
+    }
+
+    // Construction-first: bare overhead / HTLS / ABC are NOT insulated cables,
+    // so they must NOT set lvCables/mvCables flags.
+    if (series.includes("bare overhead")) { u.barOverhead = true; return; }
+    if (series.includes("HTLS"))           { u.htls = true;        return; }
+    if (series.includes("ABC aerial"))     { u.abc = true;         return; }
+
+    // Remaining series are insulated cables — use the voltage-class prefix.
+    if (/\bLV\b/.test(series)) u.lvCables = true;
+    if (/\bMV\b/.test(series)) u.mvCables = true;
+  }));
+  return u;
+}
+
+function buildReferences(state) {
+  const u = projectUsage(state);
+  const lines = [];
+
+  // Always cite the formula source and conductor α values
+  if (u.lvCables || u.manual || !u.mvCables) {
+    lines.push("IEC 60364-5-52:2009 — Low-voltage electrical installations — Part 5-52: Wiring systems. Annex D (voltage drop formula used in this calculation).");
+  }
+  lines.push("IEC 60228:2004 — Conductors of insulated cables (standard cross-sections; α temperature coefficients used for R correction).");
+
+  if (u.lvCables) {
+    lines.push("BS 5467 / BS 7889 / BS 6004 — LV cable construction standards used as catalogue source for R, X and Iz values.");
+  }
+
+  if (u.mvCables) {
+    lines.push("IEC 60502-2 — Extruded insulation power cables for rated voltages 6 kV (Uₘ = 7.2 kV) up to 30 kV (Uₘ = 36 kV) — used for MV cable parameters.");
+    lines.push("IEC 60287 series — Electric cables — Calculation of the current rating (MV ampacity reference).");
+  }
+
+  if (u.barOverhead || u.htls) {
+    lines.push("IEC 61089 — Round wire concentric lay overhead electrical stranded conductors (AAC, AAAC, ACSR).");
+  }
+  if (u.abc || u.htls) {
+    lines.push("IEC 62219 — Overhead electrical conductors — Formed wire, concentric-lay (ABC / СИП and HTLS construction).");
+  }
+
+  // Always include the voltage-class standard (U scale reference)
+  lines.push("IEC 60038 — IEC standard voltages.");
+
+  // Only keep industry handbooks for LV where they are directly authoritative
+  if (u.lvCables && !u.mvCables) {
+    lines.push("Schneider Electric — Electrical Installation Guide, Chapter G (LV voltage drop methodology).");
+    lines.push("ABB — Electrical Installation Handbook, Volume 1 (LV cable sizing).");
+  }
+
+  return lines;
+}
+
+async function downloadDocx() {
+  const proj = computeProject(state);
+  const { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell,
+          WidthType, AlignmentType, BorderStyle, Footer, PageNumber, VerticalAlign, HeightRule,
+          TableLayoutType } = docx;
+  const FIXED_LAYOUT = TableLayoutType ? TableLayoutType.FIXED : "fixed";
+
+  const FONT = "Arial Narrow";
+  const BLACK = "000000";
+  // Sizes in half-points: body & tables = 11 pt (22), all headings = 12 pt (24)
+  const SIZE_BODY = 22, SIZE_H1 = 24, SIZE_H2 = 24, SIZE_H3 = 24, SIZE_TBL = 22;
+  const ROW_HEIGHT = 397; // 0.7 cm in twips (1 cm ≈ 567 twips)
+
+  const border1 = { style: BorderStyle.SINGLE, size: 4, color: BLACK };
+  const allBorders = { top: border1, bottom: border1, left: border1, right: border1 };
+  // Cell margins 0.12 cm (0.12 × 567 twips/cm ≈ 68 twips) all sides
+  const CELL_MARGIN = 68;
+  const cellMargins = { top: CELL_MARGIN, bottom: CELL_MARGIN, left: CELL_MARGIN, right: CELL_MARGIN };
+
+  const runBody = (t, extra = {}) =>
+    new TextRun({ text: String(t), font: FONT, color: BLACK, size: SIZE_BODY, ...extra });
+  const pBody = (t, opts = {}) =>
+    new Paragraph({ children: [runBody(t, opts)], spacing: { after: 80 }, alignment: AlignmentType.LEFT });
+  const pHead = (t, level, size) =>
+    new Paragraph({
+      children: [new TextRun({ text: t, font: FONT, color: BLACK, size, bold: true })],
+      heading: level, spacing: { before: 220, after: 110 },
+    });
+  const pCenter = (t, opts = {}) =>
+    new Paragraph({ children: [runBody(t, opts)], alignment: AlignmentType.CENTER, spacing: { after: 80 } });
+
+  // Default numeric/header cells are CENTERED both ways.
+  // Text cells use align=LEFT but still vertically centered.
+  const cellTxt = (t, { bold = false, align = AlignmentType.CENTER } = {}) => {
+    return new TableCell({
+      children: [new Paragraph({
+        children: [new TextRun({ text: String(t), font: FONT, color: BLACK, size: SIZE_TBL, bold })],
+        alignment: align,
+        spacing: { before: 0, after: 0, line: 240, lineRule: "auto" },
+      })],
+      margins: cellMargins,
+      borders: allBorders,
+      verticalAlign: VerticalAlign.CENTER,
+    });
+  };
+  // Row height auto — content fully determines row height (no min, no max).
+  const row = (cells, opts = {}) => new TableRow({
+    children: cells,
+    ...opts,
+  });
+  const kv = (k, v) => row([
+    cellTxt(k, { bold: true, align: AlignmentType.LEFT }),
+    cellTxt(v, { align: AlignmentType.LEFT }),
+  ]);
+
+  // --- Project settings table -------------------------------------------
+  const sysLabel = state.system === "3ph" ? "Three-phase (line-to-line)"
+                 : state.system === "1ph" ? "Single-phase (phase-neutral)" : "DC";
+  const projTable = new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    layout: FIXED_LAYOUT,
+    rows: [
+      kv("Region preset",         labelRegion(state.region)),
+      kv("System",                 sysLabel),
+      kv("Nominal voltage U",      `${state.U} V`),
+      kv("Frequency",              `${state.freq} Hz`),
+      kv("Allowable ΔU%",          `${state.limit} %`),
+      kv("Ambient temperature",    `${state.ambient} °C`),
+      kv("Conductor operating θ",  `${state.theta_op} °C`),
+      kv("Number of feeders",      String(state.tabs.length)),
+    ],
+  });
+
+  // --- Project overview table -------------------------------------------
+  const overviewHeader = row([
+    cellTxt("#",           { bold: true }),
+    cellTxt("Feeder",      { bold: true }),
+    cellTxt("Segments",    { bold: true }),
+    cellTxt("Total ΔU, V", { bold: true }),
+    cellTxt("Total ΔU%",   { bold: true }),
+    cellTxt("Limit",       { bold: true }),
+    cellTxt("Status",      { bold: true }),
+  ], { tableHeader: true });
+  const overviewRows = proj.feeders.map((f, i) => row([
+    cellTxt(i + 1),
+    cellTxt(f.tab.name, { align: AlignmentType.LEFT }),
+    cellTxt(f.tab.segments.length),
+    cellTxt(f.dU_total.toFixed(3)),
+    cellTxt(f.dU_pct.toFixed(2) + " %", { bold: true }),
+    cellTxt(state.limit + " %"),
+    cellTxt(f.dU_pct <= state.limit ? "PASS" : "FAIL", { bold: true }),
+  ]));
+  const overviewTable = new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    layout: FIXED_LAYOUT,
+    rows: [overviewHeader, ...overviewRows],
+  });
+
+  // --- Per-feeder blocks (summary table + step-by-step) -----------------
+  const feederBlocks = [];
+  const bLabel = state.system === "3ph" ? "√3" : "2";
+
+  proj.feeders.forEach((f, fi) => {
+    // Summary table header
+    const segHeader = row([
+      cellTxt("#",         { bold: true }),
+      cellTxt("Segment",   { bold: true }),
+      cellTxt("L, m",      { bold: true }),
+      cellTxt("Cable",     { bold: true }),
+      cellTxt("S, mm²",    { bold: true }),
+      cellTxt("Sys",       { bold: true }),
+      cellTxt("U, V",      { bold: true }),
+      cellTxt("cos φ",     { bold: true }),
+      cellTxt("I, A",      { bold: true }),
+      cellTxt("ΔU, V",     { bold: true }),
+      cellTxt("ΔU %",      { bold: true }),
+    ], { tableHeader: true });
+
+    const segRows = f.tab.segments.map((s, i) => {
+      const res = f.segResults[i];
+      const sysLabel = res.sys === "3ph" ? "3ph" : res.sys === "1ph" ? "1ph" : "DC";
+      return row([
+        cellTxt(i + 1),
+        cellTxt(s.name || `Segment ${i+1}`, { align: AlignmentType.LEFT }),
+        cellTxt(s.L),
+        cellTxt(s.series, { align: AlignmentType.LEFT }),
+        cellTxt(s.S),
+        cellTxt(sysLabel),
+        cellTxt(res.U),
+        cellTxt(s.cosphi),
+        cellTxt(s.I),
+        cellTxt(res.dU.toFixed(3)),
+        cellTxt(res.dU_pct.toFixed(2) + " %", { bold: true }),
+      ]);
+    });
+    const segTable = new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      layout: FIXED_LAYOUT,
+      rows: [segHeader, ...segRows],
+    });
+
+    // Step-by-step per segment
+    const stepParas = [];
+    f.tab.segments.forEach((s, i) => {
+      const res = f.segResults[i];
+      const b = res.sys === "3ph" ? "√3" : "2";
+      const sysL = res.sys === "3ph" ? "three-phase" : res.sys === "1ph" ? "single-phase" : "DC";
+      const R_Ohm = res.R_mO / 1000;
+      const X_Ohm = res.X_mO / 1000;
+
+      stepParas.push(pHead(`Segment ${i+1} — ${s.name || ""}`, HeadingLevel.HEADING_3, SIZE_H3));
+      stepParas.push(pBody(`System for this segment: ${sysL}, U = ${res.U} V, b = ${b}`));
+      stepParas.push(pBody(`Cable: ${s.series}, S = ${s.S} mm², L = ${s.L} m`));
+
+      // Temperature correction of R — shown only when reference and operating θ differ
+      if (Number(s.theta_ref_R) !== Number(state.theta_op)) {
+        stepParas.push(pBody(
+          `R (at ${s.theta_ref_R} °C) = ${s.R_km.toFixed(4)} Ω/km → ` +
+          `R (at ${state.theta_op} °C) = ${res.R_kmT.toFixed(4)} Ω/km`
+        ));
+      } else {
+        stepParas.push(pBody(
+          `R at ${state.theta_op} °C = ${res.R_kmT.toFixed(4)} Ω/km ` +
+          `(θ_ref = θ_op, no temperature correction applied)`
+        ));
+      }
+
+      // Dimensionally correct: Ω/km × m / 1000 = Ω
+      stepParas.push(pBody(
+        `R_total = ${res.R_kmT.toFixed(4)} × ${s.L} / 1000 = ${R_Ohm.toFixed(5)} Ω ` +
+        `(= ${res.R_mO.toFixed(2)} mΩ)`
+      ));
+      stepParas.push(pBody(
+        `X_total = ${Number(s.X_km).toFixed(3)} × ${s.L} / 1000 = ${X_Ohm.toFixed(5)} Ω ` +
+        `(= ${res.X_mO.toFixed(2)} mΩ)`
+      ));
+      stepParas.push(pBody(`sin φ = √(1 − ${s.cosphi}²) = ${res.sinp.toFixed(3)}`));
+
+      // ΔU computed in Ω directly — no /1000 needed, no unit mismatch
+      if (res.sys === "dc") {
+        stepParas.push(pBody(
+          `ΔU = ${b} · ${s.I} · ${R_Ohm.toFixed(5)} · ${s.cosphi} = ${res.dU.toFixed(3)} V`
+        ));
+      } else {
+        stepParas.push(pBody(
+          `ΔU = ${b} · ${s.I} · (${R_Ohm.toFixed(5)} · ${s.cosphi} + ` +
+          `${X_Ohm.toFixed(5)} · ${res.sinp.toFixed(3)}) = ${res.dU.toFixed(3)} V`
+        ));
+      }
+      stepParas.push(pBody(`ΔU% = ${res.dU.toFixed(3)} / ${res.U} · 100 = ${res.dU_pct.toFixed(2)} %`));
+    });
+
+    // Feeder totals table
+    const feederTotals = new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      layout: FIXED_LAYOUT,
+      rows: [
+        kv("Total ΔU (V)",       f.dU_total.toFixed(3)),
+        kv("Total ΔU%",          f.dU_pct.toFixed(2) + " %"),
+        kv("Voltage at load",    f.U_load.toFixed(2) + " V"),
+        kv("Allowable limit",    state.limit + " %"),
+        kv("Verdict",            f.dU_pct <= state.limit ? "PASS" : "FAIL"),
+      ],
+    });
+
+    feederBlocks.push(
+      new Paragraph({
+        children: [new TextRun({ text: `Feeder ${fi+1} — ${f.tab.name}`, font: FONT, color: BLACK, size: SIZE_H2, bold: true })],
+        heading: HeadingLevel.HEADING_2, spacing: { before: 280, after: 140 },
+        pageBreakBefore: fi > 0,
+      }),
+      pHead("Summary of segments", HeadingLevel.HEADING_3, SIZE_H3),
+      segTable,
+      pHead("Step-by-step calculation", HeadingLevel.HEADING_3, SIZE_H3),
+      ...stepParas,
+      pHead("Feeder totals", HeadingLevel.HEADING_3, SIZE_H3),
+      feederTotals,
+      pBody(f.dU_pct <= state.limit
+        ? `The total voltage drop for this feeder (${f.dU_pct.toFixed(2)} %) is within the allowable limit of ${state.limit} %.`
+        : `The total voltage drop for this feeder (${f.dU_pct.toFixed(2)} %) exceeds the allowable limit of ${state.limit} %. Revisit cable sizing.`),
+    );
+  });
+
+  const doc = new Document({
+    title: "Voltage Drop — Combined Calculation Report",
+    description: "Multiple feeders per IEC 60364-5-52 Annex D",
+    styles: { default: { document: { run: { font: FONT, color: BLACK, size: SIZE_BODY } } } },
+    sections: [{
+      properties: { page: { margin: { top: 720, right: 720, bottom: 720, left: 720 } } },
+      footers: {
+        default: new Footer({
+          children: [new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [
+              new TextRun({ text: "Page ", font: FONT, color: BLACK, size: SIZE_TBL }),
+              new TextRun({ children: [PageNumber.CURRENT], font: FONT, color: BLACK, size: SIZE_TBL }),
+            ],
+          })],
+        }),
+      },
+      children: [
+        new Paragraph({
+          children: [new TextRun({ text: "Voltage Drop — Combined Calculation Report", font: FONT, color: BLACK, size: SIZE_H1, bold: true })],
+          alignment: AlignmentType.CENTER, spacing: { after: 140 },
+        }),
+        pCenter("Per IEC 60364-5-52 Annex D", { italics: true }),
+        pCenter(`Date: ${new Date().toISOString().slice(0,10)}`),
+
+        pHead("1. Project settings", HeadingLevel.HEADING_2, SIZE_H2),
+        projTable,
+
+        pHead("2. Project overview", HeadingLevel.HEADING_2, SIZE_H2),
+        overviewTable,
+
+        pHead("3. Per-feeder calculation", HeadingLevel.HEADING_2, SIZE_H2),
+        ...feederBlocks,
+
+        pHead("4. Glossary of abbreviations", HeadingLevel.HEADING_2, SIZE_H2),
+        (() => {
+          const gH = row([cellTxt("Symbol", { bold:true }), cellTxt("Definition", { bold:true })], { tableHeader:true });
+          const gRows = GLOSSARY.map(([s, d]) => row([
+            cellTxt(s, { bold:true, align:AlignmentType.LEFT }),
+            cellTxt(d, { align:AlignmentType.LEFT }),
+          ]));
+          return new Table({ width:{size:100, type:WidthType.PERCENTAGE}, layout:FIXED_LAYOUT, rows:[gH, ...gRows] });
+        })(),
+
+        pHead("5. References", HeadingLevel.HEADING_2, SIZE_H2),
+        ...buildReferences(state).map(line => pBody(line)),
+
+        pHead("6. Disclaimer", HeadingLevel.HEADING_2, SIZE_H2),
+        new Paragraph({
+          alignment: AlignmentType.JUSTIFIED,
+          spacing: { after: 80, line: 240, lineRule: "auto" },
+          children: [new TextRun({
+            text: "This report is produced by a client-side calculator for educational and preliminary design purposes. The author bears no responsibility, liability or warranty for decisions made based on its output. Before use, every input, formula, intermediate value and final result must be verified against the applicable national standard and actual installation conditions (grouping, ambient, harmonics, short-circuit, thermal, earth-fault-loop impedance, etc.). Final designs must be checked and signed off by a qualified engineer.",
+            font: FONT, color: BLACK, size: 18, // 9 pt, smaller than body
+          })],
+        }),
+      ],
+    }],
+  });
+
+  const blob = await Packer.toBlob(doc);
+  const ts = new Date().toISOString().slice(0, 10);
+  saveAs(blob, `voltage-drop-project-${ts}.docx`);
+}
+
+// ============================================================================
+// INIT
+// ============================================================================
+
+function populateGlobalSelects() {
+  const lim = document.getElementById("limit");
+  lim.innerHTML = STD_LIMIT.map(v => {
+    const note = v === 2 ? " — motor starting"
+               : v === 3 ? " — lighting"
+               : v === 5 ? " — other uses"
+               : v === 6 ? " — dedicated feeder"
+               : v === 8 ? " — HV-supplied installation" : "";
+    const shown = v < 5 ? v.toFixed(1) : String(v);
+    return `<option value="${v}">${shown} %${note}</option>`;
+  }).join("");
+
+  const amb = document.getElementById("ambient");
+  amb.innerHTML = STD_AMBIENT.map(t =>
+    `<option value="${t}">${t > 0 ? "+" : ""}${t} °C</option>`).join("");
+
+  const the = document.getElementById("theta-op");
+  the.innerHTML = STD_THETA.map(t => {
+    const note = t === 20  ? " — cold / reference"
+               : t === 70  ? " — PVC, full load"
+               : t === 90  ? " — XLPE / EPR, full load"
+               : t === 150 ? " — TACSR thermal-resistant"
+               : t === 180 ? " — ACSS high-temperature"
+               : t === 200 ? " — HTLS maximum" : "";
+    return `<option value="${t}">${t} °C${note}</option>`;
+  }).join("");
+}
+
+const GLOSSARY = [
+  ["U",          "Nominal system voltage at the bus (V)"],
+  ["U_source",   "Source-side voltage of a feeder (V)"],
+  ["I_B",        "Design (load) current through a segment (A)"],
+  ["I_z",        "Cable ampacity — continuous current rating (A)"],
+  ["L",          "Segment / element length (m)"],
+  ["S",          "Conductor cross-section (mm²) — IEC 60228 preferred values"],
+  ["R_km",       "Conductor resistance at reference temperature θ_ref (Ω/km)"],
+  ["X_km",       "Conductor reactance per unit length (Ω/km)"],
+  ["ρ (rho)",    "Resistivity at operating temperature (mΩ·mm²/m) — 22.5 Cu, 36.0 Al (IEC 60364-5-52)"],
+  ["α (alpha)",  "Temperature coefficient per °C — 0.00393 Cu, 0.00403 Al (IEC 60228)"],
+  ["λ (lambda)", "Reactance per unit length (mΩ/m) — typical 0.08 for LV cables"],
+  ["θ_a, θ_op",  "Ambient / conductor operating temperatures (°C)"],
+  ["θ_ref",      "Reference temperature at which catalogue R is specified (°C)"],
+  ["cos φ",      "Power factor; sin φ = √(1 − cos²φ)"],
+  ["b",          "Multiplier in the drop formula: √3 for 3-phase line-to-line, 2 for 1-phase phase-neutral or DC"],
+  ["ΔU",         "Voltage drop across a segment (V)"],
+  ["ΔU%",        "Voltage drop as percentage of the bus voltage"],
+  ["n_parallel", "Number of identical conductors paralleled in one segment"],
+  ["BS 5467 …",  "British cable construction standards"],
+  ["ABC",        "Aerial Bundled Conductor (self-supporting, IEC 62219)"],
+  ["AAC / AAAC / ACSR","Bare overhead conductor types (IEC 61089)"],
+  ["HTLS",       "High-Temperature Low-Sag transmission conductor"],
+  ["TN / TT / IT","Earthing systems per IEC 60364-4-41"],
+  ["LV / MV / HV","Low / medium / high voltage classes per IEC 60038"],
+];
+function renderGlossary(){
+  const host = document.getElementById("glossaryBody"); if (!host) return;
+  host.innerHTML = `<table><thead><tr><th style="width:18%">Symbol</th><th style="text-align:left">Definition</th></tr></thead><tbody>${
+    GLOSSARY.map(([s, d]) => `<tr><td style="text-align:left"><b>${escapeHtml(s)}</b></td><td style="text-align:left">${escapeHtml(d)}</td></tr>`).join("")
+  }</tbody></table>`;
+}
+
+initState();
+populateGlobalSelects();
+wireGlobals();
+syncGlobalsUi();
+renderAll();
+renderGlossary();
+runTests();
+</script>
+</body>
+</html>
