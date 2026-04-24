@@ -1,0 +1,2914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Short-Circuit Calculator · IEC 60909</title>
+<meta name="description" content="Multi-circuit short-circuit current calculator per IEC 60909-0 / IEC 60909-1. Positive/negative/zero sequence networks, parallel sources, transformer + cable + OHL segments, per-busbar results, UAE/GCC defaults, Word report." />
+<style>
+  :root {
+    --bg:#c8ccd1; --bg-soft:#d8dbdf; --panel:#eef0f2; --panel-2:#ffffff;
+    --ink:#000000; --ink-soft:#1a1a1a; --muted:#3a3f44;
+    --line:#8a8f94; --line-soft:#b4b9bd;
+    --btn:#3c4043; --btn-hover:#23272a; --btn-ink:#ffffff;
+    --btn-ghost-bg:#d8dbdf; --chip-bg:#3c4043; --chip-ink:#ffffff;
+    --tab-bg:#b7bbc0; --tab-active-bg:#eef0f2;
+    --ok-bg:#d6e9dc; --ok-ink:#0c5826;
+    --warn-bg:#f4e4c1; --warn-ink:#6b4a00;
+    --err-bg:#f2cdcf; --err-ink:#7f1a10;
+    --mono:"Arial Narrow", Arial, sans-serif;
+    --sans:"Arial Narrow", Arial, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --math:"Cambria Math", "STIX Two Math", Cambria, Georgia, serif;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; font-family: var(--sans); color: var(--ink); background: var(--bg); line-height: 1.5; -webkit-font-smoothing: antialiased; }
+  .container { max-width: 1280px; margin: 0 auto; padding: 22px 16px 48px; }
+
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .chip { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 3px 9px; border-radius: 2px; background: var(--chip-bg); color: var(--chip-ink); }
+  h1 { margin: 0 0 4px; font-size: 24px; font-weight: 700; color: var(--ink); letter-spacing: -0.01em; }
+  .sub { color: var(--muted); font-size: 13.5px; max-width: 900px; }
+  .rule { height: 1px; background: var(--line); margin: 14px 0 18px; }
+
+  .header-top { display: flex; justify-content: space-between; gap: 20px; align-items: flex-start; }
+  .header-left { flex: 1; min-width: 0; }
+  .header-right { text-align: right; font-size: 12px; color: var(--ink-soft); line-height: 1.35; flex-shrink: 0; }
+  .author-name { font-weight: 700; color: var(--ink); }
+  .author-email a, .author-wa-hint a { color: var(--ink-soft); text-decoration: none; }
+  .author-email a:hover, .author-wa-hint a:hover { text-decoration: underline; }
+  .author-wa-hint { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .author-links { display: flex; gap: 6px; justify-content: flex-end; margin-top: 6px; }
+  .author-links a { display: inline-flex; width: 28px; height: 28px; border-radius: 3px; background: var(--btn); align-items: center; justify-content: center; text-decoration: none; }
+  .author-links a:hover { background: var(--btn-hover); }
+  .author-links svg { width: 16px; height: 16px; fill: #fff; }
+
+  .toolbar { display: flex; align-items: center; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .toolbar-spacer { flex: 1; }
+  .toolbar button { height: 32px; padding: 0 14px; font-size: 12.5px; line-height: 1; display: inline-flex; align-items: center; }
+
+  .ad-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 14px 0 4px; }
+  @media (max-width: 760px) { .ad-row { grid-template-columns: 1fr; } }
+  .ad-slot { min-height: 90px; border: 1px dashed var(--line); border-radius: 3px; background: repeating-linear-gradient(45deg, transparent 0 10px, rgba(58,63,68,0.05) 10px 20px); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .ad-slot:hover { border-color: var(--btn); }
+  .ad-placeholder { display: flex; flex-direction: column; align-items: center; gap: 4px; font-family: "Arial Narrow", Arial, sans-serif; color: var(--muted); text-align: center; padding: 8px; }
+  .ad-placeholder-title { font-weight: 700; font-size: 12px; color: var(--ink-soft); letter-spacing: 0.04em; text-transform: uppercase; }
+  .ad-placeholder-sub { font-size: 11px; color: var(--muted); }
+  .ad-placeholder-sub code { font-family: "Consolas", monospace; font-size: 10.5px; background: #fff; padding: 0 4px; border-radius: 2px; border: 1px solid var(--line-soft); }
+
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 14px 16px; margin-bottom: 12px; }
+  .panel-title { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; }
+  .panel-title::before { content: ""; width: 6px; height: 6px; background: var(--btn); border-radius: 1px; }
+  .panel-title .right { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--ink); letter-spacing: 0; text-transform: none; display: flex; gap: 6px; }
+
+  label { display: flex; align-items: flex-end; font-size: 12px; color: var(--ink-soft); font-weight: 700; margin: 0 0 2px; min-height: 32px; line-height: 1.25; }
+  input, select { width: 100%; height: 30px; padding: 4px 8px; font-family: "Arial Narrow", Arial, sans-serif; font-size: 13.5px; color: var(--ink); background: var(--panel-2); border: 1px solid var(--line); border-radius: 2px; outline: none; transition: border-color .12s, box-shadow .12s; text-overflow: ellipsis; }
+  select { padding-right: 26px; cursor: pointer; }
+  optgroup { font-weight: 700; color: var(--muted); font-style: normal; }
+  optgroup > option { font-weight: 400; color: var(--ink); }
+  input:focus, select:focus { border-color: var(--btn); box-shadow: 0 0 0 2px rgba(60, 64, 67, 0.2); background: #fff; }
+  input[readonly], input:disabled, select:disabled { background: var(--bg-soft); color: var(--muted); }
+
+  .row { display: grid; gap: 10px; margin-bottom: 10px; }
+  .row > div { display: flex; flex-direction: column; }
+  .row > div > :last-child { margin-top: auto; }
+  .row-2 { grid-template-columns: 1fr 1fr; }
+  .row-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .row-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+  .row-5 { grid-template-columns: repeat(5, 1fr); }
+  @media (max-width: 840px) { .row-3, .row-4, .row-5 { grid-template-columns: 1fr 1fr; } }
+
+  .btns { display: flex; gap: 8px; flex-wrap: wrap; }
+  button { padding: 8px 14px; font-size: 12.5px; font-weight: 600; border-radius: 2px; border: 1px solid transparent; cursor: pointer; font-family: var(--sans); transition: background .1s, border-color .1s; }
+  .btn-primary { background: var(--btn); color: var(--btn-ink); }
+  .btn-primary:hover { background: var(--btn-hover); }
+  .btn-ghost { background: var(--btn-ghost-bg); color: var(--ink); border-color: var(--line); }
+  .btn-ghost:hover { border-color: var(--btn); }
+  .btn-sm { padding: 4px 10px; font-size: 11.5px; }
+  .btn-xs { padding: 2px 8px; font-size: 11px; }
+  .btn-danger { background: #ffffff; color: var(--err-ink); border-color: var(--line); }
+  .btn-danger:hover { background: var(--err-bg); border-color: var(--err-ink); }
+
+  .tabs-bar { display: flex; align-items: stretch; gap: 2px; border-bottom: 1px solid var(--line); margin: -14px -16px 14px; padding: 0 10px; background: var(--bg-soft); flex-wrap: wrap; }
+  .tab { padding: 9px 14px; font-size: 12.5px; font-weight: 600; background: var(--tab-bg); color: var(--ink); border: 1px solid var(--line); border-bottom: 0; border-top-left-radius: 4px; border-top-right-radius: 4px; cursor: pointer; margin-top: 6px; display: flex; align-items: center; gap: 8px; max-width: 260px; }
+  .tab:hover { background: #cbcfd4; }
+  .tab.active { background: var(--tab-active-bg); border-color: var(--line); margin-bottom: -1px; padding-bottom: 10px; }
+  .tab .tab-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
+  .tab .tab-close { background: transparent; border: 0; color: var(--muted); font-size: 14px; padding: 0 3px; cursor: pointer; font-weight: 700; }
+  .tab .tab-close:hover { color: var(--err-ink); }
+  .tab-add { padding: 9px 12px; font-size: 12.5px; font-weight: 600; background: transparent; color: var(--muted); border: 1px dashed var(--line); border-bottom: 0; border-top-left-radius: 4px; border-top-right-radius: 4px; cursor: pointer; margin-top: 6px; }
+  .tab-add:hover { color: var(--ink); border-color: var(--btn); }
+
+  .tab-head { display: flex; gap: 10px; align-items: end; margin-bottom: 8px; flex-wrap: wrap; }
+  .tab-head label { margin-top: 0; }
+  .tab-head input { font-weight: 600; }
+  .tab-head button { height: 30px; padding: 0 14px; }
+
+  .sub-panel { background: var(--panel-2); border: 1px solid var(--line); border-radius: 3px; padding: 12px 14px; margin-bottom: 10px; }
+  .sub-panel-title { font-size: 10.5px; font-weight: 700; letter-spacing: 0.10em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; padding-bottom: 4px; border-bottom: 1px dashed var(--line-soft); display: flex; align-items: center; gap: 8px; }
+  .sub-panel-title .right { margin-left: auto; display: flex; gap: 6px; }
+
+  .card { background: #fbfcfd; border: 1px solid var(--line-soft); border-radius: 3px; padding: 10px 12px; margin-bottom: 8px; border-left: 4px solid var(--line); }
+  /* Left color stripe identifies element/source type at a glance */
+  .card.type-infinite    { border-left-color: #1d4e89; } /* utility blue */
+  .card.type-transformer { border-left-color: #a05c00; } /* transformer amber */
+  .card.type-manual      { border-left-color: #606060; } /* manual gray */
+  .card.type-known_Ik    { border-left-color: #2e7d32; } /* known green */
+  .card.type-bess        { border-left-color: #6a1b9a; } /* BESS purple */
+  .card.type-diesel      { border-left-color: #b71c1c; } /* DG red */
+  .card.type-cable       { border-left-color: #0277bd; } /* cable blue */
+  .card.type-ohl         { border-left-color: #795548; } /* OHL brown */
+  .card.invalid          { background: #fdf3f3; border-left-color: var(--err-ink); }
+  .card-type-badge {
+    display: inline-block; padding: 1px 7px; border-radius: 2px;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+    background: var(--btn); color: var(--btn-ink); margin-left: 6px;
+  }
+  .warn-badge {
+    display: inline-block; padding: 1px 7px; border-radius: 2px;
+    font-size: 10.5px; font-weight: 700; background: var(--warn-bg); color: var(--warn-ink);
+    border: 1px solid #c99c3c; margin-left: 6px;
+  }
+  .approx-note {
+    font-size: 10.5px; color: var(--warn-ink); margin-top: 2px; font-style: italic;
+  }
+  .card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px dashed var(--line-soft); }
+  .card-head .num { display: inline-block; min-width: 22px; padding: 1px 6px; text-align: center; background: var(--btn); color: var(--btn-ink); border-radius: 2px; font-family: var(--mono); font-size: 11px; font-weight: 700; margin-right: 8px; }
+  .card-head .name-input { width: 260px; display: inline-block; }
+  .card-result { margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--line-soft); font-family: var(--mono); font-size: 12.5px; display: flex; gap: 14px; flex-wrap: wrap; color: var(--ink-soft); }
+  .card-result b { color: var(--ink); }
+
+  .regime-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .regime-col { border: 1px solid var(--line-soft); border-radius: 3px; padding: 8px 10px; background: #fff; }
+  .regime-col h4 { margin: 0 0 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  @media (max-width: 840px) { .regime-row { grid-template-columns: 1fr; } }
+
+  .overview table, .tests table, .buses table { width: 100%; border-collapse: collapse; font-size: 12px; font-family: var(--mono); background: var(--panel-2); }
+  .overview th, .overview td, .tests th, .tests td, .buses th, .buses td { padding: 6px 8px; border: 1px solid var(--line-soft); text-align: center; vertical-align: middle; }
+  .overview th, .tests th, .buses th { color: var(--ink); font-weight: 700; font-family: var(--sans); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; background: var(--bg-soft); border-color: var(--line); }
+  .overview .ok, .tests .pass { color: var(--ok-ink); font-weight: 700; }
+  .overview .fail, .tests .fail { color: var(--err-ink); font-weight: 700; }
+  .buses td.bus-name { text-align: left; font-weight: 700; }
+
+  .formula { font-family: var(--math); font-size: 14.5px; color: var(--ink); background: var(--panel-2); padding: 8px 12px; border-radius: 2px; border: 1px solid var(--line-soft); margin: 4px 0 8px; text-align: center; }
+
+  footer { margin-top: 24px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--ink-soft); font-size: 12px; }
+  footer a { color: var(--ink); text-decoration: underline; }
+  footer .disclaimer { background: #f4e4c1; border: 1px solid #c99c3c; color: #3a2e00; padding: 10px 14px; border-radius: 3px; font-size: 12px; line-height: 1.5; }
+
+  .pill { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.03em; background: var(--bg-soft); color: var(--muted); border: 1px solid var(--line-soft); }
+  .hint { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .empty { padding: 12px; color: var(--muted); font-style: italic; text-align: center; border: 1px dashed var(--line-soft); border-radius: 3px; background: #fafbfc; }
+</style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="header-top">
+        <div class="header-left">
+          <div class="chips">
+            <span class="chip">Calculator #002</span>
+            <span class="chip">IEC 60909-0</span>
+            <span class="chip">IEC 60909-1</span>
+            <span class="chip">up to 33 kV</span>
+            <span class="chip">Sequence networks</span>
+          </div>
+          <h1>Short-Circuit Current Calculator — IEC 60909 (LV &amp; MV up to 33 kV)</h1>
+          <div class="sub">
+            Positive / negative / zero sequence calculation of <i>I″<sub>k3</sub></i>, <i>I″<sub>k2</sub></i>,
+            <i>I″<sub>k1</sub></i>, peak <i>i<sub>p</sub></i> and <i>κ</i> at every busbar of a user-defined network.
+            Multiple parallel sources per circuit (infinite bus, transformer, manual <i>Z</i>, or known <i>I″<sub>k</sub></i>);
+            segments of type cable / OHL / transformer with parallel conductors;<br>
+            earthing model selector (TN / TT / IT / resistance / reactance / isolated); maximum and minimum regimes
+            computed independently. All computation runs in your browser — no data leaves the page.
+          </div>
+        </div>
+        <div class="header-right">
+          <div class="author-name">Developed by Eng. Evgenii Buchinskii</div>
+          <div class="author-email"><a href="mailto:buchinskii.evg@gmail.com">buchinskii.evg@gmail.com</a></div>
+          <div class="author-wa-hint">
+            Join the discussion —<br>
+            <a href="https://chat.whatsapp.com/JW3utOLN0J46EMWArIJsY8" target="_blank" rel="noopener">Electrical Designers Middle East</a>
+          </div>
+          <div class="author-links">
+            <a href="https://www.linkedin.com/in/evgenii-buchinskii-20351a2a6" target="_blank" rel="noopener" title="LinkedIn — Evgenii Buchinskii">
+              <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-label="LinkedIn"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+            </a>
+            <a href="https://chat.whatsapp.com/JW3utOLN0J46EMWArIJsY8" target="_blank" rel="noopener" title="WhatsApp group — Electrical Designers Middle East (tap to join)">
+              <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-label="WhatsApp"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
+            </a>
+          </div>
+        </div>
+      </div>
+      <div class="toolbar">
+        <button class="btn-primary" id="docxBtn">Download combined .docx report</button>
+        <button class="btn-ghost" id="calcBtn">Recalculate</button>
+        <span class="toolbar-spacer"></span>
+        <button class="btn-ghost" id="resetBtn">Reset project</button>
+      </div>
+
+      <div class="ad-row" aria-label="Advertisements">
+        <div class="ad-slot" id="ad-slot-top-left" data-ad-format="leaderboard" data-ad-size="728x90" data-ad-network="" data-ad-unit="">
+          <div class="ad-placeholder"><span class="ad-placeholder-title">Advertisement slot #1</span><span class="ad-placeholder-sub">728 × 90 leaderboard · replace <code>.ad-placeholder</code> with ad network code</span></div>
+        </div>
+        <div class="ad-slot" id="ad-slot-top-right" data-ad-format="leaderboard" data-ad-size="728x90" data-ad-network="" data-ad-unit="">
+          <div class="ad-placeholder"><span class="ad-placeholder-title">Advertisement slot #2</span><span class="ad-placeholder-sub">728 × 90 leaderboard · replace <code>.ad-placeholder</code> with ad network code</span></div>
+        </div>
+      </div>
+      <div class="rule"></div>
+    </header>
+
+    <!-- Project settings -->
+    <section class="panel">
+      <div class="panel-title">Project settings (applied to all circuits)</div>
+
+      <div class="row row-4">
+        <div>
+          <label>Region preset</label>
+          <select id="region">
+            <option value="uae">UAE (DEWA/ADDC) — 50 Hz, 50 °C</option>
+            <option value="uae-et">UAE — tropical 45 °C</option>
+            <option value="ksa">KSA (SEC) — 60 Hz, 45 °C</option>
+            <option value="qatar">Qatar (Kahramaa) — 50 Hz, 50 °C</option>
+            <option value="kuwait">Kuwait (MEW) — 50 Hz, 50 °C</option>
+            <option value="uk">United Kingdom — 50 Hz, 30 °C</option>
+            <option value="eu">EU — 50 Hz, 30 °C</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+        <div>
+          <label>System</label>
+          <select id="system">
+            <option value="3ph">Three-phase (line-to-line)</option>
+            <option value="1ph">Single-phase (phase-neutral)</option>
+            <option value="dc">DC</option>
+          </select>
+        </div>
+        <div style="grid-column: span 2">
+          <label>Network voltage</label>
+          <input id="voltage-readout" type="text" readonly value="" title="Voltage is defined by the first source of each circuit." />
+        </div>
+      </div>
+
+      <div class="row row-4">
+        <div>
+          <label>Frequency, Hz</label>
+          <select id="freq">
+            <option value="50" selected>50 Hz</option>
+            <option value="60">60 Hz</option>
+          </select>
+        </div>
+        <div>
+          <label>Earthing / neutral model (for I″<sub>k1</sub>)</label>
+          <select id="limit">
+            <option value="solid" selected>Solidly / effectively grounded (TN-S, TN-C-S for LV; direct neutral grounding for MV/HV)</option>
+            <option value="tn-c">TN-C — combined PEN conductor (LV installations only)</option>
+            <option value="tt">TT — local installation earth (LV installations)</option>
+            <option value="resistance">Resistance-earthed neutral (NER) — typical MV distribution practice</option>
+            <option value="reactance">Reactance-earthed / compensated (Peterson coil) — MV networks</option>
+            <option value="isolated">Isolated / high-impedance (IT for LV; ungrounded for MV)</option>
+          </select>
+        </div>
+        <div>
+          <label>R<sub>n</sub>, Ω (resistance / TT)</label>
+          <input id="Rn" type="number" step="0.01" min="0" value="0" />
+        </div>
+        <div>
+          <label>X<sub>n</sub>, Ω (reactance / Peterson)</label>
+          <div style="display:flex; gap:4px">
+            <input id="Xn" type="number" step="0.01" min="0" value="0" style="flex:1; min-width:0" />
+            <button type="button" class="btn-ghost btn-sm" id="RnTypical"
+                    style="white-space:nowrap"
+                    title="Fills BOTH R_n and X_n with typical values for the current region and for the currently selected earthing mode (resistance / reactance / TT).">
+              Typical R<sub>n</sub>/X<sub>n</sub>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="row row-4">
+        <div>
+          <label>Ambient θ<sub>a</sub>, °C</label>
+          <select id="ambient"></select>
+        </div>
+        <div>
+          <label>Conductor θ<sub>op</sub>, °C (for I″k_min)</label>
+          <select id="theta-op"></select>
+        </div>
+        <div></div>
+        <div></div>
+      </div>
+
+      <div class="hint">
+        IEC 60909 voltage factor <i>c</i>: LV (U ≤ 1 kV) c<sub>max</sub> = 1.05, c<sub>min</sub> = 0.95.
+        MV/HV: c<sub>max</sub> = 1.10, c<sub>min</sub> = 1.00. I″<sub>k_max</sub> uses R at 20 °C,
+        I″<sub>k_min</sub> uses R at the conductor operating temperature set above.
+        Z<sub>2</sub> = Z<sub>1</sub> (static network, far from generator).
+      </div>
+    </section>
+
+    <!-- Tabs -->
+    <section class="panel">
+      <div class="tabs-bar" id="tabsBar"></div>
+      <div id="tabContent"></div>
+    </section>
+
+    <!-- Glossary -->
+    <section class="panel">
+      <div class="panel-title">Glossary &amp; abbreviations</div>
+      <div id="glossaryBody" class="overview" style="overflow-x:auto"></div>
+      <div class="hint" style="margin-top:8px">
+        Input data and network schema are intentionally compatible with Calculator #001
+        (voltage drop): identical field names for <code>U</code>, <code>freq</code>,
+        <code>system</code>, <code>region</code>, <code>segments/elements[].L</code>,
+        <code>.series</code>, <code>.S</code>, <code>.R_km</code>, <code>.X_km</code>,
+        <code>.material</code>, <code>.n_parallel</code>, <code>.theta_ref_R</code>.
+        Future calculators in the series will follow the same contract so a project
+        can be started in one tool and continued in another.
+      </div>
+    </section>
+
+    <!-- Validation tests -->
+    <section class="panel tests">
+      <div class="panel-title">Built-in validation tests</div>
+      <table>
+        <thead><tr><th>#</th><th>Case</th><th>Quantity</th><th>Expected</th><th>Computed</th><th>Status</th></tr></thead>
+        <tbody id="testBody"></tbody>
+      </table>
+      <div class="hint" style="margin-top:8px">
+        Reference values computed by hand from IEC 60909-0 formulae; I″<sub>k1</sub> test uses
+        the three-sequence-network approach (|Z1 + Z2 + Z0|) and compares to the canonical
+        limit cases (Z0 = Z1 → I″k1 = I″k3; Z0 = 3 Z1 → I″k1 = 0.6 I″k3).
+      </div>
+    </section>
+
+    <footer>
+      <div class="disclaimer">
+        <strong>Disclaimer.</strong> This calculator is provided “as is” for educational and
+        preliminary design purposes only. The author, Eng. Evgenii Buchinskii, bears no
+        responsibility, liability or warranty of any kind (express or implied) for decisions
+        made based on its output. Before using the generated report, verify every input,
+        formula, intermediate value and final result against the applicable standard and
+        project-specific conditions (sequence impedances, motor contribution, near-to-generator
+        effects, earth-fault loop, protection coordination, etc.). Final designs must be
+        checked and signed off by a qualified engineer.
+      </div>
+    </footer>
+  </div>
+
+<!-- Shared datalists -->
+<datalist id="std-Sk"><option value="50"/><option value="100"/><option value="150"/><option value="200"/><option value="250"/><option value="350"/><option value="500"/><option value="750"/><option value="1000"/><option value="1500"/></datalist>
+<datalist id="std-Sr"><option value="100"/><option value="160"/><option value="250"/><option value="315"/><option value="400"/><option value="500"/><option value="630"/><option value="800"/><option value="1000"/><option value="1250"/><option value="1600"/><option value="2000"/><option value="2500"/><option value="3150"/><option value="4000"/></datalist>
+
+<script src="https://unpkg.com/docx@8.5.0/build/index.umd.js"></script>
+<script src="https://unpkg.com/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+<script>
+"use strict";
+
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+const STD_S = [0.5, 0.75, 1, 1.5, 2.5, 4, 6, 10, 16, 25, 35, 50, 70, 95, 120,
+               150, 185, 240, 300, 400, 500, 630, 800, 1000];
+const STD_AMBIENT = []; for (let t=-50; t<=50; t+=5) STD_AMBIENT.push(t);
+const STD_THETA   = []; for (let t=  0; t<=200;t+=5) STD_THETA.push(t);
+const ALPHA = { cu: 0.00393, al: 0.00403 };
+
+// ============================================================================
+// CABLE / CONDUCTOR LIBRARY — same as calc #001; theta_op is the R reference
+// ============================================================================
+const CABLE_DB = {
+  "LV 0.6/1 kV — Cu / XLPE / SWA / PVC (BS 5467, multicore)": { material:"cu", insulation:"xlpe", theta_op:90,
+    1.5:[15.43,0.107,23],2.5:[9.44,0.101,31],4:[5.88,0.098,40],6:[3.93,0.092,51],10:[2.33,0.086,70],16:[1.47,0.082,94],25:[0.927,0.075,123],35:[0.668,0.072,151],50:[0.494,0.069,182],70:[0.342,0.068,231],95:[0.247,0.065,280],120:[0.195,0.065,324],150:[0.158,0.065,371],185:[0.126,0.065,424],240:[0.0963,0.064,500],300:[0.0767,0.064,576],400:[0.0614,0.065,656]},
+  "LV 0.6/1 kV — Cu / XLPE / LSZH (BS 7889, unarmoured multicore)": { material:"cu", insulation:"xlpe", theta_op:90,
+    1.5:[15.43,0.110,19],2.5:[9.44,0.106,26],4:[5.88,0.102,35],6:[3.93,0.097,45],10:[2.33,0.091,63],16:[1.47,0.086,85],25:[0.927,0.082,112],35:[0.668,0.079,138],50:[0.494,0.076,168],70:[0.342,0.074,213],95:[0.247,0.072,258],120:[0.195,0.070,299],150:[0.158,0.070,344],185:[0.126,0.069,392],240:[0.0963,0.068,461],300:[0.0767,0.068,530]},
+  "LV 0.6/1 kV — Al / XLPE / SWA / PVC (BS 5467, multicore)": { material:"al", insulation:"xlpe", theta_op:90,
+    16:[2.43,0.086,73],25:[1.53,0.077,97],35:[1.11,0.074,120],50:[0.818,0.071,146],70:[0.565,0.068,186],95:[0.408,0.066,226],120:[0.323,0.064,261],150:[0.263,0.064,299],185:[0.210,0.064,341],240:[0.160,0.063,403],300:[0.128,0.063,464],400:[0.102,0.063,529],500:[0.0823,0.063,602],630:[0.0649,0.063,684]},
+  "LV 0.6/1 kV — ABC aerial bundled cable (IEC 62219)": { material:"al", insulation:"xlpe", theta_op:90,
+    16:[1.91,0.100,82],25:[1.20,0.098,105],35:[0.868,0.097,130],50:[0.641,0.095,160],70:[0.443,0.093,200],95:[0.320,0.092,245],120:[0.253,0.091,285],150:[0.206,0.090,325]},
+
+  "MV 6/10 kV — Cu / XLPE single-core (IEC 60502-2)": { material:"cu", insulation:"xlpe", theta_op:90,
+    50:[0.494,0.158,265],70:[0.342,0.150,325],95:[0.247,0.142,390],120:[0.195,0.136,445],150:[0.158,0.131,500],185:[0.126,0.125,565],240:[0.0964,0.120,655],300:[0.0767,0.116,745],400:[0.0614,0.112,840],500:[0.0493,0.108,950],630:[0.0391,0.105,1070]},
+  "MV 6/10 kV — Al / XLPE single-core (IEC 60502-2)": { material:"al", insulation:"xlpe", theta_op:90,
+    50:[0.822,0.158,205],70:[0.568,0.150,250],95:[0.411,0.142,301],120:[0.325,0.136,343],150:[0.265,0.131,388],185:[0.211,0.125,440],240:[0.161,0.120,514],300:[0.129,0.116,583],400:[0.102,0.112,666],500:[0.0822,0.108,759],630:[0.0649,0.105,860]},
+  "MV 12/20 kV — Cu / XLPE single-core (IEC 60502-2)": { material:"cu", insulation:"xlpe", theta_op:90,
+    50:[0.494,0.172,260],70:[0.342,0.164,320],95:[0.247,0.156,385],120:[0.195,0.150,440],150:[0.158,0.144,495],185:[0.126,0.138,560],240:[0.0964,0.132,650],300:[0.0767,0.128,740],400:[0.0614,0.123,835],500:[0.0493,0.119,945],630:[0.0391,0.116,1060]},
+  "MV 12/20 kV — Al / XLPE single-core (IEC 60502-2)": { material:"al", insulation:"xlpe", theta_op:90,
+    50:[0.822,0.172,200],70:[0.568,0.164,245],95:[0.411,0.156,295],120:[0.325,0.150,338],150:[0.265,0.144,383],185:[0.211,0.138,435],240:[0.161,0.132,508],300:[0.129,0.128,577],400:[0.102,0.123,660],500:[0.0822,0.119,752],630:[0.0649,0.116,853]},
+  "MV 18/30 kV — Cu / XLPE single-core (IEC 60502-2, up to 33 kV)": { material:"cu", insulation:"xlpe", theta_op:90,
+    50:[0.494,0.186,255],70:[0.342,0.178,315],95:[0.247,0.170,378],120:[0.195,0.163,432],150:[0.158,0.156,487],185:[0.126,0.150,550],240:[0.0964,0.145,640],300:[0.0767,0.140,727],400:[0.0614,0.137,822],500:[0.0493,0.132,930],630:[0.0391,0.129,1045]},
+  "MV 18/30 kV — Al / XLPE single-core (IEC 60502-2, up to 33 kV)": { material:"al", insulation:"xlpe", theta_op:90,
+    50:[0.822,0.186,198],70:[0.568,0.178,242],95:[0.411,0.170,293],120:[0.325,0.163,335],150:[0.265,0.156,380],185:[0.211,0.150,432],240:[0.161,0.145,503],300:[0.129,0.140,571],400:[0.102,0.137,654],500:[0.0822,0.132,744],630:[0.0649,0.129,845]},
+
+  "LV/MV — AAC bare overhead, all-aluminium (IEC 61089 AL1)": { material:"al", insulation:"none", theta_op:75,
+    16:[1.91,0.380,110],25:[1.20,0.370,145],35:[0.868,0.360,180],50:[0.641,0.350,220],70:[0.443,0.340,275],95:[0.320,0.335,335],120:[0.253,0.330,385],150:[0.206,0.325,440],185:[0.164,0.320,500],240:[0.125,0.315,590],300:[0.100,0.310,680],400:[0.0778,0.305,810],500:[0.0605,0.300,935],630:[0.0469,0.295,1080]},
+  "LV/MV/HV — ACSR bare overhead, Al with steel core (IEC 61089)": { material:"al", insulation:"none", theta_op:75,
+    25:[1.28,0.374,150],35:[0.901,0.365,185],50:[0.658,0.353,230],70:[0.444,0.343,290],95:[0.330,0.335,350],120:[0.261,0.330,400],150:[0.212,0.324,460],185:[0.170,0.319,525],240:[0.128,0.314,625],300:[0.105,0.309,720],400:[0.0770,0.304,870],500:[0.0620,0.299,1000],630:[0.0490,0.294,1150]},
+
+  "Manual — any voltage class (enter R and X directly)": { manual: true },
+};
+
+// ============================================================================
+// TRANSFORMER LIBRARY — presets for transformer segments
+// ============================================================================
+const TRAFO_DB = {
+  // --- LV distribution (MV → 0.4 kV, two-winding, Dyn11) ---------------
+  "LV distribution — 250 kVA (Dyn11, 11/0.4 kV)":  { Sr:250,  ukr:4.0, PkCu:3.25, U_pri:11000, U_sec:400, vg:"Dyn11",  windings:2, Z0_over_Z1:1.0 },
+  "LV distribution — 400 kVA (Dyn11, 11/0.4 kV)":  { Sr:400,  ukr:4.5, PkCu:4.6,  U_pri:11000, U_sec:400, vg:"Dyn11",  windings:2, Z0_over_Z1:1.0 },
+  "LV distribution — 500 kVA (Dyn11, 11/0.4 kV)":  { Sr:500,  ukr:4.5, PkCu:5.5,  U_pri:11000, U_sec:400, vg:"Dyn11",  windings:2, Z0_over_Z1:1.0 },
+  "LV distribution — 630 kVA (Dyn11, 11/0.4 kV)":  { Sr:630,  ukr:4.5, PkCu:6.5,  U_pri:11000, U_sec:400, vg:"Dyn11",  windings:2, Z0_over_Z1:1.0 },
+  "LV distribution — 800 kVA (Dyn11, 11/0.4 kV)":  { Sr:800,  ukr:5.0, PkCu:8.4,  U_pri:11000, U_sec:400, vg:"Dyn11",  windings:2, Z0_over_Z1:1.0 },
+  "LV distribution — 1000 kVA (Dyn11, 11/0.4 kV)": { Sr:1000, ukr:6.0, PkCu:10.5, U_pri:11000, U_sec:400, vg:"Dyn11",  windings:2, Z0_over_Z1:1.0 },
+  "LV distribution — 1250 kVA (Dyn11, 11/0.4 kV)": { Sr:1250, ukr:6.0, PkCu:13.5, U_pri:11000, U_sec:400, vg:"Dyn11",  windings:2, Z0_over_Z1:1.0 },
+  "LV distribution — 1500 kVA (Dyn11, 11/0.4 kV)": { Sr:1500, ukr:6.0, PkCu:16.5, U_pri:11000, U_sec:400, vg:"Dyn11",  windings:2, Z0_over_Z1:1.0 },
+  "LV distribution — 2000 kVA (Dyn11, 11/0.4 kV)": { Sr:2000, ukr:6.0, PkCu:21.0, U_pri:11000, U_sec:400, vg:"Dyn11",  windings:2, Z0_over_Z1:1.0 },
+  "LV distribution — 2500 kVA (Dyn11, 11/0.4 kV)": { Sr:2500, ukr:6.25,PkCu:26.5, U_pri:11000, U_sec:400, vg:"Dyn11",  windings:2, Z0_over_Z1:1.0 },
+  "LV distribution — 3150 kVA (Dyn11, 11/0.4 kV)": { Sr:3150, ukr:7.0, PkCu:33.0, U_pri:11000, U_sec:400, vg:"Dyn11",  windings:2, Z0_over_Z1:1.0 },
+  "LV distribution — 4000 kVA (Dyn11, 22/0.4 kV)": { Sr:4000, ukr:7.0, PkCu:42.0, U_pri:22000, U_sec:400, vg:"Dyn11",  windings:2, Z0_over_Z1:1.0 },
+
+  // --- MV distribution (MV → MV) ---------------------------------------
+  "MV distribution — 6300 kVA (Dyn11, 33/11 kV)":   { Sr:6300,  ukr:8.0,  PkCu:48,  U_pri:33000,  U_sec:11000, vg:"Dyn11",  windings:2, Z0_over_Z1:1.0 },
+  "MV distribution — 10000 kVA (YNd11, 33/11 kV)":  { Sr:10000, ukr:10.0, PkCu:70,  U_pri:33000,  U_sec:11000, vg:"YNd11",  windings:2, Z0_over_Z1:3.0 },
+  "MV distribution — 16000 kVA (YNd11, 33/11 kV)":  { Sr:16000, ukr:10.0, PkCu:100, U_pri:33000,  U_sec:11000, vg:"YNd11",  windings:2, Z0_over_Z1:3.0 },
+  "MV distribution — 25000 kVA (YNd11, 33/11 kV)":  { Sr:25000, ukr:11.0, PkCu:145, U_pri:33000,  U_sec:11000, vg:"YNd11",  windings:2, Z0_over_Z1:3.0 },
+  "MV distribution — 40000 kVA (YNd11, 132/33 kV)": { Sr:40000, ukr:12.0, PkCu:200, U_pri:132000, U_sec:33000, vg:"YNd11",  windings:2, Z0_over_Z1:3.0 },
+
+  // --- HV transmission (two-winding step-down / step-up) ---------------
+  "HV transmission — 63 MVA (YNyn0, 132/33 kV)":   { Sr:63000,  ukr:12.0, PkCu:260, U_pri:132000, U_sec:33000,  vg:"YNyn0", windings:2, Z0_over_Z1:3.5 },
+  "HV transmission — 125 MVA (YNyn0, 132/33 kV)":  { Sr:125000, ukr:13.0, PkCu:450, U_pri:132000, U_sec:33000,  vg:"YNyn0", windings:2, Z0_over_Z1:3.5 },
+  "HV transmission — 200 MVA (YNyn0, 220/132 kV)": { Sr:200000, ukr:14.0, PkCu:650, U_pri:220000, U_sec:132000, vg:"YNyn0", windings:2, Z0_over_Z1:4.0 },
+  "HV transmission — 400 MVA (YNyn0, 400/220 kV)": { Sr:400000, ukr:14.0, PkCu:900, U_pri:400000, U_sec:220000, vg:"YNyn0", windings:2, Z0_over_Z1:4.0 },
+
+  // --- Three-winding (modelled as equivalent two-winding HV→LV path) ---
+  // For full three-winding accuracy use u_k12, u_k23, u_k13 separately.
+  "3W HV transmission — 63 MVA (YNyn0d, 132/33/11 kV) — HV→MV":   { Sr:63000,  ukr:13.0, PkCu:280, U_pri:132000, U_sec:33000,  vg:"YNyn0d", windings:3, Z0_over_Z1:3.5, note:"3W — approx. 2-winding HV→MV path" },
+  "3W HV transmission — 125 MVA (YNyn0d, 220/33/11 kV) — HV→MV": { Sr:125000, ukr:14.0, PkCu:480, U_pri:220000, U_sec:33000,  vg:"YNyn0d", windings:3, Z0_over_Z1:4.0, note:"3W — approx. 2-winding HV→MV path" },
+  "3W Auto-transformer — 400 MVA (400/220/22 kV) — HV→MV":        { Sr:400000, ukr:14.5, PkCu:950, U_pri:400000, U_sec:220000, vg:"YN-auto", windings:3, Z0_over_Z1:3.0, note:"Auto — approx. 2-winding series path" },
+
+  // --- Split-winding (ЩЩС — two identical LV windings in parallel) -----
+  // Modelled here as single equivalent secondary; for per-half calcs, halve S_r.
+  "Split-winding — 63 MVA (YNd11d11, 132/2×11 kV) — combined":  { Sr:63000,  ukr:13.0, PkCu:260, U_pri:132000, U_sec:11000, vg:"YNd11d11", windings:"split", Z0_over_Z1:3.5, note:"Split-sec — paralleled windings" },
+  "Split-winding — 125 MVA (YNd11d11, 220/2×11 kV) — combined": { Sr:125000, ukr:14.0, PkCu:480, U_pri:220000, U_sec:11000, vg:"YNd11d11", windings:"split", Z0_over_Z1:4.0, note:"Split-sec — paralleled windings" },
+
+  "Manual — enter parameters": { manual: true },
+};
+
+// ============================================================================
+// REGION PRESETS (earthing global default = solid)
+// ============================================================================
+const REGIONS = {
+  "uae":    { U:400,  freq:50, ambient:50, limit:"solid", system:"3ph", theta:90 },
+  "uae-et": { U:400,  freq:50, ambient:45, limit:"solid", system:"3ph", theta:90 },
+  "ksa":    { U:400,  freq:60, ambient:45, limit:"solid", system:"3ph", theta:90 },
+  "qatar":  { U:415,  freq:50, ambient:50, limit:"solid", system:"3ph", theta:90 },
+  "kuwait": { U:415,  freq:50, ambient:50, limit:"solid", system:"3ph", theta:90 },
+  "uk":     { U:400,  freq:50, ambient:30, limit:"solid", system:"3ph", theta:70 },
+  "eu":     { U:400,  freq:50, ambient:30, limit:"solid", system:"3ph", theta:70 },
+  "custom": null,
+};
+function labelRegion(c){return ({"uae":"UAE (DEWA/ADDC)","uae-et":"UAE — tropical 45 °C","ksa":"Saudi Arabia (SEC)","qatar":"Qatar (Kahramaa)","kuwait":"Kuwait (MEW)","uk":"United Kingdom","eu":"European Union","custom":"Custom"})[c]||c;}
+
+// Typical neutral earthing impedance per region. The button chooses values
+// that are representative for the region's common MV distribution practice;
+// consult the local utility specification for the exact number.
+// Returns an { Rn, Xn } pair depending on the selected earthing mode.
+const RN_TYPICAL = {
+  "uae":    { resistance:{Rn:15, Xn:0}, reactance:{Rn:0, Xn:12}, tt:{Rn:10, Xn:0}, note: "DEWA 11/33 kV: ~15 Ω NER typical; if reactance-earthed, ~12 Ω Peterson coil" },
+  "uae-et": { resistance:{Rn:15, Xn:0}, reactance:{Rn:0, Xn:12}, tt:{Rn:10, Xn:0} },
+  "ksa":    { resistance:{Rn:10, Xn:0}, reactance:{Rn:0, Xn:8 }, tt:{Rn:5,  Xn:0}, note: "SEC 13.8 kV: ~10 Ω NER typical" },
+  "qatar":  { resistance:{Rn:15, Xn:0}, reactance:{Rn:0, Xn:12}, tt:{Rn:10, Xn:0} },
+  "kuwait": { resistance:{Rn:15, Xn:0}, reactance:{Rn:0, Xn:12}, tt:{Rn:10, Xn:0} },
+  "uk":     { resistance:{Rn:0,  Xn:0}, reactance:{Rn:0, Xn:0 }, tt:{Rn:10, Xn:0}, note: "UK LV TN-C-S: solidly earthed; TT installation earth ~10 Ω" },
+  "eu":     { resistance:{Rn:0,  Xn:0}, reactance:{Rn:0, Xn:40}, tt:{Rn:10, Xn:0}, note: "EU LV TN: solidly earthed; DE 20 kV Peterson coil ~40 Ω" },
+  "custom": { resistance:{Rn:0,  Xn:0}, reactance:{Rn:0, Xn:0 }, tt:{Rn:0,  Xn:0} },
+};
+function labelEarthing(c){
+  return ({
+    "solid":      "Solidly / effectively grounded (TN-S/TN-C-S for LV; direct neutral grounding for MV/HV)",
+    "tn-c":       "TN-C (PEN, LV only)",
+    "tt":         "TT — installation earth R_A (LV)",
+    "resistance": "Resistance-earthed neutral (NER) — MV distribution",
+    "reactance":  "Reactance-earthed / Peterson coil (compensated MV)",
+    "isolated":   "Isolated / IT — ungrounded or high-impedance grounded",
+  })[c] || c;
+}
+
+// ============================================================================
+// COMPLEX IMPEDANCE HELPERS (R + jX)
+// ============================================================================
+const Z0 = { R:0, X:0 };
+function zAdd(a,b){return {R:a.R+b.R, X:a.X+b.X};}
+function zScale(z,k){return {R:z.R*k, X:z.X*k};}
+function zMag(z){return Math.hypot(z.R, z.X);}
+// Engineering-notation complex number: "a + jb" or "a - j|b|" (never "a + j-b").
+function fmtCplx(R, X, unit = "mΩ", d = 3){
+  const rs = (r) => (isFinite(r) ? r.toFixed(d) : "—");
+  const sign = X >= 0 ? "+" : "−";
+  return `${rs(R)} ${sign} j${rs(Math.abs(X))} ${unit}`;
+}
+
+function zParallel(list){
+  // Admittance sum: Y = Σ 1/Z
+  let G=0, B=0, any=false;
+  for (const z of list){
+    const m2 = z.R*z.R + z.X*z.X;
+    if (m2 === 0) return {R:0, X:0}; // a short on one branch → zero
+    G += z.R / m2;
+    B += -z.X / m2;
+    any = true;
+  }
+  if (!any) return {R:Infinity, X:Infinity};
+  const Y2 = G*G + B*B;
+  if (Y2 === 0) return {R:Infinity, X:Infinity};
+  return { R: G/Y2, X: -B/Y2 };
+}
+
+// ============================================================================
+// IEC 60909 HELPERS
+// ============================================================================
+function cFactor(Un, mode){ if (Un <= 1000) return mode==="max"?1.05:0.95; return mode==="max"?1.10:1.00; }
+function correctR(R_at, from, to, mat){ const a=ALPHA[mat]||ALPHA.cu; return R_at*(1+a*(to-20))/(1+a*(from-20)); }
+
+// ============================================================================
+// SOURCE MODEL — returns {Z1, Z0} per regime (max/min) or null if not configured
+// ============================================================================
+
+// Infinite bus — user gives S″kQ (MVA) for max and/or min, plus X/R, plus Z0/Z1.
+function sourceInfinite(src, mode, Un){
+  const Sk = (mode==="max" ? src.SkQ_max_MVA : src.SkQ_min_MVA);
+  if (!Sk || Sk <= 0) return null;
+  const c  = cFactor(Un, mode);
+  const Zmag = (c * Un * Un) / (Sk * 1e6);
+  const ratioRX = (src.RX_ratio != null ? src.RX_ratio : 0.1);  // R/X, default 0.1
+  const X = Zmag / Math.sqrt(1 + ratioRX*ratioRX);
+  const R = ratioRX * X;
+  const Z1 = { R, X };
+  const z0z1 = (src.Z0_over_Z1 != null ? src.Z0_over_Z1 : 1.0);
+  const Z0 = zScale(Z1, z0z1);
+  return { Z1, Z0, cmag: Zmag, meta: { kind:"infinite", SkQ_MVA:Sk, RX_ratio:ratioRX, Z0_over_Z1:z0z1 } };
+}
+
+// Transformer source (referred to LV side) — presents Z1 and Z0 of the trafo itself.
+function sourceTrafo(src, mode, Un){
+  const Sr = (src.Sr_kVA || 0) * 1000;
+  if (Sr <= 0) return null;
+  const uk = (src.ukr_pct || 0) / 100;
+  const PkCu = (src.PkCu_kW || 0) * 1000;
+  // U_LV basis: use project Un (transformer source feeds project voltage)
+  const Ztmag = uk * Un * Un / Sr;
+  const R = PkCu * Un * Un / (Sr * Sr);
+  const X = Math.sqrt(Math.max(0, Ztmag*Ztmag - R*R));
+  const Z1 = { R, X };
+  const z0z1 = (src.Z0_over_Z1 != null ? src.Z0_over_Z1 : 1.0);
+  const Z0 = zScale(Z1, z0z1);
+  return { Z1, Z0, meta: { kind:"transformer", Sr_kVA:src.Sr_kVA, ukr_pct:src.ukr_pct, PkCu_kW:src.PkCu_kW, Z0_over_Z1:z0z1 } };
+}
+
+// Manual — direct R1, X1, R0, X0 (either full set or Z0/Z1 ratio).
+function sourceManual(src, mode){
+  const R1 = (mode==="max" ? src.R1_max : src.R1_min);
+  const X1 = (mode==="max" ? src.X1_max : src.X1_min);
+  if (R1 == null && X1 == null) return null;
+  const Z1 = { R: R1 || 0, X: X1 || 0 };
+  let Z0;
+  if (src.R0_mode === "ratio"){
+    const z0z1 = src.Z0_over_Z1 != null ? src.Z0_over_Z1 : 1.0;
+    Z0 = zScale(Z1, z0z1);
+  } else {
+    Z0 = { R: src.R0 || 0, X: src.X0 || 0 };
+  }
+  return { Z1, Z0, meta: { kind:"manual", R1, X1, Z0 } };
+}
+
+// Known short-circuit currents — user gives I″k3 (kA) and optionally I″k1 (kA) for max/min.
+// Back-calculate magnitudes of Z1 and Z0 using user-entered R/X ratio.
+function sourceKnownIk(src, mode, Un){
+  const Ik3 = (mode==="max" ? src.Ik3_max_kA : src.Ik3_min_kA);
+  const Ik1 = (mode==="max" ? src.Ik1_max_kA : src.Ik1_min_kA);
+  if (!Ik3 || Ik3 <= 0) return null;
+  const c = cFactor(Un, mode);
+  const Z1mag = (c * Un) / (Math.sqrt(3) * Ik3 * 1000);
+  const ratioRX = src.RX_ratio != null ? src.RX_ratio : 0.1;
+  const X1 = Z1mag / Math.sqrt(1 + ratioRX*ratioRX);
+  const R1 = ratioRX * X1;
+  const Z1 = { R: R1, X: X1 };
+  let Z0;
+  if (Ik1 && Ik1 > 0) {
+    // |2 Z1 + Z0| = √3·c·Un / Ik1  ⇒ assume Z0 in phase with Z1:
+    const sumMag = (Math.sqrt(3) * c * Un) / (Ik1 * 1000);
+    const Z0mag = Math.max(0, sumMag - 2 * Z1mag);
+    const X0 = Z0mag / Math.sqrt(1 + ratioRX*ratioRX);
+    const R0 = ratioRX * X0;
+    Z0 = { R: R0, X: X0 };
+  } else {
+    const z0z1 = src.Z0_over_Z1 != null ? src.Z0_over_Z1 : 1.0;
+    Z0 = zScale(Z1, z0z1);
+  }
+  return { Z1, Z0, meta: { kind:"known_Ik", Ik3_kA:Ik3, Ik1_kA:Ik1||null, RX_ratio:ratioRX } };
+}
+
+// BESS / inverter: Z = X_pu · Z_base, R/X ratio user-provided.
+// Same impedance in max and min (no speed-dependent change), c-factor at bus.
+function sourceBESS(src){
+  const Sn = (src.Sn_kVA || 0) * 1000;
+  const Un = src.Un_V || 400;
+  if (Sn <= 0 || Un <= 0) return null;
+  const Zbase = Un * Un / Sn;
+  const Zmag = (src.X_pu ?? 0.20) * Zbase;
+  const ratioRX = src.RX_ratio ?? 0.1;
+  const X = Zmag / Math.sqrt(1 + ratioRX * ratioRX);
+  const R = ratioRX * X;
+  const Z1 = { R, X };
+  const z0z1 = src.Z0_over_Z1 ?? 1.0;
+  const Z0 = zScale(Z1, z0z1);
+  return { Z1, Z0, meta: { kind: "bess", Sn_kVA: src.Sn_kVA, Un_V: Un, X_pu: src.X_pu, Ik_over_In: src.Ik_over_In } };
+}
+
+// Synchronous diesel genset — subtransient reactance X″d.
+function sourceDiesel(src){
+  const Sn = (src.Sn_kVA || 0) * 1000;
+  const Un = src.Un_V || 400;
+  if (Sn <= 0 || Un <= 0) return null;
+  const Zbase = Un * Un / Sn;
+  const Zmag = (src.Xd_pu ?? 0.15) * Zbase;
+  const ratioRX = src.RX_ratio ?? 0.08;
+  const X = Zmag / Math.sqrt(1 + ratioRX * ratioRX);
+  const R = ratioRX * X;
+  const Z1 = { R, X };
+  const z0z1 = src.Z0_over_Z1 ?? (src.X0_over_Xd ?? 0.6);
+  const Z0 = zScale(Z1, z0z1);
+  return { Z1, Z0, meta: { kind: "diesel", Sn_kVA: src.Sn_kVA, Un_V: Un, Xd_pu: src.Xd_pu } };
+}
+
+function sourceImpedance(src, mode, Un){
+  switch (src.type){
+    case "infinite":    return sourceInfinite(src, mode, Un);
+    case "transformer": return sourceTrafo(src, mode, Un);
+    case "manual":      return sourceManual(src, mode);
+    case "known_Ik":    return sourceKnownIk(src, mode, Un);
+    case "bess":        return sourceBESS(src);
+    case "diesel":      return sourceDiesel(src);
+  }
+  return null;
+}
+
+// ============================================================================
+// SEGMENT IMPEDANCES
+// ============================================================================
+
+// Cable / OHL segment per phase, positive sequence.
+function conductorZ1(seg, theta_target){
+  const mat = seg.material || "cu";
+  const R_km = correctR(seg.R_km, seg.theta_ref_R || 20, theta_target, mat);
+  const n = Math.max(1, Math.round(seg.n_parallel || 1));
+  return { R: (R_km * seg.L / 1000) / n, X: (seg.X_km * seg.L / 1000) / n };
+}
+function conductorZ0(seg, theta_target){
+  const Z1 = conductorZ1(seg, theta_target);
+  const r0r1 = seg.R0_over_R1 != null ? seg.R0_over_R1 : (seg.type==="ohl" ? 3.0 : 4.0);
+  const x0x1 = seg.X0_over_X1 != null ? seg.X0_over_X1 : (seg.type==="ohl" ? 5.0 : 3.5);
+  return { R: Z1.R * r0r1, X: Z1.X * x0x1 };
+}
+
+// Transformer segment (LV side, in the middle of the chain).
+function transformerZ1(seg){
+  const Sr = (seg.Sr_kVA || 0) * 1000;
+  if (Sr <= 0) return { R:0, X:0 };
+  const U = seg.U_sec || 400;    // impedance referred to secondary
+  const uk = (seg.ukr_pct || 0) / 100;
+  const PkCu = (seg.PkCu_kW || 0) * 1000;
+  const Ztmag = uk * U * U / Sr;
+  const R = PkCu * U * U / (Sr * Sr);
+  const X = Math.sqrt(Math.max(0, Ztmag*Ztmag - R*R));
+  return { R, X };
+}
+function transformerZ0(seg){
+  const Z1 = transformerZ1(seg);
+  const z0z1 = seg.Z0_over_Z1 != null ? seg.Z0_over_Z1 : 1.0;
+  return zScale(Z1, z0z1);
+}
+
+// Zero-sequence propagation rule through a transformer based on the vector
+// group. Z0 from an upstream source propagates to the downstream (secondary)
+// side ONLY if the primary winding is a grounded wye (YN). A Δ (D/d) or an
+// ungrounded Y blocks the zero-sequence path — in that case the downstream Z0
+// is the transformer's own Z0 alone.
+function vgPropagatesZ0Upstream(vg){
+  if (!vg) return false;                   // unknown → conservatively block
+  const v = String(vg).toLowerCase().replace(/\s+/g,"");
+  // "yn…" on primary means grounded wye, Z0 path open
+  if (v.startsWith("yn")) return true;
+  // "y…" without "yn" = ungrounded Y → blocked
+  // "d…" = delta → blocked
+  return false;
+}
+// Zero-sequence availability on the SECONDARY side (downstream) based on VG.
+// A Δ secondary (…d) has no neutral, so I″k1 at the secondary side is
+// undefined unless a zig-zag / grounding transformer is added. Return false
+// to flag that downstream Z0 cannot be freely used.
+function vgHasSecondaryZ0Path(vg){
+  if (!vg) return true;
+  const v = String(vg).toLowerCase().replace(/\s+/g,"");
+  // If secondary is delta: "…d" or "…d11" → no Z0 path
+  // For vg strings like "dyn11", "yndyn0": secondary letter is lowercase of second half
+  // simplest check: if v has "d" after "y" — meaning "yd" pattern — secondary is Δ
+  if (/y.?d\d*$/.test(v)) return false;       // YNd11, Yd1, YNd5
+  if (/d\s*d/.test(v))    return false;        // Dd
+  if (/^d[^y]/.test(v))   return true;         // Dy/Dyn — secondary is Y/YN
+  return true;
+}
+
+// Segment impedance pair (Z1, Z0) at given operating temperature.
+function segmentImpedances(seg, theta_target){
+  if (seg.type === "transformer") {
+    return { Z1: transformerZ1(seg), Z0: transformerZ0(seg) };
+  }
+  return { Z1: conductorZ1(seg, theta_target), Z0: conductorZ0(seg, theta_target) };
+}
+
+// ============================================================================
+// CIRCUIT TRAVERSAL — produce a list of busbars with accumulated Z and fault I
+// ============================================================================
+
+// Earthing adjustment of Z0 at the fault point for I″k1.
+function earthingZ0(Z0, earthing, Rn, Xn){
+  if (earthing === "isolated" || earthing === "it") return null;
+  if (earthing === "resistance") return { R: Z0.R + 3*(Rn||0), X: Z0.X };
+  if (earthing === "reactance")  return { R: Z0.R,            X: Z0.X + 3*(Xn||0) };
+  if (earthing === "tt")         return { R: Z0.R + 3*(Rn||0), X: Z0.X };  // Rn re-used as R_A
+  // solid / tn-c: no addition
+  return Z0;
+}
+
+// BB0 voltage follows the project-level nominal U by default.
+// Users can override per circuit; if they do, the override persists until
+// they blank the field (then it falls back to the project U again).
+// The circuit voltage is defined by the first source of the circuit.
+// Subsequent sources inherit (and are locked to) the same value.
+function getCircuitU(tab){
+  const u = tab && tab.sources && tab.sources[0] && tab.sources[0].Un_V;
+  return (u && u > 0) ? u : 400;
+}
+// Enforce: every source after the first copies the first source's Un_V.
+function syncCircuitVoltage(tab){
+  if (!tab || !tab.sources || tab.sources.length === 0) return;
+  const U = getCircuitU(tab);
+  tab.sources.forEach((s, i) => { if (i > 0) s.Un_V = U; });
+}
+
+// Kept for backwards compatibility — now derived strictly from the first source.
+function effectiveInitialU(tab, globals){
+  return getCircuitU(tab);
+}
+
+function traverseCircuit(tab, globals, mode){
+  const U0 = effectiveInitialU(tab, globals);
+  // Source impedance is computed against its own voltage base. For sources
+  // that reference system voltage (infinite, transformer, known_Ik), use U0.
+  const srcImps = tab.sources.map(s => sourceImpedance(s, mode, U0)).filter(x => x);
+  if (srcImps.length === 0) return { buses: [], active: false };
+  const Z1_src = srcImps.length === 1 ? srcImps[0].Z1 : zParallel(srcImps.map(s => s.Z1));
+  const Z0_src = srcImps.length === 1 ? srcImps[0].Z0 : zParallel(srcImps.map(s => s.Z0));
+
+  // R-at-reference for min mode (operating temperature); max mode uses 20 °C.
+  const theta_target = (mode === "max") ? 20 : globals.theta_op;
+
+  const buses = [];
+  let U_now = U0;
+  let Z1 = { ...Z1_src };
+  let Z0 = { ...Z0_src };
+
+  buses.push({ index: 0, name: "BB0 (source)", U: U_now, Z1: {...Z1}, Z0: {...Z0}, via: "source" });
+
+  tab.segments.forEach((seg, i) => {
+    if (seg.type === "transformer") {
+      // Refer upstream impedances to the secondary (LV) side.
+      const scale = (seg.U_sec * seg.U_sec) / Math.max(1, seg.U_pri * seg.U_pri);
+      Z1 = zScale(Z1, scale);
+      const Zt1 = transformerZ1(seg);
+      Z1 = zAdd(Z1, Zt1);
+
+      // Zero-sequence: respect the vector group.
+      //   • Primary YN + secondary y(n)/... → Z0 propagates: Z0 = scaled + Z0_t
+      //   • Any other (D primary, or ungrounded Y primary) → blocked:
+      //     Z0 on the secondary side = Z0_t only (plus whatever comes
+      //     from downstream neutral earthing, applied at the fault point).
+      const Zt0 = transformerZ0(seg);
+      if (vgPropagatesZ0Upstream(seg.vg)) {
+        Z0 = zScale(Z0, scale);
+        Z0 = zAdd(Z0, Zt0);
+      } else {
+        Z0 = { ...Zt0 };
+      }
+      U_now = seg.U_sec || U_now;
+    } else {
+      const zz = segmentImpedances(seg, theta_target);
+      Z1 = zAdd(Z1, zz.Z1);
+      Z0 = zAdd(Z0, zz.Z0);
+    }
+    buses.push({
+      index: i+1,
+      name: seg.bus_name || `BB${i+1}`,
+      U: U_now,
+      Z1: { ...Z1 },
+      Z0: { ...Z0 },
+      via: seg.type + (seg.name ? " — " + seg.name : ""),
+    });
+  });
+
+  // Fault currents at each bus.
+  buses.forEach(b => {
+    const c = cFactor(b.U, mode);
+    const Z1mag = zMag(b.Z1);
+    const Z0_adj = earthingZ0(b.Z0, globals.earthing, globals.Rn, globals.Xn);
+    const Ik3 = Z1mag > 0 ? (c * b.U) / (Math.sqrt(3) * Z1mag) : 0;
+    const Ik2 = (Math.sqrt(3)/2) * Ik3;
+    let Ik1 = 0;
+    if (Z0_adj) {
+      const sum = zAdd(zScale(b.Z1, 2), Z0_adj);
+      const sumMag = zMag(sum);
+      Ik1 = sumMag > 0 ? (Math.sqrt(3) * c * b.U) / sumMag : 0;
+    }
+    const RX = b.Z1.X > 0 ? b.Z1.R / b.Z1.X : 0;
+    const kappa = 1.02 + 0.98 * Math.exp(-3 * RX);
+    const ip = kappa * Math.sqrt(2) * Ik3;
+    Object.assign(b, { c, Z1mag, Z0mag: Z0_adj ? zMag(Z0_adj) : null, Ik3, Ik2, Ik1, kappa, ip });
+  });
+
+  return { buses, active: true };
+}
+
+// Traverse the chain using ONLY one source (others disconnected) to find
+// each individual source's contribution at every busbar.
+function perSourceContributions(tab, globals){
+  return tab.sources.map(s => {
+    const fakeTab = { ...tab, sources: [s] };
+    return {
+      source: s,
+      max: traverseCircuit(fakeTab, globals, "max"),
+      min: traverseCircuit(fakeTab, globals, "min"),
+    };
+  });
+}
+
+function computeCircuit(tab, globals){
+  const max = traverseCircuit(tab, globals, "max");
+  const min = traverseCircuit(tab, globals, "min");
+  const contributions = perSourceContributions(tab, globals);
+  // Validity tracking per source
+  const srcStatus = tab.sources.map(s => {
+    const mx = sourceImpedance(s, "max", effectiveInitialU(tab, globals));
+    const mn = sourceImpedance(s, "min", effectiveInitialU(tab, globals));
+    return {
+      id: s.id, name: s.name, type: s.type,
+      included_max: !!mx, included_min: !!mn,
+      warnings: sourceWarnings(s, mx, mn),
+    };
+  });
+  const warnings = [];
+  const total = tab.sources.length;
+  const okMax = srcStatus.filter(x => x.included_max).length;
+  const okMin = srcStatus.filter(x => x.included_min).length;
+  if (okMax < total) warnings.push(`MAX regime: only ${okMax} of ${total} source(s) produced a valid Z — the rest have incomplete input.`);
+  if (okMin < total && okMin > 0) warnings.push(`MIN regime: only ${okMin} of ${total} source(s) produced a valid Z — the rest have incomplete input.`);
+  if (okMax === 0 && okMin === 0) warnings.push(`No source provided enough data for any regime — no fault currents computed.`);
+  // Simplified Z0 warnings
+  tab.sources.forEach(s => { if (hasSimplifiedZ0Source(s)) warnings.push(`Source “${s.name}”: Z0 is based on a simplified Z0/Z1 ratio, not on an explicit grounding model. I″k1 is approximate.`); });
+  tab.segments.forEach(s => { if (s.type !== "transformer" && (s.R0_over_R1 != null || s.X0_over_X1 != null)) warnings.push(`Element “${s.name}”: Z0 is derived from the R0/R1, X0/X1 ratio approximation — not from a detailed sheath / earth-return model.`); });
+
+  // ---- Internal consistency checks (structural integrity of the model) ----
+  const busNames = tab.segments.map(s => (s.bus_name || "").trim().toUpperCase());
+  const dupBus = busNames.filter((n, i) => n && busNames.indexOf(n) !== i);
+  if (dupBus.length) warnings.push(`DUPLICATE BUS NAMES detected: ${[...new Set(dupBus)].join(", ")}. Two different physical points share the same identifier — ambiguous model.`);
+  const elemNames = tab.segments.map(s => (s.name || "").trim().toLowerCase());
+  const dupEl = elemNames.filter((n, i) => n && elemNames.indexOf(n) !== i);
+  if (dupEl.length) warnings.push(`DUPLICATE ELEMENT NAMES detected: ${[...new Set(dupEl)].join(", ")}.`);
+  // Element type ↔ catalogue series mismatch
+  tab.segments.forEach(s => {
+    if (s.type === "ohl" && s.series && !/bare overhead|HTLS/i.test(s.series))
+      warnings.push(`Element “${s.name}” is typed OHL but the library series is a cable (“${s.series}”). Pick an overhead-conductor catalogue entry.`);
+    if (s.type === "cable" && s.series && /bare overhead|HTLS/i.test(s.series))
+      warnings.push(`Element “${s.name}” is typed Cable but the library series is an overhead conductor (“${s.series}”). Pick a cable catalogue entry.`);
+  });
+
+  const hasStructuralIssue = dupBus.length > 0 || dupEl.length > 0 ||
+    tab.segments.some(s => (s.type === "ohl" && s.series && !/bare overhead|HTLS/i.test(s.series)) ||
+                            (s.type === "cable" && s.series && /bare overhead|HTLS/i.test(s.series)));
+
+  let status;
+  if (okMax === 0 && okMin === 0) status = "empty";
+  else if (hasStructuralIssue) status = "partial";
+  else if (okMax === total && (okMin === 0 || okMin === total)) status = "complete";
+  else status = "partial";
+  return { max, min, srcStatus, warnings, contributions, status, hasStructuralIssue };
+}
+
+function sourceWarnings(src, mx, mn){
+  const w = [];
+  if (src.type === "infinite") {
+    if (!src.SkQ_max_MVA) w.push("MAX regime not defined (S″kQ_max missing)");
+    if (!src.SkQ_min_MVA) w.push("MIN regime not defined (S″kQ_min missing)");
+  }
+  if (src.type === "known_Ik") {
+    if (!src.Ik3_max_kA) w.push("MAX regime not defined (I″k3_max missing)");
+    if (!src.Ik3_min_kA) w.push("MIN regime not defined (I″k3_min missing)");
+    if (!src.Ik1_max_kA && !src.Ik1_min_kA) w.push("I″k1 not given — Z0 falls back to Z0/Z1 ratio (approximation).");
+  }
+  if (src.type === "manual" && !src.X1_max && !src.X1_min) w.push("Manual R1/X1 are all zero — source effectively short-circuited at BB0.");
+  if (src.type === "transformer" && !src.Sr_kVA) w.push("Transformer S_r missing.");
+  if ((src.type === "bess" || src.type === "diesel") && !src.Sn_kVA) w.push("Inverter/generator S_n missing.");
+  return w;
+}
+// Canonical voltage class per IEC 60038 / IEC 60071 — used to match equipment
+// to the system. E.g. 10, 11 and 12 kV all belong to the same 12 kV class,
+// so a 10.5/0.4 kV transformer is a valid choice for an 11 kV busbar.
+function voltageClass(U){
+  if (!isFinite(U) || U <= 0) return 0;
+  if (U <= 1000)                        return Math.round(U);          // LV — exact
+  if (U >= 1001   && U <=  3600)        return  3600;
+  if (U >  3600   && U <=  7200)        return  7200;   // 6, 6.6, 6.9, 7.2
+  if (U >  7200   && U <= 12000)        return 12000;   // 10, 11, 12
+  if (U > 12000   && U <= 17500)        return 17500;   // 13.8, 15, 17.5
+  if (U > 17500   && U <= 24000)        return 24000;   // 20, 22, 24
+  if (U > 24000   && U <= 36000)        return 36000;   // 27, 30, 33, 35, 36
+  if (U > 36000   && U <= 52000)        return 52000;
+  if (U > 52000   && U <= 72500)        return 72500;   // 66, 69, 72.5
+  if (U > 72500   && U <= 145000)       return 145000;  // 110, 115, 132, 138, 145
+  if (U > 145000  && U <= 170000)       return 170000;  // 154, 161, 170
+  if (U > 170000  && U <= 245000)       return 245000;  // 220, 230, 245
+  if (U > 245000  && U <= 362000)       return 362000;  // 275, 345, 362
+  if (U > 362000  && U <= 420000)       return 420000;  // 380, 400, 420
+  if (U > 420000  && U <= 550000)       return 550000;
+  return 800000;
+}
+
+// Derive the applicable voltage window for a cable / OHL / ABC series
+// from its name. Manual is always shown.
+function cableVoltageRange(seriesName){
+  if (seriesName.startsWith("Manual")) return { min: 0, max: Infinity };
+  if (seriesName.startsWith("LV 0.6/1 kV"))  return { min: 0,      max: 1000 };
+  if (seriesName.startsWith("MV 6/10 kV"))   return { min: 3001,   max: 12000 };
+  if (seriesName.startsWith("MV 12/20 kV"))  return { min: 6001,   max: 24000 };
+  if (seriesName.startsWith("MV 18/30 kV"))  return { min: 15001,  max: 36000 };
+  if (seriesName.startsWith("LV/MV/HV"))     return { min: 0,      max: 300000 };
+  if (seriesName.startsWith("LV/MV"))        return { min: 0,      max: 36000 };
+  return { min: 0, max: Infinity };
+}
+function cableMatchesVoltage(name, U){
+  const r = cableVoltageRange(name);
+  return U >= r.min && U <= r.max;
+}
+
+// Upstream bus voltage for an element at position `idx` inside the chain.
+// For the first element it's the circuit voltage (Source #1). For subsequent
+// elements, the voltage is stepped down by each transformer along the path.
+function elementUpstreamVoltage(tab, idx){
+  let U = getCircuitU(tab);
+  for (let i = 0; i < idx; i++) {
+    const seg = tab.segments[i];
+    if (seg.type === "transformer" && seg.U_sec > 0) U = seg.U_sec;
+  }
+  return U;
+}
+
+function hasSimplifiedZ0Source(src){
+  if (src.type === "manual" && src.R0_mode === "ratio") return true;
+  if (src.type === "transformer") return true;      // Z0 is always from Z0/Z1 ratio
+  if (src.type === "bess" || src.type === "diesel") return true;
+  if (src.type === "infinite") return true;
+  if (src.type === "known_Ik" && !(src.Ik1_max_kA && src.Ik1_max_kA > 0)) return true;
+  return false;
+}
+
+function computeProject(state){
+  const globals = {
+    U: state.U, freq: state.freq, ambient: state.ambient,
+    theta_op: state.theta_op, system: state.system,
+    earthing: state.earthing, Rn: state.Rn, Xn: state.Xn,
+  };
+  return { globals, circuits: state.tabs.map(t => ({ tab: t, ...computeCircuit(t, globals) })) };
+}
+
+// ============================================================================
+// STATE
+// ============================================================================
+let state, nextTabId, nextSegId, nextSrcId;
+
+// Type-specific default name labels (used by auto-naming).
+const SRC_TYPE_LABEL = {
+  infinite: "Utility", transformer: "Transformer",
+  manual: "ManualSrc", known_Ik: "KnownIk",
+  bess: "BESS", diesel: "Genset",
+};
+const ELEM_TYPE_LABEL = { cable: "Cable", ohl: "OHL", transformer: "Trafo" };
+
+function nextUniqueName(label, existing){
+  const used = new Set(existing.map(e => (e.name || "").trim().toLowerCase()));
+  let n = 1;
+  while (used.has(`${label}${n}`.toLowerCase())) n++;
+  return `${label}${n}`;
+}
+
+// Recompute the name for an element or source if the user has NOT edited it
+// manually. Auto-names always follow Type+Sequence (Utility1, BESS2, Cable3…).
+function refreshAutoName(kind, item, pool){
+  if (item.name_manual) return;
+  const label = kind === "src" ? SRC_TYPE_LABEL[item.type] : ELEM_TYPE_LABEL[item.type];
+  if (!label) return;
+  item.name = nextUniqueName(label, pool.filter(x => x !== item));
+}
+
+// When a user changes the source TYPE, seed the fields of the new type with
+// sensible defaults so the state matches what is visible in the UI and the
+// validator does not flag the source as "incomplete" when the form looks full.
+function initSourceTypeDefaults(src){
+  // All source types carry an explicit rated voltage Un_V.
+  src.Un_V = src.Un_V ?? 400;
+  if (src.type === "infinite") {
+    src.SkQ_max_MVA = src.SkQ_max_MVA ?? 250;
+    src.SkQ_min_MVA = src.SkQ_min_MVA ?? 200;
+    src.RX_ratio    = src.RX_ratio    ?? 0.1;
+    src.Z0_over_Z1  = src.Z0_over_Z1  ?? 1.0;
+  } else if (src.type === "transformer") {
+    src.Sr_kVA     = src.Sr_kVA     ?? 1000;
+    src.ukr_pct    = src.ukr_pct    ?? 6.0;
+    src.PkCu_kW    = src.PkCu_kW    ?? 10.5;
+    src.Z0_over_Z1 = src.Z0_over_Z1 ?? 1.0;
+  } else if (src.type === "manual") {
+    src.R1_max = src.R1_max ?? 0; src.X1_max = src.X1_max ?? 0;
+    src.R1_min = src.R1_min ?? 0; src.X1_min = src.X1_min ?? 0;
+    src.R0 = src.R0 ?? 0; src.X0 = src.X0 ?? 0;
+    src.R0_mode = src.R0_mode ?? "ratio";
+    src.Z0_over_Z1 = src.Z0_over_Z1 ?? 1.0;
+  } else if (src.type === "known_Ik") {
+    src.Ik3_max_kA = src.Ik3_max_kA ?? 25;
+    src.Ik3_min_kA = src.Ik3_min_kA ?? 20;
+    src.Ik1_max_kA = src.Ik1_max_kA ?? null;
+    src.Ik1_min_kA = src.Ik1_min_kA ?? null;
+    src.RX_ratio   = src.RX_ratio   ?? 0.1;
+    src.Z0_over_Z1 = src.Z0_over_Z1 ?? 1.0;
+  } else if (src.type === "bess") {
+    src.Sn_kVA     = src.Sn_kVA     ?? 500;
+    src.Un_V       = src.Un_V       ?? 400;
+    src.X_pu       = src.X_pu       ?? 0.20;
+    src.RX_ratio   = src.RX_ratio   ?? 0.1;
+    src.Ik_over_In = src.Ik_over_In ?? 1.2;
+    src.Z0_over_Z1 = src.Z0_over_Z1 ?? 1.0;
+  } else if (src.type === "diesel") {
+    src.Sn_kVA     = src.Sn_kVA     ?? 500;
+    src.Un_V       = src.Un_V       ?? 400;
+    src.Xd_pu      = src.Xd_pu      ?? 0.15;
+    src.RX_ratio   = src.RX_ratio   ?? 0.08;
+    src.X0_over_Xd = src.X0_over_Xd ?? 0.6;
+    src.Z0_over_Z1 = src.Z0_over_Z1 ?? 0.6;
+  }
+}
+
+function makeDefaultSource(kind = "infinite"){
+  const src = {
+    id: nextSrcId++, name: `${SRC_TYPE_LABEL[kind] || "Source"}1`,
+    name_manual: false,
+    type: kind,
+  };
+  initSourceTypeDefaults(src);
+  // Also pre-seed the other types' typical values so a later type switch
+  // keeps numbers the user can see in the UI consistent with the state.
+  if (src.SkQ_max_MVA == null) { src.SkQ_max_MVA = 250; src.SkQ_min_MVA = 200; }
+  if (src.Sr_kVA     == null) { src.Sr_kVA = 1000; src.ukr_pct = 6.0; src.PkCu_kW = 10.5; }
+  if (src.R0_mode    == null) { src.R1_max = 0; src.X1_max = 0; src.R1_min = 0; src.X1_min = 0; src.R0 = 0; src.X0 = 0; src.R0_mode = "ratio"; }
+  if (src.Ik3_max_kA == null) { src.Ik3_max_kA = 25; src.Ik3_min_kA = 20; }
+  if (src.Sn_kVA     == null) { src.Sn_kVA = 500; src.Un_V = 400; }
+  if (src.X_pu       == null) { src.X_pu = 0.20; src.Ik_over_In = 1.2; }
+  if (src.Xd_pu      == null) { src.Xd_pu = 0.15; src.X0_over_Xd = 0.6; }
+  if (src.RX_ratio   == null) src.RX_ratio = 0.1;
+  if (src.Z0_over_Z1 == null) src.Z0_over_Z1 = 1.0;
+  return src;
+}
+
+// Unique bus name within a circuit: BB{n} where n = next free integer.
+function nextBusName(tab){
+  const used = new Set((tab?.segments || []).map(s => (s.bus_name || "").trim().toUpperCase()));
+  let n = (tab?.segments || []).length + 1;
+  while (used.has(`BB${n}`)) n++;
+  return `BB${n}`;
+}
+
+// Suggest a typical secondary voltage for a given primary (step-down).
+function suggestSecondaryVoltage(Upri){
+  if (Upri <= 1000)   return Math.max(230, Math.round(Upri / 2));
+  if (Upri <= 12000)  return 400;      // 6.6–11 kV → 0.4 kV
+  if (Upri <= 24000)  return 400;      // 15–22 kV → 0.4 kV also common
+  if (Upri <= 36000)  return 11000;    // 33 kV → 11 kV
+  if (Upri <= 72500)  return 11000;    // 66 kV → 11 kV
+  if (Upri <= 145000) return 33000;    // 132 kV → 33 kV
+  if (Upri <= 245000) return 132000;   // 220 kV → 132 kV
+  return 220000;
+}
+// Pick the best TRAFO_DB preset for a given primary voltage class; fallback to Manual.
+function pickTrafoPreset(Upri){
+  const cls = voltageClass(Upri);
+  const candidates = Object.entries(TRAFO_DB).filter(([k, v]) =>
+    !v.manual && voltageClass(v.U_pri) === cls);
+  if (candidates.length) {
+    // Prefer the smallest Sr in that class as a neutral default
+    candidates.sort((a,b) => a[1].Sr - b[1].Sr);
+    return candidates[Math.floor(candidates.length/2)][0];
+  }
+  return "Manual — enter parameters";
+}
+
+function makeDefaultSegment(kind = "cable", tab = null, insertAt = null){
+  const bus = nextBusName(tab);
+  const existing = (tab && tab.segments) || [];
+  const position = insertAt != null ? insertAt : existing.length;
+  const autoName = nextUniqueName(ELEM_TYPE_LABEL[kind] || "Element", existing);
+  if (kind === "transformer"){
+    const upstreamU = tab ? elementUpstreamVoltage(tab, position) : 11000;
+    const U_sec = suggestSecondaryVoltage(upstreamU);
+    const presetKey = pickTrafoPreset(upstreamU);
+    const preset = TRAFO_DB[presetKey];
+    const useCat = preset && !preset.manual;
+    return {
+      id: nextSegId++, name: autoName, name_manual: false, type: "transformer",
+      trafo_preset: presetKey,
+      Sr_kVA:     useCat ? preset.Sr        : 1000,
+      ukr_pct:    useCat ? preset.ukr       : 6.0,
+      PkCu_kW:    useCat ? preset.PkCu      : 10.5,
+      U_pri:      useCat ? preset.U_pri     : upstreamU,
+      U_sec:      useCat ? preset.U_sec     : U_sec,
+      Z0_over_Z1: useCat ? preset.Z0_over_Z1 : 1.0,
+      vg:         useCat ? (preset.vg || "Dyn11") : "Dyn11",
+      bus_name: bus,
+    };
+  }
+  const series = kind === "ohl"
+    ? "LV/MV/HV — ACSR bare overhead, Al with steel core (IEC 61089)"
+    : "LV 0.6/1 kV — Cu / XLPE / SWA / PVC (BS 5467, multicore)";
+  const cable = CABLE_DB[series];
+  const S = kind === "ohl" ? 95 : 240;
+  const row = cable[S];
+  return {
+    id: nextSegId++, name: autoName, name_manual: false,
+    type: kind,
+    series, S,
+    material: cable.material,
+    R_km: row[0], X_km: row[1], Iz: row[2],
+    theta_ref_R: cable.theta_op,
+    manualRX: false,
+    L: 50, n_parallel: 1,
+    R0_over_R1: kind === "ohl" ? 3.0 : 4.0,
+    X0_over_X1: kind === "ohl" ? 5.0 : 3.5,
+    bus_name: bus,
+  };
+}
+// Deduplicate bus names in a circuit (used after element move / change).
+function ensureUniqueBusNames(tab){
+  const used = new Set();
+  tab.segments.forEach((s, i) => {
+    let base = (s.bus_name || "").trim();
+    if (!base) base = `BB${i + 1}`;
+    let nm = base, k = 2;
+    while (used.has(nm.toUpperCase())) { nm = `${base} (${k++})`; }
+    s.bus_name = nm;
+    used.add(nm.toUpperCase());
+  });
+}
+
+function makeDefaultCircuit(name = "Circuit"){
+  const tab = {
+    id: nextTabId++,
+    name,
+    initial_U: null,                 // null ⇒ inherit from project U (state.U)
+    sources: [ makeDefaultSource("infinite") ],
+    segments: [],
+  };
+  tab.segments.push(makeDefaultSegment("cable", tab));
+  ensureUniqueBusNames(tab);
+  return tab;
+}
+
+function initState(){
+  nextTabId = 1; nextSegId = 1; nextSrcId = 1;
+  state = {
+    region: "uae", system: "3ph", U: 400, freq: 50,
+    ambient: 50, theta_op: 90,
+    earthing: "solid", Rn: 0, Xn: 0, limit: "solid",
+    tabs: [ makeDefaultCircuit("Circuit 1") ],
+    activeTab: "overview",
+  };
+}
+
+// ============================================================================
+// TABS
+// ============================================================================
+function renderTabs(){
+  const bar = document.getElementById("tabsBar");
+  bar.innerHTML = "";
+
+  const ov = document.createElement("button");
+  ov.className = "tab" + (state.activeTab === "overview" ? " active" : "");
+  ov.innerHTML = `<span class="tab-label">Overview</span>`;
+  ov.addEventListener("click", () => { state.activeTab = "overview"; renderTabs(); renderTabContent(); });
+  bar.appendChild(ov);
+
+  state.tabs.forEach(t => {
+    const btn = document.createElement("button");
+    btn.className = "tab" + (t.id === state.activeTab ? " active" : "");
+    btn.dataset.id = t.id;
+    btn.innerHTML = `<span class="tab-label" title="${escapeHtml(t.name)}">${escapeHtml(t.name)}</span>
+                     <span class="tab-close" title="Remove circuit">&times;</span>`;
+    btn.addEventListener("click", e => {
+      if (e.target.classList.contains("tab-close")) return;
+      state.activeTab = t.id; renderTabs(); renderTabContent();
+    });
+    btn.querySelector(".tab-close").addEventListener("click", e => { e.stopPropagation(); removeTab(t.id); });
+    bar.appendChild(btn);
+  });
+
+  const add = document.createElement("button");
+  add.className = "tab-add";
+  add.textContent = "+ New circuit";
+  add.addEventListener("click", addTab);
+  bar.appendChild(add);
+}
+
+function addTab(){
+  const next = makeDefaultCircuit(`Circuit ${state.tabs.length + 1}`);
+  state.tabs.push(next);
+  state.activeTab = next.id;
+  renderAll();
+}
+function duplicateTab(id){
+  const src = state.tabs.find(t => t.id === id); if (!src) return;
+  const clone = JSON.parse(JSON.stringify(src));
+  clone.id = nextTabId++;
+  clone.name = src.name + " (copy)";
+  clone.sources  = clone.sources.map (s => ({ ...s, id: nextSrcId++ }));
+  clone.segments = clone.segments.map(s => ({ ...s, id: nextSegId++ }));
+  const idx = state.tabs.findIndex(t => t.id === id);
+  state.tabs.splice(idx + 1, 0, clone);
+  state.activeTab = clone.id;
+  renderAll();
+}
+function removeTab(id){
+  if (state.tabs.length <= 1) return;
+  const idx = state.tabs.findIndex(t => t.id === id); if (idx < 0) return;
+  state.tabs.splice(idx, 1);
+  if (state.activeTab === id) state.activeTab = "overview";
+  renderAll();
+}
+
+// ============================================================================
+// TAB CONTENT
+// ============================================================================
+function renderTabContent(){
+  const host = document.getElementById("tabContent");
+
+  if (state.activeTab === "overview") {
+    host.innerHTML = `
+      <div class="panel-title" style="margin-top:6px">Project overview — all circuits, every busbar</div>
+      <div class="overview" style="overflow-x:auto">
+        <table id="overviewTable">
+          <thead><tr>
+            <th>Circuit</th><th>#</th><th class="bus-name">Busbar</th><th>U, V</th>
+            <th>Z1_max, mΩ</th><th>Z0_max, mΩ</th>
+            <th>I″k3_max, kA</th><th>I″k2_max, kA</th><th>I″k1_max, kA</th>
+            <th>κ</th><th>i_p, kA</th>
+            <th>Z1_min, mΩ</th><th>Z0_min, mΩ</th>
+            <th>I″k3_min, kA</th><th>I″k1_min, kA</th>
+          </tr></thead>
+          <tbody id="overviewBody"></tbody>
+        </table>
+      </div>
+      <div class="hint" style="margin-top:8px">
+        Every busbar of every circuit is shown. Use the circuit tabs to edit sources and
+        network elements. When the table does not fit the screen, scroll horizontally.
+      </div>`;
+    renderOverview();
+    return;
+  }
+
+  const tab = state.tabs.find(t => t.id === state.activeTab);
+  if (!tab) { host.innerHTML = ""; return; }
+
+  host.innerHTML = `
+    <div class="tab-head">
+      <div style="flex:1">
+        <label>Circuit name</label>
+        <input id="tabName" value="${escapeHtml(tab.name)}" />
+      </div>
+      <div>
+        <label>BB0 voltage (defined by Source #1)</label>
+        <input id="tabU0" type="text" readonly value="${getCircuitU(tab)} V" title="To change, edit the rated voltage of Source #1 in the first card below." />
+      </div>
+      <div><button class="btn-ghost btn-sm" id="dupTab" title="Duplicate this circuit">⎘ Duplicate circuit</button></div>
+      <div><button class="btn-ghost btn-sm" id="addSrc">+ Add source</button></div>
+      <div><button class="btn-ghost btn-sm" id="addSeg">+ Add element</button></div>
+    </div>
+
+    <div class="sub-panel">
+      <div class="sub-panel-title">1. Sources at BB0 (combined in parallel)</div>
+      <div id="sources"></div>
+    </div>
+
+    <div class="sub-panel">
+      <div class="sub-panel-title">2. Network elements (source → busbars → fault)</div>
+      <div id="segments"></div>
+    </div>
+
+    <div class="sub-panel">
+      <div class="sub-panel-title">3. Fault currents at every busbar (combined, all sources in parallel)</div>
+      <div class="buses"><div id="busesBody"></div></div>
+      <div class="hint">
+        Two regimes are shown side-by-side when both are configured on the source(s). If only
+        one regime is filled, only that regime is calculated.
+      </div>
+    </div>
+
+    <div class="sub-panel">
+      <div class="sub-panel-title">4. Fault level at each busbar — each source considered in isolation</div>
+      <div class="buses"><div id="contribsBody"></div></div>
+      <div class="hint">
+        Shows the short-circuit current that would occur at each busbar if <b>only one source</b>
+        were connected and the others were disconnected. Useful for protection coordination and
+        to identify the dominant contributor.
+        <br><b>Important:</b> these per-source currents are NOT additive — do not sum them to
+        obtain the total fault current. The combined fault level is the one shown in the main
+        “Fault currents at every busbar (combined)” table above.
+      </div>
+    </div>
+  `;
+
+  document.getElementById("tabName").addEventListener("input", e => { tab.name = e.target.value; renderTabs(); });
+  // tabU0 is now read-only; the value is the first source's Un_V.
+  document.getElementById("dupTab").addEventListener("click", () => duplicateTab(tab.id));
+  document.getElementById("addSrc").addEventListener("click", () => {
+    const s = makeDefaultSource("infinite");
+    tab.sources.push(s);
+    refreshAutoName("src", s, tab.sources);      // ensure unique auto-name
+    syncCircuitVoltage(tab);
+    renderSources(); renderBuses(); syncVoltageReadout();
+  });
+  document.getElementById("addSeg").addEventListener("click", () => {
+    const el = makeDefaultSegment("cable", tab);   // pass tab → unique bus name
+    tab.segments.push(el);
+    refreshAutoName("elem", el, tab.segments);     // unique auto-name
+    ensureUniqueBusNames(tab);                     // belt-and-braces uniqueness
+    renderSegments(); renderBuses();
+  });
+
+  renderSources();
+  renderSegments();
+  renderBuses();
+}
+
+// ---------------- Sources ----------------
+function renderSources(){
+  const tab = state.tabs.find(t => t.id === state.activeTab); if (!tab) return;
+  const host = document.getElementById("sources");
+  if (!tab.sources.length) { host.innerHTML = `<div class="empty">No sources. Click “+ Add source”.</div>`; return; }
+  host.innerHTML = "";
+  tab.sources.forEach((src, idx) => host.appendChild(renderSource(tab, src, idx)));
+}
+function renderSource(tab, src, idx){
+  const wrap = document.createElement("div");
+  const warns = sourceWarnings(src);
+  wrap.className = `card type-${src.type}` + (warns.length ? " invalid" : "");
+  const typeOpts = [
+    ["infinite",    "Infinite bus — grid / utility feed"],
+    ["transformer", "Distribution transformer"],
+    ["manual",      "Manual — R, X for both sequences"],
+    ["known_Ik",    "Known I″k3 and I″k1 at this bus"],
+    ["bess",        "BESS / inverter-interfaced source"],
+    ["diesel",      "Diesel / synchronous generator"],
+  ].map(([v,l]) => `<option value="${v}" ${src.type===v?"selected":""}>${l}</option>`).join("");
+
+  // Flat (no regime split) or two-regime layout per source type
+  let body = "";
+  if (src.type === "infinite") {
+    const maxFields = fieldPair("S″kQ_max, MVA", `data-s="SkQ_max_MVA" list="std-Sk"`, src.SkQ_max_MVA);
+    const minFields = fieldPair("S″kQ_min, MVA", `data-s="SkQ_min_MVA" list="std-Sk"`, src.SkQ_min_MVA);
+    body = `
+      <div class="regime-row">
+        <div class="regime-col"><h4>Maximum regime (I″k_max)</h4><div class="row row-2">${maxFields}</div></div>
+        <div class="regime-col"><h4>Minimum regime (I″k_min) — optional</h4><div class="row row-2">${minFields}</div></div>
+      </div>
+      <div class="row row-4" style="margin-top:8px">
+        <div><label>R/X ratio of source</label><input data-s="RX_ratio" type="number" step="0.01" min="0" value="${src.RX_ratio}" /></div>
+        <div><label>Z0/Z1 ratio of source</label><input data-s="Z0_over_Z1" type="number" step="0.1" min="0" value="${src.Z0_over_Z1}" /></div>
+        <div></div><div></div>
+      </div>`;
+  } else if (src.type === "transformer") {
+    const trafoOpts = Object.keys(TRAFO_DB).map(k => `<option value="${k}" ${src.trafo_preset===k?"selected":""}>${k}</option>`).join("");
+    body = `
+      <div class="row row-4">
+        <div style="grid-column: span 2"><label>Transformer preset</label><select data-s="trafo_preset">${trafoOpts}</select></div>
+        <div><label>S_r, kVA</label><input data-s="Sr_kVA" type="number" list="std-Sr" value="${src.Sr_kVA}" /></div>
+        <div><label>u_kr, %</label><input data-s="ukr_pct" type="number" step="0.1" value="${src.ukr_pct}" /></div>
+      </div>
+      <div class="row row-4">
+        <div><label>P_kCu, kW (at 75 °C)</label><input data-s="PkCu_kW" type="number" step="0.1" value="${src.PkCu_kW}" /></div>
+        <div><label>Z0/Z1 ratio (vector group)</label><input data-s="Z0_over_Z1" type="number" step="0.1" min="0" value="${src.Z0_over_Z1}" /></div>
+        <div style="grid-column: span 2"><label>Regime note</label><input type="text" readonly value="Transformer impedance is the same for max and min regimes; the regime differs only by c-factor applied at the bus." /></div>
+      </div>`;
+  } else if (src.type === "manual") {
+    const maxFields = `
+      <div><label>R1_max, Ω</label><input data-s="R1_max" type="number" step="0.0001" value="${src.R1_max}" /></div>
+      <div><label>X1_max, Ω</label><input data-s="X1_max" type="number" step="0.0001" value="${src.X1_max}" /></div>`;
+    const minFields = `
+      <div><label>R1_min, Ω</label><input data-s="R1_min" type="number" step="0.0001" value="${src.R1_min}" /></div>
+      <div><label>X1_min, Ω</label><input data-s="X1_min" type="number" step="0.0001" value="${src.X1_min}" /></div>`;
+    const z0Fields = src.R0_mode === "ratio"
+      ? `<div><label>Z0/Z1 ratio</label><input data-s="Z0_over_Z1" type="number" step="0.1" min="0" value="${src.Z0_over_Z1}" /></div><div></div><div></div>`
+      : `<div><label>R0, Ω</label><input data-s="R0" type="number" step="0.0001" value="${src.R0}" /></div>
+         <div><label>X0, Ω</label><input data-s="X0" type="number" step="0.0001" value="${src.X0}" /></div><div></div>`;
+    body = `
+      <div class="regime-row">
+        <div class="regime-col"><h4>Maximum regime</h4><div class="row row-2">${maxFields}</div></div>
+        <div class="regime-col"><h4>Minimum regime — optional</h4><div class="row row-2">${minFields}</div></div>
+      </div>
+      <div class="row row-4" style="margin-top:8px">
+        <div><label>Z0 entry</label>
+          <select data-s="R0_mode">
+            <option value="ratio" ${src.R0_mode==="ratio"?"selected":""}>Ratio Z0/Z1</option>
+            <option value="explicit" ${src.R0_mode==="explicit"?"selected":""}>Explicit R0, X0</option>
+          </select></div>
+        ${z0Fields}
+      </div>`;
+  } else if (src.type === "known_Ik") {
+    const maxFields = `
+      <div><label>I″k3_max, kA</label><input data-s="Ik3_max_kA" type="number" step="0.1" min="0" value="${src.Ik3_max_kA}" /></div>
+      <div><label>I″k1_max, kA (optional)</label><input data-s="Ik1_max_kA" type="number" step="0.1" min="0" value="${src.Ik1_max_kA}" /></div>`;
+    const minFields = `
+      <div><label>I″k3_min, kA</label><input data-s="Ik3_min_kA" type="number" step="0.1" min="0" value="${src.Ik3_min_kA}" /></div>
+      <div><label>I″k1_min, kA (optional)</label><input data-s="Ik1_min_kA" type="number" step="0.1" min="0" value="${src.Ik1_min_kA}" /></div>`;
+    body = `
+      <div class="regime-row">
+        <div class="regime-col"><h4>Maximum regime</h4><div class="row row-2">${maxFields}</div></div>
+        <div class="regime-col"><h4>Minimum regime — optional</h4><div class="row row-2">${minFields}</div></div>
+      </div>
+      <div class="row row-4" style="margin-top:8px">
+        <div><label>R/X ratio</label><input data-s="RX_ratio" type="number" step="0.01" min="0" value="${src.RX_ratio}" /></div>
+        <div><label>Z0/Z1 fallback (if I″k1 blank)</label><input data-s="Z0_over_Z1" type="number" step="0.1" min="0" value="${src.Z0_over_Z1}" /></div>
+        <div></div><div></div>
+      </div>`;
+  } else if (src.type === "bess") {
+    body = `
+      <div class="row row-4">
+        <div><label>Rated inverter S_n, kVA</label><input data-s="Sn_kVA" type="number" step="10" min="0" value="${src.Sn_kVA || 500}" /></div>
+        <div><label>Nominal voltage U_n, V</label><input data-s="Un_V" type="number" step="1" min="0" value="${src.Un_V || 400}" /></div>
+        <div><label>X_pu (subtransient equivalent)</label><input data-s="X_pu" type="number" step="0.01" min="0" value="${src.X_pu ?? 0.20}" /></div>
+        <div><label>R/X ratio</label><input data-s="RX_ratio" type="number" step="0.01" min="0" value="${src.RX_ratio ?? 0.1}" /></div>
+      </div>
+      <div class="row row-4">
+        <div><label>Fault current factor I_k / I_n</label><input data-s="Ik_over_In" type="number" step="0.1" min="0" value="${src.Ik_over_In ?? 1.2}" /></div>
+        <div><label>Z0/Z1 ratio (inverter)</label><input data-s="Z0_over_Z1" type="number" step="0.1" min="0" value="${src.Z0_over_Z1 ?? 1.0}" /></div>
+        <div style="grid-column: span 2"><label>Note</label><input type="text" readonly value="BESS is modelled as a voltage source behind Z = X_pu·Z_base (Z_base = Un²/Sn). Actual I_k limited by inverter: I_contrib ≈ I_k/I_n × S_n/(√3·U_n)." /></div>
+      </div>`;
+  } else if (src.type === "diesel") {
+    body = `
+      <div class="row row-4">
+        <div><label>Rated S_n, kVA</label><input data-s="Sn_kVA" type="number" step="10" min="0" value="${src.Sn_kVA || 500}" /></div>
+        <div><label>Nominal voltage U_n, V</label><input data-s="Un_V" type="number" step="1" min="0" value="${src.Un_V || 400}" /></div>
+        <div><label>X″d (subtransient), pu</label><input data-s="Xd_pu" type="number" step="0.01" min="0" value="${src.Xd_pu ?? 0.15}" /></div>
+        <div><label>R/X ratio</label><input data-s="RX_ratio" type="number" step="0.01" min="0" value="${src.RX_ratio ?? 0.08}" /></div>
+      </div>
+      <div class="row row-4">
+        <div><label>X″0 / X″d (zero-seq)</label><input data-s="X0_over_Xd" type="number" step="0.05" min="0" value="${src.X0_over_Xd ?? 0.6}" /></div>
+        <div><label>Z0/Z1 (total)</label><input data-s="Z0_over_Z1" type="number" step="0.1" min="0" value="${src.Z0_over_Z1 ?? 0.6}" /></div>
+        <div style="grid-column: span 2"><label>Note</label><input type="text" readonly value="Synchronous genset modelled with subtransient reactance X″d. Z = X″d · Z_base (Z_base = Un²/Sn). Typical values: X″d 0.12–0.20 pu, X″0 0.05–0.60 pu." /></div>
+      </div>`;
+  }
+
+  const warnBadge = warns.length ? `<span class="warn-badge" title="${escapeHtml(warns.join('; '))}">⚠ incomplete — excluded from calc</span>` : "";
+  const typeLabel = SRC_TYPE_LABEL[src.type] || src.type;
+  const isFirst = idx === 0;
+  const voltageStdOpts = [230,277,400,415,480,525,600,690,1000,3300,6600,10000,11000,13800,15000,20000,22000,33000]
+    .map(v => `<option value="${v}" ${Number(src.Un_V)===v?"selected":""}>${v >= 1000 ? (v/1000) + " kV" : v + " V"}</option>`).join("");
+  const voltageRow = `
+    <div class="row row-4">
+      <div>
+        <label>Rated voltage U_n${isFirst ? "" : " (inherited from Source #1)"}</label>
+        <select data-s="Un_V_std" ${isFirst ? "" : "disabled"}>${voltageStdOpts}<option value="custom" ${![230,277,400,415,480,525,600,690,1000,3300,6600,10000,11000,13800,15000,20000,22000,33000].includes(Number(src.Un_V))?"selected":""}>Custom…</option></select>
+      </div>
+      <div>
+        <label>U_n custom, V</label>
+        <input data-s="Un_V" type="number" step="1" min="0" value="${src.Un_V}" ${isFirst ? "" : "disabled"} />
+      </div>
+      <div style="grid-column: span 2">
+        <label>Voltage rule</label>
+        <input type="text" readonly value="${ isFirst ? 'Source #1 defines the circuit voltage for all downstream elements and sources.' : 'Locked — follows Source #1. To change, edit Source #1 voltage or move this source to the top.' }" />
+      </div>
+    </div>`;
+  wrap.innerHTML = `
+    <div class="card-head">
+      <div><span class="num">${idx + 1}</span>
+        <input class="name-input" data-s-name="name" value="${escapeHtml(src.name || "Source")}" />
+        <span class="card-type-badge">${typeLabel}</span>
+        ${warnBadge}
+      </div>
+      <div>
+        <button class="btn-ghost btn-xs" data-src-act="up"   ${idx === 0 ? "disabled" : ""}>↑</button>
+        <button class="btn-ghost btn-xs" data-src-act="down" ${idx === tab.sources.length-1 ? "disabled" : ""}>↓</button>
+        <button class="btn-danger btn-xs" data-src-act="del">Remove</button>
+      </div>
+    </div>
+
+    <div class="row row-4">
+      <div style="grid-column: span 2"><label>Source type</label><select data-s="type">${typeOpts}</select></div>
+      <div></div><div></div>
+    </div>
+
+    ${voltageRow}
+
+    ${body}
+
+    ${ hasSimplifiedZ0Source(src) ? `<div class="approx-note">⚠ Z0 for this source is based on a simplified Z0/Z1 ratio (approximation — edit the Z0/Z1 field to enter a value from real grounding / manufacturer data).</div>` : "" }
+  `;
+
+  wrap.querySelector('[data-s-name]').addEventListener("input", e => {
+    const v = e.target.value;
+    // uniqueness guard — revert if duplicates another source in the same tab
+    const dup = tab.sources.some(s => s !== src && (s.name || "").trim().toLowerCase() === v.trim().toLowerCase());
+    if (dup && v.trim()) {
+      e.target.setCustomValidity("Duplicate source name in this circuit");
+      e.target.reportValidity();
+      src.name = nextUniqueName(v.trim(), tab.sources.filter(s => s !== src));
+    } else {
+      e.target.setCustomValidity("");
+      src.name = v;
+      src.name_manual = true;
+    }
+    renderSources(); renderBuses();
+  });
+  wrap.querySelectorAll("[data-s]").forEach(el => {
+    const handler = () => onSrcField(tab, src, el);
+    el.addEventListener("input", handler);
+    el.addEventListener("change", handler);
+  });
+  wrap.querySelectorAll("[data-src-act]").forEach(el => el.addEventListener("click", () => {
+    const act = el.dataset.srcAct;
+    const i = tab.sources.findIndex(s => s.id === src.id);
+    if (i < 0) return;
+    if (act === "del" && tab.sources.length > 1) { tab.sources.splice(i, 1); }
+    else if (act === "up"   && i > 0)                  { [tab.sources[i-1], tab.sources[i]] = [tab.sources[i], tab.sources[i-1]]; }
+    else if (act === "down" && i < tab.sources.length-1){ [tab.sources[i],   tab.sources[i+1]] = [tab.sources[i+1], tab.sources[i]]; }
+    syncCircuitVoltage(tab);
+    renderSources(); renderBuses(); syncVoltageReadout();
+  }));
+
+  return wrap;
+}
+function fieldPair(label, attrs, value){
+  return `<div><label>${label}</label><input ${attrs} type="number" step="0.1" min="0" value="${value ?? ""}" /></div>`;
+}
+
+function onSrcField(tab, src, el){
+  const f = el.dataset.s; const v = el.value;
+  if (f === "type") {
+    src.type = v;
+    initSourceTypeDefaults(src);                    // make sure state matches UI defaults
+    refreshAutoName("src", src, tab.sources);
+    // Preserve the enforced circuit voltage when type changes.
+    syncCircuitVoltage(tab);
+    renderSources(); renderBuses(); syncVoltageReadout(); return;
+  }
+  if (f === "Un_V_std") {
+    if (v === "custom") return;                     // let user edit the custom field
+    src.Un_V = parseFloat(v);
+    syncCircuitVoltage(tab);                         // first source propagates to all others
+    renderSources(); renderSegments(); renderBuses(); syncVoltageReadout(); return;
+  }
+  if (f === "Un_V") {
+    src.Un_V = parseFloat(v) || src.Un_V;
+    syncCircuitVoltage(tab);
+    renderSources(); renderSegments(); renderBuses(); syncVoltageReadout(); return;
+  }
+  if (f === "trafo_preset") {
+    src.trafo_preset = v;
+    const t = TRAFO_DB[v];
+    if (t && !t.manual) {
+      src.Sr_kVA = t.Sr; src.ukr_pct = t.ukr; src.PkCu_kW = t.PkCu;
+      src.Z0_over_Z1 = t.Z0_over_Z1;
+    }
+    renderSources(); renderBuses(); return;
+  }
+  if (f === "R0_mode") { src.R0_mode = v; renderSources(); renderBuses(); return; }
+  src[f] = parseFloat(v);
+  if (isNaN(src[f])) src[f] = 0;
+  renderBuses();
+}
+
+// ---------------- Segments ----------------
+function renderSegments(){
+  const tab = state.tabs.find(t => t.id === state.activeTab); if (!tab) return;
+  const host = document.getElementById("segments");
+  if (!tab.segments.length) { host.innerHTML = `<div class="empty">No elements. Click “+ Add element”.</div>`; return; }
+  host.innerHTML = "";
+  tab.segments.forEach((seg, idx) => host.appendChild(renderSegment(tab, seg, idx)));
+}
+function renderSegment(tab, seg, idx){
+  const wrap = document.createElement("div");
+  wrap.className = `card type-${seg.type}`;
+
+  const typeOpts = [
+    ["cable",      "Cable — insulated conductor"],
+    ["ohl",        "OHL — overhead line / bare conductor"],
+    ["transformer","Transformer (mid-chain)"],
+  ].map(([v,l]) => `<option value="${v}" ${seg.type===v?"selected":""}>${l}</option>`).join("");
+
+  let body = "";
+  if (seg.type === "transformer") {
+    const upstreamU = elementUpstreamVoltage(tab, idx);
+    const upClass = voltageClass(upstreamU);
+    // Filter transformer presets by HV-side voltage CLASS (IEC 60038).
+    // 10, 11 and 12 kV are all the same 12 kV class — a 11/0.4 kV preset is
+    // therefore a valid choice on a 10 kV bus and vice versa.
+    const keyMatch = k => {
+      const t = TRAFO_DB[k]; if (!t) return true;
+      if (t.manual) return true;
+      return voltageClass(t.U_pri || 0) === upClass;
+    };
+    const trafoOpts = Object.keys(TRAFO_DB).map(k => {
+      const ok = keyMatch(k);
+      const disabled = ok ? "" : "disabled";
+      const tag = ok ? "" : " (U_pri mismatch)";
+      return `<option value="${k}" ${disabled} ${seg.trafo_preset===k?"selected":""}>${k}${tag}</option>`;
+    }).join("");
+    const vgOpts = ["Dyn11","Dyn1","Yyn0","YNyn0","YNd11","Yzn11","Dd0","YN-auto"]
+      .map(v => `<option value="${v}" ${seg.vg===v?"selected":""}>${v}</option>`).join("");
+    const z0note = vgPropagatesZ0Upstream(seg.vg)
+      ? "Primary YN grounded — upstream Z0 PROPAGATES to secondary (Z0_LV = scaled Z0_HV + Z0_trafo)."
+      : "Primary D or Y (ungrounded) — upstream Z0 is BLOCKED. Secondary Z0 = Z0_trafo only.";
+    body = `
+      <div class="row row-4">
+        <div style="grid-column: span 2"><label>Transformer preset</label><select data-f="trafo_preset">${trafoOpts}</select></div>
+        <div><label>U_pri, V</label><input data-f="U_pri" type="number" value="${seg.U_pri}" /></div>
+        <div><label>U_sec, V</label><input data-f="U_sec" type="number" value="${seg.U_sec}" /></div>
+      </div>
+      <div class="row row-4">
+        <div><label>S_r, kVA</label><input data-f="Sr_kVA" type="number" list="std-Sr" value="${seg.Sr_kVA}" /></div>
+        <div><label>u_kr, %</label><input data-f="ukr_pct" type="number" step="0.1" value="${seg.ukr_pct}" /></div>
+        <div><label>P_kCu, kW</label><input data-f="PkCu_kW" type="number" step="0.1" value="${seg.PkCu_kW}" /></div>
+        <div><label>Z0/Z1 ratio (transformer)</label><input data-f="Z0_over_Z1" type="number" step="0.1" min="0" value="${seg.Z0_over_Z1}" /></div>
+      </div>
+      <div class="row row-4">
+        <div><label>Vector group (governs Z0 path)</label><select data-f="vg">${vgOpts}</select></div>
+        <div style="grid-column: span 3"><label>Zero-sequence behaviour</label><input type="text" readonly value="${z0note}" /></div>
+      </div>
+    `;
+  } else {
+    const upstreamU = elementUpstreamVoltage(tab, idx);
+    const matches = k => cableMatchesVoltage(k, upstreamU);
+    const groups = { CABLE:[], OHL:[], OTHER:[] };
+    Object.keys(CABLE_DB).forEach(k => {
+      if (!matches(k)) return;                     // filter by upstream bus voltage
+      if (k.startsWith("Manual")) groups.OTHER.push(k);
+      else if (k.includes("bare overhead") || k.includes("HTLS")) groups.OHL.push(k);
+      else groups.CABLE.push(k);
+    });
+    // If the current selection doesn't match the upstream voltage, keep it
+    // available (as a misfit warning) so the user is never silently pinned.
+    let mismatchOption = "";
+    if (!matches(seg.series)) {
+      mismatchOption = `<optgroup label="⚠ current selection (voltage mismatch)">
+        <option value="${escapeHtml(seg.series)}" selected>${escapeHtml(seg.series)}</option></optgroup>`;
+    }
+    const seriesOpts = mismatchOption + Object.entries(groups).filter(([_,a])=>a.length).map(([label, items]) =>
+      `<optgroup label="${label} — applicable to ${upstreamU >= 1000 ? (upstreamU/1000)+' kV' : upstreamU+' V'} bus">${
+        items.map(k => `<option value="${escapeHtml(k)}" ${k===seg.series?"selected":""}>${escapeHtml(k)}</option>`).join("")
+      }</optgroup>`).join("");
+    const cable = CABLE_DB[seg.series];
+    const libSizes = cable && !cable.manual ? Object.keys(cable).filter(k=>!isNaN(Number(k))).map(Number).sort((a,b)=>a-b) : null;
+    const sizeList = libSizes || STD_S;
+    const sOpts = sizeList.map(s => `<option value="${s}" ${Number(s)===Number(seg.S)?"selected":""}>${s}</option>`).join("");
+    body = `
+      <div class="row row-4">
+        <div><label>Series</label><select data-f="series">${seriesOpts}</select></div>
+        <div><label>Pick S, mm²</label><select data-f="S_pick"><option value="">— pick —</option>${sOpts}</select></div>
+        <div><label>Cross-section S, mm² (editable)</label><input data-f="S" type="number" step="0.1" min="0" value="${seg.S}" /></div>
+        <div><label>Length L, m</label><input data-f="L" type="number" step="0.1" min="0" value="${seg.L}" /></div>
+      </div>
+      <div class="row row-4">
+        <div><label>R at θ<sub>ref</sub>, Ω/km <span class="pill">${seg.theta_ref_R} °C</span></label><input data-f="R_km" type="number" step="0.0001" value="${seg.R_km}" ${seg.manualRX?"":"readonly"} /></div>
+        <div><label>X, Ω/km</label><input data-f="X_km" type="number" step="0.001" value="${seg.X_km}" ${seg.manualRX?"":"readonly"} /></div>
+        <div><label>R/X source</label>
+          <select data-f="manualRX">
+            <option value="false" ${seg.manualRX?"":"selected"}>Use library</option>
+            <option value="true"  ${seg.manualRX?"selected":""}>Manual</option>
+          </select></div>
+        <div><label>Parallel conductors n</label><input data-f="n_parallel" type="number" step="1" min="1" value="${seg.n_parallel}" /></div>
+      </div>
+      <div class="row row-4">
+        <div><label>Material</label>
+          <select data-f="material" ${cable && !cable.manual ? "disabled" : ""}>
+            <option value="cu" ${seg.material==="cu"?"selected":""}>Copper</option>
+            <option value="al" ${seg.material==="al"?"selected":""}>Aluminium</option>
+          </select></div>
+        <div><label>R0/R1 ratio ⚠ approximation</label><input data-f="R0_over_R1" type="number" step="0.1" min="0" value="${seg.R0_over_R1}" title="True R0/R1 depends on sheath bonding and earth return — edit if you have a more accurate value" /></div>
+        <div><label>X0/X1 ratio ⚠ approximation</label><input data-f="X0_over_X1" type="number" step="0.1" min="0" value="${seg.X0_over_X1}" title="True X0/X1 depends on geometry and earth return — edit if you have a more accurate value" /></div>
+        <div></div>
+      </div>
+      <div class="approx-note">⚠ Zero-sequence of cables/OHL is a simplified R0/R1, X0/X1 ratio — edit above with project-specific values from manufacturer, CIGRÉ or utility data if available.</div>
+    `;
+  }
+
+  wrap.innerHTML = `
+    <div class="card-head">
+      <div><span class="num">${idx + 1}</span>
+        <input class="name-input" data-f-name="name" value="${escapeHtml(seg.name)}" />
+        <span class="card-type-badge">${seg.type.toUpperCase()}</span>
+        <input class="name-input" style="width:200px;margin-left:8px" data-f-name="bus_name" value="${escapeHtml(seg.bus_name || '')}" placeholder="Busbar name at end" />
+      </div>
+      <div>
+        <button class="btn-ghost btn-xs" data-seg-act="up"   ${idx===0?"disabled":""}>↑</button>
+        <button class="btn-ghost btn-xs" data-seg-act="down" ${idx===tab.segments.length-1?"disabled":""}>↓</button>
+        <button class="btn-danger btn-xs" data-seg-act="del">Remove</button>
+      </div>
+    </div>
+
+    <div class="row row-4">
+      <div><label>Element type</label><select data-f="type">${typeOpts}</select></div>
+      <div></div><div></div><div></div>
+    </div>
+
+    ${body}
+
+    <div class="card-result" data-role="segResult">—</div>
+  `;
+
+  wrap.querySelectorAll("[data-f-name]").forEach(el => el.addEventListener("input", e => {
+    const fld = el.dataset.fName;
+    const v = e.target.value;
+    if (fld === "name") {
+      const dup = tab.segments.some(s => s !== seg && (s.name || "").trim().toLowerCase() === v.trim().toLowerCase());
+      if (dup && v.trim()) {
+        e.target.setCustomValidity("Duplicate element name in this circuit");
+        e.target.reportValidity();
+        seg.name = nextUniqueName(v.trim(), tab.segments.filter(s => s !== seg));
+      } else {
+        e.target.setCustomValidity("");
+        seg.name = v;
+        seg.name_manual = true;
+      }
+      renderSegments();
+    } else if (fld === "bus_name") {
+      const dup = tab.segments.some(s => s !== seg && (s.bus_name || "").trim().toLowerCase() === v.trim().toLowerCase());
+      if (dup && v.trim()) {
+        e.target.setCustomValidity("Duplicate busbar name — each bus must be unique in the circuit");
+        e.target.reportValidity();
+        return;
+      } else {
+        e.target.setCustomValidity("");
+        seg.bus_name = v;
+      }
+    } else {
+      seg[fld] = v;
+    }
+    renderBuses();
+  }));
+  wrap.querySelectorAll("[data-f]").forEach(el => {
+    const h = () => onSegField(tab, seg, el);
+    el.addEventListener("input", h);
+    el.addEventListener("change", h);
+  });
+  wrap.querySelectorAll("[data-seg-act]").forEach(el => el.addEventListener("click", () => onSegAction(tab, seg.id, el.dataset.segAct)));
+  return wrap;
+}
+function onSegField(tab, seg, el){
+  const f = el.dataset.f; const v = el.value;
+  if (f === "type") {
+    // Switching type — re-init defaults, preserve id and bus_name.
+    const prevManualName = seg.name_manual;
+    const prevName = seg.name;
+    const segIdx = tab.segments.indexOf(seg);
+    // ALWAYS re-initialise via makeDefaultSegment so that the catalogue
+    // series, R_km/X_km, material, ratios etc. are consistent with the
+    // NEW type. Preserve only id, bus_name and the manual-name flag.
+    Object.assign(
+      seg,
+      makeDefaultSegment(v, tab, segIdx),
+      { id: seg.id, bus_name: seg.bus_name }
+    );
+    // Name behaviour: keep user's manual name if they had set one, else regenerate per new type.
+    if (prevManualName) { seg.name = prevName; seg.name_manual = true; }
+    else                { refreshAutoName("elem", seg, tab.segments); }
+    renderSegments(); renderBuses(); return;
+  }
+  if (f === "trafo_preset") {
+    seg.trafo_preset = v;
+    const t = TRAFO_DB[v];
+    if (t && !t.manual) {
+      seg.Sr_kVA = t.Sr; seg.ukr_pct = t.ukr; seg.PkCu_kW = t.PkCu;
+      seg.U_pri = t.U_pri; seg.U_sec = t.U_sec; seg.Z0_over_Z1 = t.Z0_over_Z1;
+      if (t.vg) seg.vg = t.vg;
+    }
+    renderSegments(); renderBuses(); return;
+  }
+  if (f === "series") {
+    seg.series = v;
+    const cable = CABLE_DB[v];
+    if (cable && !cable.manual) {
+      seg.material = cable.material;
+      seg.theta_ref_R = cable.theta_op;
+      const sizes = Object.keys(cable).filter(k=>!isNaN(Number(k))).map(Number).sort((a,b)=>a-b);
+      if (!sizes.includes(Number(seg.S))) seg.S = sizes[Math.floor(sizes.length/2)];
+      const row = cable[seg.S];
+      if (row) { seg.R_km = row[0]; seg.X_km = row[1]; seg.Iz = row[2]; }
+      seg.manualRX = false;
+    } else {
+      seg.manualRX = true; seg.theta_ref_R = 20; seg.Iz = null;
+    }
+    renderSegments(); renderBuses(); return;
+  }
+  if (f === "S" || f === "S_pick") {
+    const picked = f === "S_pick" && !v ? null : parseFloat(v);
+    if (picked == null) return;
+    seg.S = picked;
+    const cable = CABLE_DB[seg.series];
+    if (cable && !cable.manual && cable[seg.S]) {
+      const row = cable[seg.S];
+      seg.R_km = row[0]; seg.X_km = row[1]; seg.Iz = row[2];
+    } else if (!cable || cable.manual) { seg.Iz = null; }
+    if (f === "S_pick") renderSegments();
+    renderBuses(); return;
+  }
+  if (f === "manualRX") {
+    seg.manualRX = v === "true";
+    if (seg.manualRX) seg.theta_ref_R = 20;
+    else {
+      const cable = CABLE_DB[seg.series];
+      if (cable && !cable.manual) {
+        seg.theta_ref_R = cable.theta_op;
+        const row = cable[seg.S];
+        if (row) { seg.R_km = row[0]; seg.X_km = row[1]; seg.Iz = row[2]; }
+      }
+    }
+    renderSegments(); renderBuses(); return;
+  }
+  if (f === "material") { seg.material = v; renderBuses(); return; }
+  seg[f] = parseFloat(v);
+  if (isNaN(seg[f])) seg[f] = 0;
+  renderBuses();
+}
+function onSegAction(tab, segId, act){
+  const idx = tab.segments.findIndex(s => s.id === segId); if (idx < 0) return;
+  if (act === "del" && tab.segments.length > 1) tab.segments.splice(idx, 1);
+  else if (act === "up" && idx > 0)   [tab.segments[idx-1], tab.segments[idx]] = [tab.segments[idx], tab.segments[idx-1]];
+  else if (act === "down" && idx < tab.segments.length - 1) [tab.segments[idx], tab.segments[idx+1]] = [tab.segments[idx+1], tab.segments[idx]];
+  renderSegments(); renderBuses();
+}
+
+// ---------------- Buses table ----------------
+function renderBuses(){
+  const tab = state.tabs.find(t => t.id === state.activeTab); if (!tab) return;
+  const globals = { U: state.U, freq: state.freq, theta_op: state.theta_op, earthing: state.earthing, Rn: state.Rn, Xn: state.Xn };
+  const c = computeCircuit(tab, globals);
+
+  // Per-segment result strip — use max regime if available, else min.
+  const regime = c.max.active ? c.max : c.min;
+  const segWraps = document.querySelectorAll('.card [data-role="segResult"]');
+  tab.segments.forEach((seg, i) => {
+    const bus = regime.buses[i + 1];
+    if (!bus || !segWraps[i]) return;
+    segWraps[i].innerHTML = bus
+      ? `bus=<b>${escapeHtml(bus.name)}</b> · U=<b>${bus.U}</b> V · Z1=<b>${(bus.Z1mag*1000).toFixed(2)}</b> mΩ · I″k3=<b>${(bus.Ik3/1000).toFixed(2)}</b> kA · I″k1=<b>${(bus.Ik1/1000).toFixed(2)}</b> kA · ip=<b>${(bus.ip/1000).toFixed(2)}</b> kA · κ=<b>${bus.kappa.toFixed(3)}</b>`
+      : `—`;
+  });
+
+  // Per-busbar table
+  const host = document.getElementById("busesBody"); if (!host) return;
+  host.innerHTML = busesTableHTML(c);
+  const chost = document.getElementById("contribsBody");
+  if (chost) chost.innerHTML = contributionsTableHTML(c);
+}
+
+function contributionsTableHTML(c){
+  const rows = [];
+  const contribs = c.contributions || [];
+  if (!contribs.length) return `<div class="empty">No sources configured.</div>`;
+  const hasMax = contribs.some(x => x.max.active);
+  const hasMin = contribs.some(x => x.min.active);
+  // Headers
+  const head = [`<th>Busbar</th><th>U, V</th><th>Source</th>`,
+    hasMax ? `<th>I″k3_max, kA</th><th>I″k1_max, kA</th><th>i_p_max, kA</th>` : ``,
+    hasMin ? `<th>I″k3_min, kA</th><th>I″k1_min, kA</th>` : ``,
+  ].join("");
+  // Rows — one per (bus, source)
+  const refBuses = (hasMax ? contribs.find(x=>x.max.active)?.max.buses : contribs.find(x=>x.min.active)?.min.buses) || [];
+  const N = refBuses.length;
+  for (let bi = 0; bi < N; bi++){
+    contribs.forEach((ct, si) => {
+      const bmax = ct.max.active ? ct.max.buses[bi] : null;
+      const bmin = ct.min.active ? ct.min.buses[bi] : null;
+      const ref  = bmax || bmin; if (!ref) return;
+      const cells = [
+        `<td class="bus-name">${si === 0 ? escapeHtml(ref.name) : ""}</td>`,
+        `<td>${ref.U}</td>`,
+        `<td style="text-align:left">${escapeHtml(ct.source.name)}</td>`,
+      ];
+      if (hasMax) cells.push(
+        `<td>${bmax ? (bmax.Ik3/1000).toFixed(2) : "—"}</td>`,
+        `<td>${bmax ? (bmax.Ik1/1000).toFixed(2) : "—"}</td>`,
+        `<td>${bmax ? (bmax.ip/1000).toFixed(2) : "—"}</td>`,
+      );
+      if (hasMin) cells.push(
+        `<td>${bmin ? (bmin.Ik3/1000).toFixed(2) : "—"}</td>`,
+        `<td>${bmin ? (bmin.Ik1/1000).toFixed(2) : "—"}</td>`,
+      );
+      rows.push(`<tr>${cells.join("")}</tr>`);
+    });
+  }
+  return `<table><thead><tr>${head}</tr></thead><tbody>${rows.join("")}</tbody></table>`;
+}
+
+function busesTableHTML(c){
+  const hasMax = c.max.active, hasMin = c.min.active;
+  const buses = hasMax ? c.max.buses : c.min.buses;
+  if (!buses.length) return `<div class="empty">No results — configure at least one source regime.</div>`;
+  const headCols = [
+    `<th>#</th><th class="bus-name">Busbar</th><th>U, V</th>`,
+    hasMax ? `<th>Z1_max, mΩ</th><th>Z0_max, mΩ</th><th>I″k3_max, kA</th><th>I″k2_max, kA</th><th>I″k1_max, kA</th><th>κ</th><th>i_p, kA</th>` : ``,
+    hasMin ? `<th>Z1_min, mΩ</th><th>Z0_min, mΩ</th><th>I″k3_min, kA</th><th>I″k1_min, kA</th>` : ``,
+  ].join("");
+  const rows = buses.map((b, i) => {
+    const bmin = hasMin ? c.min.buses[i] : null;
+    const cells = [
+      `<td>${i}</td>`,
+      `<td class="bus-name">${escapeHtml(b.name)}</td>`,
+      `<td>${b.U}</td>`,
+    ];
+    if (hasMax) {
+      cells.push(
+        `<td>${(b.Z1mag*1000).toFixed(2)}</td>`,
+        `<td>${b.Z0mag!=null ? (b.Z0mag*1000).toFixed(2) : "—"}</td>`,
+        `<td><b>${(b.Ik3/1000).toFixed(2)}</b></td>`,
+        `<td>${(b.Ik2/1000).toFixed(2)}</td>`,
+        `<td>${(b.Ik1/1000).toFixed(2)}</td>`,
+        `<td>${b.kappa.toFixed(3)}</td>`,
+        `<td>${(b.ip/1000).toFixed(2)}</td>`,
+      );
+    }
+    if (hasMin && bmin) {
+      cells.push(
+        `<td>${(bmin.Z1mag*1000).toFixed(2)}</td>`,
+        `<td>${bmin.Z0mag!=null ? (bmin.Z0mag*1000).toFixed(2) : "—"}</td>`,
+        `<td><b>${(bmin.Ik3/1000).toFixed(2)}</b></td>`,
+        `<td>${(bmin.Ik1/1000).toFixed(2)}</td>`,
+      );
+    }
+    return `<tr>${cells.join("")}</tr>`;
+  }).join("");
+  return `<table><thead><tr>${headCols}</tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+// ---------------- Overview ----------------
+function renderOverview(){
+  const tbody = document.getElementById("overviewBody"); if (!tbody) return;
+  const { circuits } = computeProject(state);
+  tbody.innerHTML = "";
+  circuits.forEach((c, ci) => {
+    const mx = c.max.active ? c.max.buses : [];
+    const mn = c.min.active ? c.min.buses : [];
+    const N = Math.max(mx.length, mn.length);
+    for (let i = 0; i < N; i++) {
+      const bm = mx[i]; const bn = mn[i];
+      const b = bm || bn;
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td style="text-align:left">${i === 0 ? escapeHtml(c.tab.name) : ""}</td>
+        <td>${i}</td>
+        <td class="bus-name">${escapeHtml(b.name)}</td>
+        <td>${b.U}</td>
+        <td>${bm ? (bm.Z1mag*1000).toFixed(2) : "—"}</td>
+        <td>${bm && bm.Z0mag!=null ? (bm.Z0mag*1000).toFixed(2) : "—"}</td>
+        <td><b>${bm ? (bm.Ik3/1000).toFixed(2) : "—"}</b></td>
+        <td>${bm ? (bm.Ik2/1000).toFixed(2) : "—"}</td>
+        <td>${bm ? (bm.Ik1/1000).toFixed(2) : "—"}</td>
+        <td>${bm ? bm.kappa.toFixed(3) : "—"}</td>
+        <td>${bm ? (bm.ip/1000).toFixed(2) : "—"}</td>
+        <td>${bn ? (bn.Z1mag*1000).toFixed(2) : "—"}</td>
+        <td>${bn && bn.Z0mag!=null ? (bn.Z0mag*1000).toFixed(2) : "—"}</td>
+        <td><b>${bn ? (bn.Ik3/1000).toFixed(2) : "—"}</b></td>
+        <td>${bn ? (bn.Ik1/1000).toFixed(2) : "—"}</td>`;
+      tbody.appendChild(tr);
+    }
+  });
+}
+
+// ============================================================================
+// GLOBALS
+// ============================================================================
+function applyRegion(code){
+  state.region = code;
+  const r = REGIONS[code]; if (!r) return;
+  state.U = r.U; state.freq = r.freq; state.ambient = r.ambient;
+  state.earthing = r.limit; state.limit = r.limit; state.system = r.system; state.theta_op = r.theta;
+  syncGlobalsUi();
+}
+function syncGlobalsUi(){
+  document.getElementById("region").value = state.region;
+  document.getElementById("system").value = state.system;
+  document.getElementById("freq").value = String(state.freq);
+  document.getElementById("limit").value = state.earthing;
+  document.getElementById("ambient").value = String(state.ambient);
+  document.getElementById("theta-op").value = String(state.theta_op);
+  document.getElementById("Rn").value = String(state.Rn);
+  document.getElementById("Xn").value = String(state.Xn);
+  syncVoltageReadout();
+}
+function syncVoltageReadout(){
+  const el = document.getElementById("voltage-readout");
+  if (el) {
+    el.value = state.tabs.map(t => `“${t.name}”: ${getCircuitU(t)} V`).join("  ·  ") || "(no circuits)";
+  }
+  // Also refresh per-tab BB0 readout when the active tab has one
+  const tabU0 = document.getElementById("tabU0");
+  const tab = state.tabs.find(t => t.id === state.activeTab);
+  if (tabU0 && tab) tabU0.value = `${getCircuitU(tab)} V`;
+}
+function wireGlobals(){
+  const lim = document.getElementById("limit");
+  document.getElementById("region").addEventListener("change", e => { applyRegion(e.target.value); renderAll(); });
+  document.getElementById("system").addEventListener("change", e => { state.system = e.target.value; renderAll(); });
+  document.getElementById("freq").addEventListener("change",   e => { state.freq = parseFloat(e.target.value); renderAll(); });
+  lim.addEventListener("change",                               e => { state.earthing = e.target.value; state.limit = e.target.value; renderAll(); });
+  document.getElementById("ambient").addEventListener("change",e => { state.ambient = parseFloat(e.target.value); });
+  document.getElementById("theta-op").addEventListener("change",e => { state.theta_op = parseFloat(e.target.value); renderAll(); });
+  document.getElementById("Rn").addEventListener("input",      e => { state.Rn = parseFloat(e.target.value)||0; renderAll(); });
+  document.getElementById("Xn").addEventListener("input",      e => { state.Xn = parseFloat(e.target.value)||0; renderAll(); });
+  document.getElementById("RnTypical").addEventListener("click", () => {
+    const row = RN_TYPICAL[state.region] || RN_TYPICAL.custom;
+    const mode = state.earthing === "reactance" ? "reactance"
+              : state.earthing === "tt"         ? "tt"
+              : "resistance";                 // default mapping for solid / TN / isolated → resistance table (usually 0/0)
+    const t = row[mode] || { Rn:0, Xn:0 };
+    state.Rn = t.Rn; state.Xn = t.Xn;
+    document.getElementById("Rn").value = t.Rn;
+    document.getElementById("Xn").value = t.Xn;
+    renderAll();
+  });
+  document.getElementById("calcBtn").addEventListener("click", renderAll);
+  document.getElementById("docxBtn").addEventListener("click", downloadDocx);
+  document.getElementById("resetBtn").addEventListener("click",() => { initState(); syncGlobalsUi(); renderAll(); });
+}
+// ============================================================================
+// GLOSSARY (shared page-level legend; also emitted into docx report)
+// ============================================================================
+const GLOSSARY = [
+  ["U",           "Nominal system voltage at a busbar (V)"],
+  ["U_pri / U_sec","Transformer primary / secondary rated voltage (V)"],
+  ["c",           "IEC 60909 voltage factor (1.05 LV max, 0.95 LV min, 1.10 MV max, 1.00 MV min)"],
+  ["S″kQ",        "Short-circuit power of the infinite-bus source (MVA)"],
+  ["Z_Q",         "Source impedance referred to the nominal bus voltage (Ω)"],
+  ["S_r",         "Transformer rated apparent power (kVA)"],
+  ["u_kr",        "Transformer short-circuit voltage, percentage of U_r"],
+  ["P_kCu",       "Transformer copper losses at rated load (kW)"],
+  ["Z_t",         "Transformer leakage impedance referred to LV side (Ω)"],
+  ["X″d",         "Subtransient reactance of a synchronous generator (pu)"],
+  ["X_pu",        "Per-unit reactance (BESS / inverter); Z = X_pu · U²/S_n"],
+  ["Z1, Z2, Z0",  "Positive / negative / zero sequence impedances (Ω)"],
+  ["R0/R1, X0/X1","Zero-sequence scaling factors for cables / OHL / transformers"],
+  ["R_n, X_n",    "Neutral earthing resistor / reactor (Ω) — adds 3·R_n or 3·X_n to Z0"],
+  ["α",           "Conductor temperature coefficient (per °C): Cu 0.00393, Al 0.00403"],
+  ["θ_a, θ_op",   "Ambient / conductor operating temperatures (°C)"],
+  ["I″k3",        "Initial symmetrical three-phase short-circuit current (A)"],
+  ["I″k2",        "Line-to-line short-circuit current = (√3/2)·I″k3"],
+  ["I″k1",        "Line-to-earth (single-phase-to-ground) short-circuit current (A)"],
+  ["κ (kappa)",   "Peak factor = 1.02 + 0.98·e^(−3·R/X)"],
+  ["i_p",         "Peak short-circuit current = κ·√2·I″k (A)"],
+  ["BB0, BB1 …",  "Busbars along the circuit, numbered from the source"],
+  ["TN / TT / IT","Earthing systems per IEC 60364-4-41"],
+  ["BESS",        "Battery Energy Storage System (inverter-interfaced source)"],
+  ["DG",          "Diesel / synchronous generator"],
+  ["LV / MV / HV","Low / medium / high voltage classes"],
+  ["n_parallel",  "Number of identical conductors paralleled in one element"],
+];
+function renderGlossary(){
+  const host = document.getElementById("glossaryBody"); if (!host) return;
+  host.innerHTML = `<table><thead><tr><th style="width:18%">Symbol</th><th style="text-align:left">Definition</th></tr></thead><tbody>${
+    GLOSSARY.map(([s, d]) => `<tr><td style="text-align:left"><b>${escapeHtml(s)}</b></td><td style="text-align:left">${escapeHtml(d)}</td></tr>`).join("")
+  }</tbody></table>`;
+}
+
+function populateGlobalSelects(){
+  const amb = document.getElementById("ambient");
+  amb.innerHTML = STD_AMBIENT.map(t => `<option value="${t}">${t>0?"+":""}${t} °C</option>`).join("");
+  const the = document.getElementById("theta-op");
+  the.innerHTML = STD_THETA.map(t => {
+    const note = t===20?" — 20 °C (IEC 60909 R_20 for I″k_max)"
+               : t===70?" — 70 °C (PVC operating)"
+               : t===90?" — 90 °C (XLPE operating)"
+               : t===160?" — 160 °C (XLPE fault limit)"
+               : t===140?" — 140 °C (PVC fault limit)" : "";
+    return `<option value="${t}">${t} °C${note}</option>`;
+  }).join("");
+}
+function renderAll(){ renderTabs(); renderTabContent(); }
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+// ============================================================================
+// VALIDATION TESTS
+// ============================================================================
+const TESTS = [
+  {
+    name: "1000 kVA trafo, u_kr=6 %, P_Cu=11 kW, fault at LV busbars (source=trafo)",
+    quantity: "I″k3_max",
+    expected: 25.26, unit: "kA", tol: 0.3,
+    run: () => {
+      const src = { type:"transformer", Sr_kVA:1000, ukr_pct:6.0, PkCu_kW:11, Z0_over_Z1:1.0 };
+      const si = sourceTrafo(src, "max", 400);
+      const Z = zMag(si.Z1);
+      return (1.05 * 400) / (Math.sqrt(3) * Z) / 1000;
+    },
+  },
+  {
+    name: "Peak factor κ when R/X = 0.05",
+    quantity: "κ",
+    expected: 1.863, unit: "", tol: 0.005,
+    run: () => 1.02 + 0.98 * Math.exp(-3 * 0.05),
+  },
+  {
+    name: "I″k1 equals I″k3 when Z0 = Z1 (rigid earthing limit)",
+    quantity: "I″k1 / I″k3",
+    expected: 1.000, unit: "", tol: 0.001,
+    run: () => {
+      const Z1 = { R: 0.01, X: 0.05 };
+      const Z0 = { ...Z1 };
+      const Z1mag = zMag(Z1);
+      const sum = zAdd(zScale(Z1, 2), Z0);
+      const sumMag = zMag(sum);
+      const Ik3 = 1 / (Math.sqrt(3) * Z1mag);
+      const Ik1 = Math.sqrt(3) / sumMag;
+      return Ik1 / Ik3;
+    },
+  },
+  {
+    name: "I″k1 = 0.6 · I″k3 when Z0 = 3·Z1 (common cable ratio)",
+    quantity: "I″k1 / I″k3",
+    expected: 0.600, unit: "", tol: 0.01,
+    run: () => {
+      const Z1 = { R: 0.01, X: 0.05 };
+      const Z0 = zScale(Z1, 3);
+      const Z1mag = zMag(Z1);
+      const sum = zAdd(zScale(Z1, 2), Z0);
+      const sumMag = zMag(sum);
+      const Ik3 = 1 / (Math.sqrt(3) * Z1mag);
+      const Ik1 = Math.sqrt(3) / sumMag;
+      return Ik1 / Ik3;
+    },
+  },
+];
+function runTests(){
+  const tbody = document.getElementById("testBody"); tbody.innerHTML = "";
+  TESTS.forEach((t, i) => {
+    const v = t.run(); const ok = Math.abs(v - t.expected) <= t.tol;
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${i+1}</td><td style="text-align:left">${t.name}</td><td>${t.quantity}</td><td>${t.expected.toFixed(3)} ${t.unit}</td><td>${v.toFixed(3)} ${t.unit}</td><td class="${ok?'pass':'fail'}">${ok?'PASS':'FAIL'}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+// ============================================================================
+// CONTEXT-AWARE REFERENCES
+// ============================================================================
+function projectUsage(state){
+  const u = { lvCables:false, mvCables:false, barOverhead:false, abc:false, manualCable:false,
+              hasTrafoSeg:false, infSrc:false, trafoSrc:false, manualSrc:false, knownIkSrc:false,
+              earthingSpecial:false };
+  if (["resistance","reactance","tt","isolated","it","tn-c"].includes(state.earthing)) u.earthingSpecial = true;
+  state.tabs.forEach(t => {
+    t.sources.forEach(s => {
+      if (s.type === "infinite") u.infSrc = true;
+      if (s.type === "transformer") u.trafoSrc = true;
+      if (s.type === "manual") u.manualSrc = true;
+      if (s.type === "known_Ik") u.knownIkSrc = true;
+    });
+    t.segments.forEach(s => {
+      const series = s.series || "";
+      if (s.type === "transformer") { u.hasTrafoSeg = true; return; }
+      if (series.startsWith("Manual")) { u.manualCable = true; return; }
+      if (series.includes("bare overhead")) { u.barOverhead = true; return; }
+      if (series.includes("ABC aerial")) { u.abc = true; return; }
+      if (/\bLV\b/.test(series)) u.lvCables = true;
+      if (/\bMV\b/.test(series)) u.mvCables = true;
+    });
+  });
+  return u;
+}
+function buildReferences(state){
+  const u = projectUsage(state); const lines = [];
+  lines.push("IEC 60909-0:2016 — Short-circuit currents in three-phase a.c. systems — Part 0: Calculation of currents.");
+  lines.push("IEC 60909-1 — Factors for the calculation of short-circuit currents according to IEC 60909-0.");
+  lines.push("IEC 60909-4 — Examples for the calculation of short-circuit currents.");
+  lines.push("IEC 60038 — IEC standard voltages (voltage factor c).");
+  lines.push("IEC 60228:2004 — Conductors of insulated cables (α temperature coefficients).");
+  if (u.trafoSrc || u.hasTrafoSeg) {
+    lines.push("IEC 60076-1 — Power transformers: general (S_r, u_kr, P_kCu definitions).");
+    lines.push("IEC 60076-5 — Power transformers — Ability to withstand short-circuit.");
+  }
+  if (u.lvCables) lines.push("BS 5467 / BS 7889 / BS 6004 — LV cable construction standards.");
+  if (u.mvCables) lines.push("IEC 60502-2 — MV cables 6 kV up to 30 kV (Uₘ = 36 kV).");
+  if (u.barOverhead) lines.push("IEC 61089 — Round wire concentric lay overhead electrical stranded conductors.");
+  if (u.abc) lines.push("IEC 62219 — Overhead electrical conductors — Formed wire concentric lay.");
+  if (u.earthingSpecial) lines.push("IEC 60364-4-41 — Protection against electric shock; earthing arrangements (TN / TT / IT) referenced for the earth-fault loop model.");
+  return lines;
+}
+
+// ============================================================================
+// DETAILED STEP-BY-STEP DERIVATIONS (used by the .docx report)
+// Every formula, every intermediate number, every assumption is emitted as
+// plain text so an engineer can verify each step with a calculator.
+// ============================================================================
+
+function detailedCircuitSteps(tab, c, U0, globals, h){
+  const { cellTxt, row, pBody, pHead, Table, WidthType, AlignmentType, HeadingLevel, FIXED_LAYOUT, SIZE_H3 } = h;
+  const out = [];
+  const hasMax = c.max.active, hasMin = c.min.active;
+
+  const fmt3 = n => (isFinite(n) ? n.toFixed(3) : "—");
+  const fmt4 = n => (isFinite(n) ? n.toFixed(4) : "—");
+  const mOhm = z => fmtCplx(z.R*1000, z.X*1000, "mΩ", 3);
+  const mOhmMag = z => fmt3(zMag(z)*1000);
+
+  // ---- 3.0  Status + topology + input classification ---------------------
+  out.push(pHead("3.0  Circuit model status, topology and inputs", HeadingLevel.HEADING_3, SIZE_H3));
+  const okMax = c.srcStatus.filter(s => s.included_max).length;
+  const okMin = c.srcStatus.filter(s => s.included_min).length;
+  const T = tab.sources.length;
+  const statusLabel = c.status === "complete"
+        ? "NUMERICAL CALCULATION COMPLETED — no automatic structural flags raised. Full engineering review of the input model, zero-sequence assumptions and source representation is still required before the results are used for design."
+    : c.status === "partial"
+        ? (c.hasStructuralIssue
+           ? "CALCULATION EXECUTED WITH STRUCTURAL FLAGS — duplicate identifiers, mismatched element types, or excluded sources detected. Manual review required before use."
+           : "CALCULATION PARTIAL — some sources were excluded or approximated. Review the included / excluded list below.")
+    : "CALCULATION NOT PERFORMED — no source provided enough data.";
+  out.push(pBody(`Model status: ${statusLabel}.`, { bold:true }));
+  out.push(pBody(`MAX regime: ${okMax} of ${T} source(s) included. MIN regime: ${okMin} of ${T} source(s) included.`));
+  if (c.warnings.length) {
+    out.push(pBody("Warnings affecting result reliability:", { bold:true }));
+    c.warnings.forEach(w => out.push(pBody("  • " + w)));
+  } else {
+    out.push(pBody("No warnings."));
+  }
+  // One-line topology
+  const topology = ["BB0 (source bus, U = " + U0 + " V)"]
+    .concat(tab.segments.map((s, i) => {
+      const via = s.type === "transformer"
+        ? `${s.Sr_kVA} kVA ${s.U_pri}/${s.U_sec} V transformer (${s.vg})`
+        : s.type === "ohl"
+          ? `${s.L} m OHL ${s.S} mm² (×${s.n_parallel})`
+          : `${s.L} m cable ${s.S} mm² (×${s.n_parallel})`;
+      return `→ ${via} → ${s.bus_name}`;
+    }))
+    .join(" ");
+  out.push(pBody("Topology: " + topology, { italics:true }));
+  // BB0 physical meaning — derived from first element
+  const firstSeg = tab.segments[0];
+  let bb0meaning = "upstream busbar at the network side of the first element";
+  if (firstSeg && firstSeg.type === "transformer") {
+    bb0meaning = `HV-side bus of transformer “${firstSeg.name}” (utility feed point, U = ${U0} V)`;
+  } else if (tab.sources.some(s => s.type === "transformer")) {
+    bb0meaning = `LV bus of the source transformer (main switchboard incomer, U = ${U0} V)`;
+  } else if (tab.sources.some(s => s.type === "infinite")) {
+    bb0meaning = `Point of common coupling (PCC) with the utility network (U = ${U0} V)`;
+  }
+  out.push(pBody(`Physical meaning of BB0: ${bb0meaning}.`));
+
+  // Input classification
+  out.push(pBody("Input data origin classification:", { bold:true }));
+  tab.sources.forEach(s => {
+    let origin;
+    if (s.type === "known_Ik") origin = s.Ik1_max_kA ? "user-provided utility/short-circuit test data" : "user-provided I″k3 only (Z0 ≈ Z0/Z1·Z1 — engineering assumption)";
+    else if (s.type === "transformer") origin = "catalogue / nameplate (Sr, u_kr, P_kCu)";
+    else if (s.type === "infinite") origin = "utility network data (S″kQ, R/X) — modelled as an infinite-bus equivalent with no upstream current limit beyond the declared S″kQ";
+    else if (s.type === "bess")     origin = "BESS inverter nameplate (Sn, X_pu) — SIMPLIFIED: voltage source behind X_pu·Z_base; converter current-limit / FRT control not modelled";
+    else if (s.type === "diesel")   origin = "synchronous genset nameplate (Sn, X″d) — SIMPLIFIED: source behind subtransient reactance only; AVR, decay, excitation dynamics not modelled";
+    else origin = "manual (user-entered R, X)";
+    out.push(pBody(`  • Source “${s.name}” (${s.type}): ${origin}`));
+  });
+  tab.segments.forEach(s => {
+    let origin;
+    if (s.type === "transformer") {
+      origin = s.trafo_preset && !TRAFO_DB[s.trafo_preset]?.manual
+        ? `transformer catalogue preset: ${s.trafo_preset} (IEC 60076)`
+        : "user-entered transformer nameplate data (IEC 60076)";
+    } else if (s.type === "ohl") {
+      origin = s.manualRX ? "user-entered overhead-conductor R, X (manual)"
+                          : `overhead-conductor catalogue: ${s.series} (IEC 61089)`;
+    } else if (s.type === "cable") {
+      origin = s.manualRX ? "user-entered cable R, X (manual)"
+                          : `cable catalogue: ${s.series}`;
+    } else origin = "user data";
+    out.push(pBody(`  • Element “${s.name}” (${s.type}): ${origin}`));
+  });
+
+  // ---- 3.1  Sources — individual derivation ------------------------------
+  out.push(pHead("3.1  Source impedances — detailed derivation per source", HeadingLevel.HEADING_3, SIZE_H3));
+  out.push(pBody(`In this step, the Thévenin impedance (positive and zero sequence) of every source feeding BB0 is derived. The per-source values are subsequently combined in parallel to form the single equivalent upstream impedance seen from every downstream fault point.`, { italics:true }));
+  out.push(pBody(`Reference bus voltage at BB0: U0 = ${U0} V. Voltage factor c: c_max = ${cFactor(U0,"max")}, c_min = ${cFactor(U0,"min")} (IEC 60909-0 Table 1).`));
+
+  // Split sources: included vs excluded (for transparency)
+  const included = tab.sources.filter(s => {
+    const mx = sourceImpedance(s, "max", U0);
+    const mn = sourceImpedance(s, "min", U0);
+    return mx || mn;
+  });
+  const excluded = tab.sources.filter(s => !included.includes(s));
+  if (excluded.length) {
+    out.push(pBody(`Excluded from the calculation (input incomplete) — ${excluded.length} source(s):`, { bold:true }));
+    excluded.forEach(s => out.push(pBody(`  • “${s.name}” (${s.type}) — ${sourceWarnings(s).join("; ") || "no valid data"}`)));
+  }
+  if (included.length === 0) {
+    out.push(pBody("No source has enough data — the fault current calculation cannot be completed.", { bold:true }));
+    return out;
+  }
+  out.push(pBody(`Sources actually included in the equivalent calculation: ${included.length} of ${tab.sources.length}.`, { bold:true }));
+
+
+  included.forEach((s, i) => {
+    const mx = sourceImpedance(s, "max", U0);
+    const mn = sourceImpedance(s, "min", U0);
+    out.push(pBody(`— Source #${i+1}: ${s.name} (type: ${s.type}) —`, { bold:true }));
+    const z0Note = hasSimplifiedZ0Source(s)
+      ? "Z0 for this source is derived from a simplified Z0/Z1 ratio (approximation — see warnings)."
+      : "Z0 for this source is derived from actual short-circuit test or grounding data.";
+    out.push(pBody("  Zero-sequence data origin: " + z0Note, { italics:true }));
+    if (mx) sourceDerivationLines(s, U0, "max").forEach(l => out.push(pBody("  " + l)));
+    else    out.push(pBody("  MAX regime: not computed (input incomplete)."));
+    if (mn) sourceDerivationLines(s, U0, "min").forEach(l => out.push(pBody("  " + l)));
+    if (mx) out.push(pBody(`  → Z1_max = ${mOhm(mx.Z1)}     |Z1_max| = ${mOhmMag(mx.Z1)} mΩ     R/X = ${fmt3(mx.Z1.X>0?mx.Z1.R/mx.Z1.X:0)}`));
+    if (mx) out.push(pBody(`  → Z0_max = ${mOhm(mx.Z0)}     |Z0_max| = ${mOhmMag(mx.Z0)} mΩ`));
+    if (mn) out.push(pBody(`  → Z1_min = ${mOhm(mn.Z1)}     |Z1_min| = ${mOhmMag(mn.Z1)} mΩ`));
+    if (mn) out.push(pBody(`  → Z0_min = ${mOhm(mn.Z0)}     |Z0_min| = ${mOhmMag(mn.Z0)} mΩ`));
+  });
+
+  // ---- 3.2  Parallel combination at BB0 ---------------------------------
+  const parNeeded = included.length > 1;
+  if (parNeeded) {
+    out.push(pHead("3.2  Parallel combination of sources at BB0", HeadingLevel.HEADING_3, SIZE_H3));
+    out.push(pBody(`In this step, the ${included.length} active sources feeding BB0 are combined into a single equivalent Thévenin impedance. In sequence-network notation, the parallel combination is performed in each sequence: Y = Σ 1/Z_k; Z_equiv = 1/Y_total. The numerical admittance sum is presented below to allow independent verification of each intermediate value.`, { italics:true }));
+    ["max","min"].forEach(mode => {
+      const imps = included.map(s => sourceImpedance(s, mode, U0)).filter(x => x);
+      if (imps.length < 2) return;
+      out.push(pBody(`${mode.toUpperCase()} regime — Z1 combination:`, { bold:true }));
+      let G1 = 0, B1 = 0;
+      imps.forEach((s, i) => {
+        const m2 = s.Z1.R*s.Z1.R + s.Z1.X*s.Z1.X;
+        const g = s.Z1.R/m2, b = -s.Z1.X/m2;
+        G1 += g; B1 += b;
+        out.push(pBody(`  Y1_${i+1} = 1/(${mOhm(s.Z1)}) = ${fmtCplx(g*1e6, b*1e6, "× 10⁻⁶ S", 4)}`));
+      });
+      out.push(pBody(`  Y1_total = Σ Y1 = ${fmtCplx(G1*1e6, B1*1e6, "× 10⁻⁶ S", 4)}`));
+      const Z1par = zParallel(imps.map(s => s.Z1));
+      out.push(pBody(`  Z1_BB0 = 1 / Y1_total = ${mOhm(Z1par)}  (|Z1| = ${mOhmMag(Z1par)} mΩ)`, { bold:true }));
+
+      out.push(pBody(`${mode.toUpperCase()} regime — Z0 combination:`, { bold:true }));
+      let G0 = 0, B0 = 0;
+      imps.forEach((s, i) => {
+        const m2 = s.Z0.R*s.Z0.R + s.Z0.X*s.Z0.X;
+        if (m2 === 0) return;
+        const g = s.Z0.R/m2, b = -s.Z0.X/m2;
+        G0 += g; B0 += b;
+        out.push(pBody(`  Y0_${i+1} = 1/(${mOhm(s.Z0)}) = ${fmtCplx(g*1e6, b*1e6, "× 10⁻⁶ S", 4)}`));
+      });
+      out.push(pBody(`  Y0_total = ${fmtCplx(G0*1e6, B0*1e6, "× 10⁻⁶ S", 4)}`));
+      const Z0par = zParallel(imps.map(s => s.Z0));
+      out.push(pBody(`  Z0_BB0 = 1 / Y0_total = ${mOhm(Z0par)}  (|Z0| = ${mOhmMag(Z0par)} mΩ)`, { bold:true }));
+    });
+  } else {
+    out.push(pBody(`Only one source is included — no parallel combination required. Z at BB0 equals the single source impedance derived above.`, { italics:true }));
+  }
+
+  // ---- 3.3  Element impedances -----------------------------------------
+  out.push(pHead("3.3  Network element impedances — derivation", HeadingLevel.HEADING_3, SIZE_H3));
+  out.push(pBody(`In this step, the positive-sequence (Z1) and zero-sequence (Z0) impedance of every element between BB0 and the load is derived. For each element, the catalogue or user-entered inputs, the applicable IEC 60909 / 60228 formulae, and the resulting numerical values are presented in sequence, ready to be accumulated along the chain.`, { italics:true }));
+  out.push(pBody("MAX regime uses R at 20 °C (lowest R, highest I″k). MIN regime uses R at the configured conductor operating temperature (higher R, lower I″k). X is independent of temperature."));
+
+  tab.segments.forEach((seg, i) => {
+    out.push(pBody(`— Element #${i+1}: ${seg.name} (type: ${seg.type}) → busbar “${seg.bus_name}” —`, { bold:true }));
+    if (seg.type === "cable") {
+      out.push(pBody("  Z0 assumption: R0/R1, X0/X1 are user-editable ratios (approximation — true value depends on sheath/armour bonding and earth-return path).", { italics:true }));
+    } else if (seg.type === "ohl") {
+      out.push(pBody("  Z0 assumption: R0/R1, X0/X1 are user-editable ratios (approximation — true value depends on tower/earth-wire geometry and earth-return path).", { italics:true }));
+    } else {
+      out.push(pBody(`  Z0 assumption: Z0_trafo derived from Z0/Z1 ratio = ${seg.Z0_over_Z1}; propagation governed by vector group ${seg.vg}.`, { italics:true }));
+    }
+    elementDerivationLines(seg, globals).forEach(l => out.push(pBody("  " + l)));
+  });
+
+  // ---- 3.4  Zero-sequence network assembly ------------------------------
+  out.push(pHead("3.4  Zero-sequence network assembly through the chain", HeadingLevel.HEADING_3, SIZE_H3));
+  out.push(pBody(`In this step, the zero-sequence equivalent of the chain is assembled. Z0 is accumulated element-by-element, with a vector-group check applied at every transformer (a Δ or ungrounded-Y primary blocks the upstream Z0). The assembled Z0 at each busbar forms the basis for the single-phase-to-earth current I″k1 at that bus.`, { italics:true }));
+  const hasTrafo = tab.segments.some(s => s.type === "transformer");
+  if (hasTrafo) {
+    out.push(pBody("Zero-sequence propagation rule applied in this circuit:"));
+    out.push(pBody("  • Transformer primary = YN (grounded wye): upstream Z0 propagates to secondary; scaled by (U_sec/U_pri)² and added to Z0_trafo."));
+    out.push(pBody("  • Transformer primary = D (delta) or Y (ungrounded wye): upstream Z0 BLOCKED. Secondary Z0 starts fresh from Z0_trafo."));
+  } else {
+    out.push(pBody("This circuit contains no transformer, so no vector-group rules apply — Z0 accumulates element-by-element in series from the source."));
+  }
+  out.push(pBody("  • Cable / OHL: Z0 = Z1 × (R0/R1 for R, X0/X1 for X). Contributes in series. Simplified — true Z0 depends on sheath bonding and earth return."));
+  out.push(pBody(`  • Earthing at fault point (${labelEarthing(globals.earthing)}): adds 3·R_n = ${3*(globals.Rn||0)} Ω and/or 3·X_n = ${3*(globals.Xn||0)} Ω to Z0 before computing I″k1.`));
+  out.push(pBody("WARNING: Z0 is assembled from user-selectable ratios (R0/R1, X0/X1, Z0/Z1). Where actual utility or manufacturer data is not available, the resulting I″k1 is an engineering approximation — its accuracy is limited by the zero-sequence model adopted.", { bold:true }));
+
+  const zeroSeqH = row([
+    cellTxt("#", {bold:true}), cellTxt("At bus", {bold:true}),
+    cellTxt("Via element", {bold:true}), cellTxt("Z0 rule applied", {bold:true}),
+    cellTxt("Z0 after element (max mode), mΩ", {bold:true}),
+  ], { tableHeader:true });
+  const refBuses = hasMax ? c.max.buses : c.min.buses;
+  const zeroSeqRows = refBuses.map((b, i) => {
+    let via = "source", rule = "Z0 = combined source Z0";
+    if (i > 0) {
+      const seg = tab.segments[i-1];
+      via = `${seg.type}: ${seg.name}`;
+      if (seg.type === "transformer") {
+        rule = vgPropagatesZ0Upstream(seg.vg)
+          ? `vg=${seg.vg}: YN primary → Z0 PROPAGATES (scaled·(U_sec/U_pri)² + Z0_trafo)`
+          : `vg=${seg.vg}: D/Y primary → Z0 BLOCKED (Z0 = Z0_trafo only)`;
+      } else {
+        rule = "Z0_prev + Z0_element";
+      }
+    }
+    return row([
+      cellTxt(i), cellTxt(b.name, { align:AlignmentType.LEFT }),
+      cellTxt(via, { align:AlignmentType.LEFT }),
+      cellTxt(rule, { align:AlignmentType.LEFT }),
+      cellTxt(mOhm(b.Z0)),
+    ]);
+  });
+  out.push(new Table({ width:{size:100, type:WidthType.PERCENTAGE}, layout:FIXED_LAYOUT, rows:[zeroSeqH, ...zeroSeqRows] }));
+
+  // ---- 3.5  Fault currents per bus --------------------------------------
+  out.push(pHead("3.5  Fault currents at every busbar — formulas and numbers", HeadingLevel.HEADING_3, SIZE_H3));
+  out.push(pBody(`In this step, the short-circuit currents at each busbar are computed from the accumulated Z1 and Z0 obtained in the previous step. The following quantities are determined: I″k3 (balanced three-phase), I″k2 (line-to-line), I″k1 (single-phase-to-earth), the peak factor κ and the peak current i_p. The MAXIMUM regime (c_max and R at 20 °C) is applied for breaking-capacity and peak-withstand selection. The MINIMUM regime (c_min and R at operating θ) is applied for protection-sensitivity verification (the minimum fault that the protective device must detect).`, { italics:true }));
+  ["max","min"].forEach(mode => {
+    const active = mode === "max" ? hasMax : hasMin;
+    if (!active) return;
+    const buses = mode === "max" ? c.max.buses : c.min.buses;
+    out.push(pBody(`${mode === "max" ? "MAXIMUM" : "MINIMUM"} regime:`, { bold:true }));
+    let prevU = null;
+    buses.forEach((b, bi) => {
+      const cFac = cFactor(b.U, mode);
+      const sumR = 2*b.Z1.R + (b.Z0mag!=null ? b.Z0.R : 0);
+      const sumX = 2*b.Z1.X + (b.Z0mag!=null ? b.Z0.X : 0);
+      const sumMag = Math.hypot(sumR, sumX);
+      const RX = b.Z1.X > 0 ? (b.Z1.R / b.Z1.X) : 0;
+
+      // Explicit voltage-base transition notice
+      if (prevU !== null && b.U !== prevU) {
+        const fromClass = prevU > 1000 ? "MV" : "LV";
+        const toClass   = b.U   > 1000 ? "MV" : "LV";
+        out.push(pBody(`  Voltage base transition: ${prevU} V (${fromClass}) → ${b.U} V (${toClass}) through transformer. All upstream impedances referred to ${b.U} V base for subsequent busbars.`, { italics:true, bold:true }));
+      }
+      prevU = b.U;
+
+      out.push(pBody(`  ${b.name} (U = ${b.U} V):`, { bold:true }));
+      out.push(pBody(`    c = ${cFac} (IEC 60909-0, ${b.U<=1000?"LV":"MV/HV"})`));
+      out.push(pBody(`    Z1 = ${mOhm(b.Z1)}     |Z1| = √(R²+X²) = ${mOhmMag(b.Z1)} mΩ`));
+      out.push(pBody(`    I″k3 = c·U / (√3·|Z1|) = ${cFac}·${b.U} / (1.732·${mOhmMag(b.Z1)}·10⁻³) = ${(b.Ik3/1000).toFixed(3)} kA`));
+      out.push(pBody(`    I″k2 = (√3/2)·I″k3 = 0.866·${(b.Ik3/1000).toFixed(3)} = ${(b.Ik2/1000).toFixed(3)} kA`));
+      if (b.Z0mag != null) {
+        out.push(pBody(`    Z0 (adjusted for earthing) = (${fmt3(b.Z0.R*1000)} + j${fmt3(b.Z0.X*1000)}) mΩ`));
+        out.push(pBody(`    2·Z1 + Z0 = (${fmt3(sumR*1000)} + j${fmt3(sumX*1000)}) mΩ   |2·Z1 + Z0| = ${fmt3(sumMag*1000)} mΩ`));
+        out.push(pBody(`    I″k1 = √3·c·U / |2·Z1 + Z0| = 1.732·${cFac}·${b.U} / (${fmt3(sumMag*1000)}·10⁻³) = ${(b.Ik1/1000).toFixed(3)} kA`));
+      } else {
+        out.push(pBody(`    I″k1 = 0 (earthing mode “${labelEarthing(globals.earthing)}” — no zero-sequence path)`));
+      }
+      out.push(pBody(`    R/X = ${fmt3(RX)}     κ = 1.02 + 0.98·e^(−3·R/X) = 1.02 + 0.98·e^(−${fmt3(3*RX)}) = ${b.kappa.toFixed(3)}`));
+      out.push(pBody(`    i_p = κ·√2·I″k3 = ${b.kappa.toFixed(3)}·1.414·${(b.Ik3/1000).toFixed(3)} = ${(b.ip/1000).toFixed(3)} kA`));
+    });
+  });
+
+  // ---- 3.6  Engineering interpretation ----------------------------------
+  out.push(pHead("3.6  Engineering interpretation of the results", HeadingLevel.HEADING_3, SIZE_H3));
+  out.push(pBody("Use each value for the right engineering decision:"));
+  out.push(pBody("  • I″k3_max — RMS initial three-phase short-circuit current (maximum). Compared to breaker Icu (IEC 60947-2 or IEC 62271-100) and switchgear peak withstand."));
+  out.push(pBody("  • i_p — peak short-circuit current. Compared to breaker ip_max / Ipk of switchgear. Depends on R/X at the fault point."));
+  out.push(pBody("  • I″k1_max — line-to-earth fault current (maximum). Used for single-phase breaker ratings on TN systems and for earthing system thermal rating."));
+  out.push(pBody("  • I″k3_min and I″k1_min — minimum fault currents. Used to verify protection pickup and selectivity (must be detected reliably)."));
+  out.push(pBody("Always apply the engineering verdict to the right quantity; do not mix max and min regimes for the same check.", { italics:true }));
+  if (c.warnings.length) {
+    out.push(pBody("Case-specific warnings applicable to this circuit:", { bold:true }));
+    c.warnings.forEach(w => out.push(pBody("  • " + w)));
+  }
+
+  return out;
+}
+
+// ---- Per-source derivation lines (max or min mode) -----------------------
+function sourceDerivationLines(s, U0, mode){
+  const lines = [];
+  const cFac = cFactor(U0, mode);
+  const lbl = mode === "max" ? "MAX" : "MIN";
+  const fmt3 = n => (isFinite(n) ? n.toFixed(3) : "—");
+  const fmt4 = n => (isFinite(n) ? n.toFixed(4) : "—");
+
+  if (s.type === "infinite") {
+    const Sk = mode === "max" ? s.SkQ_max_MVA : s.SkQ_min_MVA;
+    if (!Sk) { lines.push(`${lbl}: S″kQ_${mode} not provided — regime skipped.`); return lines; }
+    const rx = s.RX_ratio ?? 0.1, z0z1 = s.Z0_over_Z1 ?? 1.0;
+    lines.push(`${lbl}: S″kQ_${mode} = ${Sk} MVA, R/X = ${rx}, Z0/Z1 = ${z0z1}, c_${mode} = ${cFac}`);
+    lines.push(`   Computation of the utility Thévenin impedance from the declared short-circuit power:`);
+    const Zq = (cFac * U0 * U0) / (Sk * 1e6);
+    lines.push(`   Z_Q = c·U² / S″kQ = ${cFac}·${U0}² / (${Sk}·10⁶) = ${fmt3(Zq*1000)} mΩ`);
+    lines.push(`   Separation of |Z_Q| into R and X using the given R/X ratio:`);
+    const Xq = Zq / Math.sqrt(1 + rx*rx);
+    const Rq = rx * Xq;
+    lines.push(`   X_Q = Z_Q / √(1 + (R/X)²) = ${fmt3(Zq*1000)} / √(1 + ${rx}²) = ${fmt3(Xq*1000)} mΩ`);
+    lines.push(`   R_Q = (R/X)·X_Q = ${rx}·${fmt3(Xq*1000)} = ${fmt3(Rq*1000)} mΩ`);
+    lines.push(`   Z1_Q = R_Q + jX_Q = ${fmtCplx(Rq*1000, Xq*1000, "mΩ", 3)}`);
+    lines.push(`   Derivation of the zero-sequence source impedance from the Z0/Z1 assumption:`);
+    lines.push(`   Z0_Q = (Z0/Z1)·Z1_Q = ${z0z1}·(${fmtCplx(Rq*1000, Xq*1000, "", 3)}) = ${fmtCplx(Rq*1000*z0z1, Xq*1000*z0z1, "mΩ", 3)}`);
+  } else if (s.type === "transformer") {
+    if (mode === "min") { lines.push(`MIN: transformer Z identical to max regime; only c_min = ${cFac} differs (applied at bus).`); return lines; }
+    lines.push(`Transformer source: S_r = ${s.Sr_kVA} kVA, u_kr = ${s.ukr_pct} %, P_kCu = ${s.PkCu_kW} kW, Z0/Z1 = ${s.Z0_over_Z1}, c_max = ${cFactor(U0,"max")}`);
+    lines.push(`   Computation of the transformer impedance referred to the secondary (LV) side:`);
+    const Sr = s.Sr_kVA * 1000, uk = s.ukr_pct / 100, PkCu = s.PkCu_kW * 1000;
+    const Zt = uk * U0 * U0 / Sr;
+    const Rt = PkCu * U0 * U0 / (Sr * Sr);
+    const Xt = Math.sqrt(Math.max(0, Zt*Zt - Rt*Rt));
+    lines.push(`   Z_t = (u_kr/100)·U² / S_r = ${uk}·${U0}²/${Sr} = ${fmt3(Zt*1000)} mΩ`);
+    lines.push(`   R_t (from load losses) = P_kCu·U² / S_r² = ${PkCu}·${U0}²/${Sr*Sr} = ${fmt3(Rt*1000)} mΩ`);
+    lines.push(`   X_t = √(Z_t² − R_t²) = √(${fmt3(Zt*1000)}² − ${fmt3(Rt*1000)}²) = ${fmt3(Xt*1000)} mΩ`);
+    lines.push(`   Z1_t = R_t + jX_t = ${fmtCplx(Rt*1000, Xt*1000, "mΩ", 3)}`);
+    lines.push(`   Derivation of the transformer zero-sequence impedance from the Z0/Z1 ratio (governed by the vector group):`);
+    lines.push(`   Z0_t = (Z0/Z1)·Z1_t = ${s.Z0_over_Z1}·(${fmtCplx(Rt*1000, Xt*1000, "", 3)}) = ${fmtCplx(Rt*1000*s.Z0_over_Z1, Xt*1000*s.Z0_over_Z1, "mΩ", 3)}`);
+  } else if (s.type === "manual") {
+    const R1 = mode === "max" ? s.R1_max : s.R1_min;
+    const X1 = mode === "max" ? s.X1_max : s.X1_min;
+    if ((R1 == null || X1 == null) && !(R1 > 0 || X1 > 0)) { lines.push(`${lbl}: R1/X1 for ${mode} not provided — regime skipped.`); return lines; }
+    lines.push(`${lbl}: manual entry. R1_${mode} = ${R1||0} Ω, X1_${mode} = ${X1||0} Ω`);
+    if (s.R0_mode === "ratio") {
+      lines.push(`   Z0 from ratio: Z0 = ${s.Z0_over_Z1}·Z1 = (${((R1||0)*s.Z0_over_Z1).toFixed(4)} + j${((X1||0)*s.Z0_over_Z1).toFixed(4)}) Ω`);
+    } else {
+      lines.push(`   Z0 explicit: R0 = ${s.R0} Ω, X0 = ${s.X0} Ω`);
+    }
+  } else if (s.type === "known_Ik") {
+    const Ik3 = mode === "max" ? s.Ik3_max_kA : s.Ik3_min_kA;
+    const Ik1 = mode === "max" ? s.Ik1_max_kA : s.Ik1_min_kA;
+    if (!Ik3) { lines.push(`${lbl}: I″k3_${mode} not provided — regime skipped.`); return lines; }
+    const rx = s.RX_ratio ?? 0.1;
+    lines.push(`${lbl}: known I″k — Input: I″k3_${mode} = ${Ik3} kA, I″k1_${mode} = ${Ik1 || "(not given)"} kA, R/X = ${rx}, c_${mode} = ${cFac}`);
+    lines.push(`   Back-calculation of the source impedance from the given short-circuit current(s):`);
+    const Z1mag = (cFac * U0) / (Math.sqrt(3) * Ik3 * 1000);
+    lines.push(`   |Z1| = c·U / (√3·I″k3) = ${cFac}·${U0} / (1.732·${Ik3}·1000) = ${fmt3(Z1mag*1000)} mΩ`);
+    const X1 = Z1mag / Math.sqrt(1 + rx*rx), R1 = rx * X1;
+    lines.push(`   Split via R/X = ${rx}: X1 = |Z1|/√(1+(R/X)²) = ${fmt3(X1*1000)} mΩ; R1 = ${fmt3(R1*1000)} mΩ`);
+    if (Ik1 && Ik1 > 0) {
+      const sumMag = (Math.sqrt(3) * cFac * U0) / (Ik1 * 1000);
+      const Z0mag = Math.max(0, sumMag - 2*Z1mag);
+      lines.push(`   Derivation of Z0 from the measured / provided I″k1:`);
+      lines.push(`   |2·Z1 + Z0| = √3·c·U/I″k1 = 1.732·${cFac}·${U0} / (${Ik1}·1000) = ${fmt3(sumMag*1000)} mΩ`);
+      lines.push(`   |Z0| = |2·Z1 + Z0| − 2·|Z1| = ${fmt3(sumMag*1000)} − 2·${fmt3(Z1mag*1000)} = ${fmt3(Z0mag*1000)} mΩ (assumes same R/X for Z0)`);
+    } else {
+      const z0z1 = s.Z0_over_Z1 ?? 1.0;
+      lines.push(`   I″k1 not given — using fallback Z0/Z1 = ${z0z1}: Z0 = ${z0z1}·Z1.`);
+    }
+  } else if (s.type === "bess") {
+    if (mode === "min") { lines.push(`MIN: inverter impedance identical to max; c_min = ${cFac} applied at bus.`); return lines; }
+    const Sn = s.Sn_kVA * 1000, Un = s.Un_V, Xpu = s.X_pu ?? 0.20, rx = s.RX_ratio ?? 0.1;
+    const Zbase = Un*Un/Sn;
+    lines.push(`BESS: S_n = ${s.Sn_kVA} kVA, U_n = ${Un} V, X_pu = ${Xpu}, R/X = ${rx}, Z0/Z1 = ${s.Z0_over_Z1 ?? 1.0}`);
+    lines.push(`   Computation of the base impedance and the inverter Thévenin impedance:`);
+    lines.push(`   Z_base = U_n²/S_n = ${Un}²/${Sn} = ${fmt3(Zbase*1000)} mΩ`);
+    lines.push(`   |Z_BESS| = X_pu · Z_base = ${Xpu}·${fmt3(Zbase*1000)} = ${fmt3(Xpu*Zbase*1000)} mΩ`);
+    const Xb = Xpu*Zbase/Math.sqrt(1+rx*rx), Rb = rx*Xb;
+    lines.push(`   Split by R/X: X = ${fmt3(Xb*1000)} mΩ; R = ${fmt3(Rb*1000)} mΩ`);
+  } else if (s.type === "diesel") {
+    if (mode === "min") { lines.push(`MIN: generator subtransient Z identical to max; c_min = ${cFac} applied at bus.`); return lines; }
+    const Sn = s.Sn_kVA * 1000, Un = s.Un_V, Xd = s.Xd_pu ?? 0.15, rx = s.RX_ratio ?? 0.08;
+    const Zbase = Un*Un/Sn;
+    lines.push(`Diesel genset: S_n = ${s.Sn_kVA} kVA, U_n = ${Un} V, X″d = ${Xd} pu, R/X = ${rx}, Z0/Z1 = ${s.Z0_over_Z1 ?? 0.6}`);
+    lines.push(`   Computation of the generator Thévenin impedance from the subtransient reactance:`);
+    lines.push(`   Z_base = U_n²/S_n = ${Un}²/${Sn} = ${fmt3(Zbase*1000)} mΩ`);
+    lines.push(`   |Z_G| = X″d · Z_base = ${Xd}·${fmt3(Zbase*1000)} = ${fmt3(Xd*Zbase*1000)} mΩ`);
+  }
+  return lines;
+}
+
+// ---- Per-element derivation lines ----------------------------------------
+function elementDerivationLines(seg, globals){
+  const lines = [];
+  const fmt3 = n => (isFinite(n) ? n.toFixed(3) : "—");
+  const fmt4 = n => (isFinite(n) ? n.toFixed(4) : "—");
+
+  if (seg.type === "transformer") {
+    const Upri = seg.U_pri, Usec = seg.U_sec;
+    const klv = (Usec*Usec)/(Upri*Upri);
+    lines.push(`Transformer ${Upri}/${Usec} V, S_r = ${seg.Sr_kVA} kVA, u_kr = ${seg.ukr_pct} %, P_kCu = ${seg.PkCu_kW} kW, vg = ${seg.vg}`);
+    lines.push(`  Voltage-base transition: the calculation moves from the HV side (${Upri} V) to the LV side (${Usec} V). All upstream impedances are referred to the LV base by the factor (U_sec/U_pri)² = (${Usec}/${Upri})² = ${klv.toFixed(6)}.`);
+    const Sr = seg.Sr_kVA * 1000, uk = seg.ukr_pct / 100, PkCu = seg.PkCu_kW * 1000, U = seg.U_sec;
+    const Zt = uk * U * U / Sr;
+    const Rt = PkCu * U * U / (Sr * Sr);
+    const Xt = Math.sqrt(Math.max(0, Zt*Zt - Rt*Rt));
+    lines.push(`  Z_t (referred to LV) = (u_kr/100)·U_sec²/S_r = ${uk}·${U}²/${Sr} = ${fmt3(Zt*1000)} mΩ`);
+    lines.push(`  R_t = P_kCu·U_sec²/S_r² = ${PkCu}·${U}²/${Sr*Sr} = ${fmt3(Rt*1000)} mΩ`);
+    lines.push(`  X_t = √(Z_t² − R_t²) = ${fmt3(Xt*1000)} mΩ`);
+    lines.push(`  Z1_t = R_t + jX_t = ${fmtCplx(Rt*1000, Xt*1000, "mΩ", 3)}`);
+    lines.push(`  Z0_t = (Z0/Z1)·Z1_t = ${seg.Z0_over_Z1}·Z1_t = ${fmtCplx(Rt*1000*seg.Z0_over_Z1, Xt*1000*seg.Z0_over_Z1, "mΩ", 3)}`);
+    lines.push(`  Vector group ${seg.vg}: upstream Z0 ${vgPropagatesZ0Upstream(seg.vg) ? "PROPAGATES (scaled to the LV base + Z0_t added)" : "BLOCKED at the Δ/ungrounded-Y winding — downstream Z0 is reinitialised to Z0_t only"}.`);
+  } else {
+    const mat = seg.material || "cu";
+    const theta_max = 20;
+    const theta_min = globals.theta_op;
+    const R_km_max = correctR(seg.R_km, seg.theta_ref_R || 20, theta_max, mat);
+    const R_km_min = correctR(seg.R_km, seg.theta_ref_R || 20, theta_min, mat);
+    const n = Math.max(1, Math.round(seg.n_parallel || 1));
+    lines.push(`${seg.type.toUpperCase()} ${seg.series}, S = ${seg.S} mm², L = ${seg.L} m, n_parallel = ${n}, material = ${mat}`);
+    lines.push(`  Catalogue R at θ_ref = ${seg.theta_ref_R} °C: R_km = ${fmt4(seg.R_km)} Ω/km.  α(${mat}) = ${ALPHA[mat]} /°C.`);
+    lines.push(`  R at 20 °C (max mode) = R_km·(1+α·(20−20))/(1+α·(${seg.theta_ref_R}−20)) = ${fmt4(R_km_max)} Ω/km`);
+    lines.push(`  R at ${theta_min} °C (min mode) = R_km·(1+α·(${theta_min}−20))/(1+α·(${seg.theta_ref_R}−20)) = ${fmt4(R_km_min)} Ω/km`);
+    const R_max = R_km_max * seg.L / 1000 / n;
+    const X     = seg.X_km  * seg.L / 1000 / n;
+    const R_min = R_km_min * seg.L / 1000 / n;
+    lines.push(`  R_max = ${fmt4(R_km_max)}·${seg.L}/1000 / ${n} = ${fmt3(R_max*1000)} mΩ;  X = ${fmt4(seg.X_km)}·${seg.L}/1000 / ${n} = ${fmt3(X*1000)} mΩ`);
+    lines.push(`  R_min = ${fmt4(R_km_min)}·${seg.L}/1000 / ${n} = ${fmt3(R_min*1000)} mΩ`);
+    lines.push(`  Z0: R0 = R·(R0/R1) = R · ${seg.R0_over_R1}; X0 = X·(X0/X1) = X · ${seg.X0_over_X1}`);
+    lines.push(`  →  Z0_max ≈ (${fmt3(R_max*1000*seg.R0_over_R1)} + j${fmt3(X*1000*seg.X0_over_X1)}) mΩ`);
+  }
+  return lines;
+}
+
+// ============================================================================
+// .DOCX REPORT
+// ============================================================================
+async function downloadDocx(){
+  const proj = computeProject(state);
+  const { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell,
+          WidthType, AlignmentType, BorderStyle, Footer, PageNumber, VerticalAlign,
+          TableLayoutType } = docx;
+  const FIXED_LAYOUT = TableLayoutType ? TableLayoutType.FIXED : "fixed";
+
+  const FONT = "Arial Narrow", BLACK = "000000";
+  const SIZE_BODY = 22, SIZE_H1 = 24, SIZE_H2 = 24, SIZE_H3 = 24, SIZE_TBL = 22;
+  const CELL_MARGIN = 68;
+
+  const border1 = { style: BorderStyle.SINGLE, size: 4, color: BLACK };
+  const allBorders = { top:border1, bottom:border1, left:border1, right:border1 };
+  const cellMargins = { top:CELL_MARGIN, bottom:CELL_MARGIN, left:CELL_MARGIN, right:CELL_MARGIN };
+
+  const runBody = (t, e = {}) => new TextRun({ text:String(t), font:FONT, color:BLACK, size:SIZE_BODY, ...e });
+  const pBody = (t, o = {}) => new Paragraph({ children:[runBody(t, o)], spacing:{after:80}, alignment:AlignmentType.LEFT });
+  const pHead = (t, level, size) => new Paragraph({ children:[new TextRun({ text:t, font:FONT, color:BLACK, size, bold:true })], heading:level, spacing:{before:220, after:110} });
+  const pCenter = (t, o = {}) => new Paragraph({ children:[runBody(t, o)], alignment:AlignmentType.CENTER, spacing:{after:80} });
+
+  const cellTxt = (t, { bold=false, align=AlignmentType.CENTER } = {}) => new TableCell({
+    children:[new Paragraph({
+      children:[new TextRun({ text:String(t), font:FONT, color:BLACK, size:SIZE_TBL, bold })],
+      alignment:align, spacing:{before:0, after:0, line:240, lineRule:"auto"},
+    })],
+    margins:cellMargins, borders:allBorders, verticalAlign:VerticalAlign.CENTER,
+  });
+  const row = (cells, opts = {}) => new TableRow({ children:cells, ...opts });
+  const kv = (k, v) => row([ cellTxt(k, { bold:true, align:AlignmentType.LEFT }), cellTxt(v, { align:AlignmentType.LEFT }) ]);
+
+  // Project settings
+  const sysLabel = state.system === "3ph" ? "Three-phase (line-to-line)" : state.system === "1ph" ? "Single-phase (phase-neutral)" : "DC";
+  const projTable = new Table({
+    width:{ size:100, type:WidthType.PERCENTAGE }, layout:FIXED_LAYOUT,
+    rows:[
+      kv("Region preset", labelRegion(state.region)),
+      kv("System", sysLabel),
+      kv("Network voltage (per circuit)", state.tabs.map(t => `“${t.name}”: ${getCircuitU(t)} V`).join("; ")),
+      kv("Frequency", `${state.freq} Hz`),
+      kv("Voltage factor c_max", state.tabs.map(t => `“${t.name}”: ${cFactor(getCircuitU(t),"max").toFixed(2)}`).join("; ")),
+      kv("Voltage factor c_min", state.tabs.map(t => `“${t.name}”: ${cFactor(getCircuitU(t),"min").toFixed(2)}`).join("; ")),
+      kv("Earthing model", labelEarthing(state.earthing)),
+      kv("R_n (ohms)", String(state.Rn)),
+      kv("X_n (ohms)", String(state.Xn)),
+      kv("Ambient temperature", `${state.ambient} °C`),
+      kv("Conductor op. temp.", `${state.theta_op} °C (used for I″k_min)`),
+      kv("Number of circuits", String(state.tabs.length)),
+    ],
+  });
+
+  // Overview table
+  const ovH = row([ cellTxt("#",{bold:true}), cellTxt("Circuit",{bold:true}), cellTxt("Sources",{bold:true}), cellTxt("Segs",{bold:true}),
+                    cellTxt("I″k3_max, kA",{bold:true}), cellTxt("I″k1_max, kA",{bold:true}),
+                    cellTxt("i_p, kA",{bold:true}), cellTxt("I″k3_min, kA",{bold:true}) ], { tableHeader:true });
+  const ovRows = proj.circuits.map((c, i) => {
+    const lm = c.max.active ? c.max.buses[c.max.buses.length-1] : null;
+    const ln = c.min.active ? c.min.buses[c.min.buses.length-1] : null;
+    return row([
+      cellTxt(i+1), cellTxt(c.tab.name, { align:AlignmentType.LEFT }),
+      cellTxt(c.tab.sources.length), cellTxt(c.tab.segments.length),
+      cellTxt(lm?(lm.Ik3/1000).toFixed(2):"—", { bold:true }),
+      cellTxt(lm?(lm.Ik1/1000).toFixed(2):"—"),
+      cellTxt(lm?(lm.ip /1000).toFixed(2):"—"),
+      cellTxt(ln?(ln.Ik3/1000).toFixed(2):"—"),
+    ]);
+  });
+  const ovTable = new Table({ width:{size:100, type:WidthType.PERCENTAGE}, layout:FIXED_LAYOUT, rows:[ovH, ...ovRows] });
+
+  // Per-circuit blocks
+  const blocks = [];
+  proj.circuits.forEach((c, ci) => {
+    const hasMax = c.max.active, hasMin = c.min.active;
+    const refBuses = hasMax ? c.max.buses : c.min.buses;
+
+    // Sources table — R+jX and |Z| for each sequence and regime
+    const srcHeader = row([
+      cellTxt("#",{bold:true}), cellTxt("Name",{bold:true}), cellTxt("Type",{bold:true}),
+      cellTxt("R1_max, mΩ",{bold:true}), cellTxt("X1_max, mΩ",{bold:true}), cellTxt("|Z1|_max",{bold:true}),
+      cellTxt("R0_max, mΩ",{bold:true}), cellTxt("X0_max, mΩ",{bold:true}), cellTxt("|Z0|_max",{bold:true}),
+      cellTxt("R1_min, mΩ",{bold:true}), cellTxt("X1_min, mΩ",{bold:true}), cellTxt("|Z1|_min",{bold:true}),
+    ], { tableHeader:true });
+    const Uc = getCircuitU(c.tab);
+    const srcRows = c.tab.sources.map((s, i) => {
+      const mx = sourceImpedance(s, "max", Uc);
+      const mn = sourceImpedance(s, "min", Uc);
+      return row([
+        cellTxt(i+1), cellTxt(s.name, { align:AlignmentType.LEFT }), cellTxt(s.type, { align:AlignmentType.LEFT }),
+        cellTxt(mx ? (mx.Z1.R*1000).toFixed(3) : "—"),
+        cellTxt(mx ? (mx.Z1.X*1000).toFixed(3) : "—"),
+        cellTxt(mx ? (zMag(mx.Z1)*1000).toFixed(3) : "—"),
+        cellTxt(mx ? (mx.Z0.R*1000).toFixed(3) : "—"),
+        cellTxt(mx ? (mx.Z0.X*1000).toFixed(3) : "—"),
+        cellTxt(mx ? (zMag(mx.Z0)*1000).toFixed(3) : "—"),
+        cellTxt(mn ? (mn.Z1.R*1000).toFixed(3) : "—"),
+        cellTxt(mn ? (mn.Z1.X*1000).toFixed(3) : "—"),
+        cellTxt(mn ? (zMag(mn.Z1)*1000).toFixed(3) : "—"),
+      ]);
+    });
+    const srcTable = new Table({ width:{size:100, type:WidthType.PERCENTAGE}, layout:FIXED_LAYOUT, rows:[srcHeader, ...srcRows] });
+
+    // Per-source fault contribution table
+    const contribHeader = row([
+      cellTxt("Busbar", { bold:true }), cellTxt("U, V", { bold:true }), cellTxt("Source", { bold:true }),
+      cellTxt("I″k3_max, kA", { bold:true }), cellTxt("I″k1_max, kA", { bold:true }), cellTxt("i_p_max, kA", { bold:true }),
+      cellTxt("I″k3_min, kA", { bold:true }), cellTxt("I″k1_min, kA", { bold:true }),
+    ], { tableHeader:true });
+    const contribRows = [];
+    const contribBuses = c.contributions.find(x => x.max.active)?.max.buses || c.contributions.find(x => x.min.active)?.min.buses || [];
+    contribBuses.forEach((b, bi) => {
+      c.contributions.forEach((ct, si) => {
+        const bmax = ct.max.active ? ct.max.buses[bi] : null;
+        const bmin = ct.min.active ? ct.min.buses[bi] : null;
+        const ref  = bmax || bmin;
+        if (!ref) return;
+        contribRows.push(row([
+          cellTxt(si === 0 ? ref.name : "", { align:AlignmentType.LEFT }),
+          cellTxt(ref.U),
+          cellTxt(ct.source.name, { align:AlignmentType.LEFT }),
+          cellTxt(bmax ? (bmax.Ik3/1000).toFixed(3) : "—", { bold: true }),
+          cellTxt(bmax ? (bmax.Ik1/1000).toFixed(3) : "—"),
+          cellTxt(bmax ? (bmax.ip /1000).toFixed(3) : "—"),
+          cellTxt(bmin ? (bmin.Ik3/1000).toFixed(3) : "—", { bold: true }),
+          cellTxt(bmin ? (bmin.Ik1/1000).toFixed(3) : "—"),
+        ]));
+      });
+    });
+    const contribTable = new Table({
+      width:{size:100, type:WidthType.PERCENTAGE}, layout:FIXED_LAYOUT,
+      rows:[contribHeader, ...contribRows],
+    });
+
+    // Segments table
+    const segHeader = row([ cellTxt("#",{bold:true}), cellTxt("Name",{bold:true}), cellTxt("Type",{bold:true}),
+                            cellTxt("L / Sr",{bold:true}), cellTxt("n || / u_kr",{bold:true}),
+                            cellTxt("R0/R1",{bold:true}), cellTxt("X0/X1 or Z0/Z1",{bold:true}), cellTxt("Bus at end",{bold:true}) ], { tableHeader:true });
+    const segRows = c.tab.segments.map((s, i) => {
+      let spec1, spec2, spec3, spec4;
+      if (s.type === "transformer") {
+        spec1 = `${s.Sr_kVA} kVA`; spec2 = `u_kr=${s.ukr_pct}%`;
+        spec3 = "—"; spec4 = `Z0/Z1=${s.Z0_over_Z1}`;
+      } else {
+        spec1 = `${s.L} m`; spec2 = `n=${s.n_parallel}`;
+        spec3 = String(s.R0_over_R1); spec4 = String(s.X0_over_X1);
+      }
+      return row([
+        cellTxt(i+1), cellTxt(s.name, { align:AlignmentType.LEFT }), cellTxt(s.type),
+        cellTxt(spec1), cellTxt(spec2), cellTxt(spec3), cellTxt(spec4),
+        cellTxt(refBuses[i+1] ? refBuses[i+1].name : "—", { align:AlignmentType.LEFT }),
+      ]);
+    });
+    const segTable = new Table({ width:{size:100, type:WidthType.PERCENTAGE}, layout:FIXED_LAYOUT, rows:[segHeader, ...segRows] });
+
+    // Per-bus results table — now with explicit R and X columns, not only |Z|
+    const busHeader = [cellTxt("#",{bold:true}), cellTxt("Busbar",{bold:true}), cellTxt("U, V",{bold:true})];
+    if (hasMax) busHeader.push(
+      cellTxt("R1_max, mΩ",{bold:true}), cellTxt("X1_max, mΩ",{bold:true}), cellTxt("|Z1|_max, mΩ",{bold:true}),
+      cellTxt("R0_max, mΩ",{bold:true}), cellTxt("X0_max, mΩ",{bold:true}), cellTxt("|Z0|_max, mΩ",{bold:true}),
+      cellTxt("I″k3_max, kA",{bold:true}), cellTxt("I″k2_max, kA",{bold:true}),
+      cellTxt("I″k1_max, kA",{bold:true}), cellTxt("κ",{bold:true}), cellTxt("i_p, kA",{bold:true}),
+    );
+    if (hasMin) busHeader.push(
+      cellTxt("R1_min, mΩ",{bold:true}), cellTxt("X1_min, mΩ",{bold:true}),
+      cellTxt("I″k3_min, kA",{bold:true}), cellTxt("I″k1_min, kA",{bold:true}),
+    );
+    const busHead = row(busHeader, { tableHeader:true });
+    const busRows = refBuses.map((b, i) => {
+      const bn = hasMin ? c.min.buses[i] : null;
+      const cells = [ cellTxt(i), cellTxt(b.name, {align:AlignmentType.LEFT}), cellTxt(b.U) ];
+      if (hasMax) cells.push(
+        cellTxt((b.Z1.R*1000).toFixed(2)),
+        cellTxt((b.Z1.X*1000).toFixed(2)),
+        cellTxt((b.Z1mag*1000).toFixed(2)),
+        cellTxt(b.Z0mag!=null ? (b.Z0.R*1000).toFixed(2) : "—"),
+        cellTxt(b.Z0mag!=null ? (b.Z0.X*1000).toFixed(2) : "—"),
+        cellTxt(b.Z0mag!=null ? (b.Z0mag*1000).toFixed(2) : "—"),
+        cellTxt((b.Ik3/1000).toFixed(2), { bold:true }),
+        cellTxt((b.Ik2/1000).toFixed(2)),
+        cellTxt((b.Ik1/1000).toFixed(2)),
+        cellTxt(b.kappa.toFixed(3)),
+        cellTxt((b.ip/1000).toFixed(2)),
+      );
+      if (hasMin && bn) cells.push(
+        cellTxt((bn.Z1.R*1000).toFixed(2)),
+        cellTxt((bn.Z1.X*1000).toFixed(2)),
+        cellTxt((bn.Ik3/1000).toFixed(2), { bold:true }),
+        cellTxt((bn.Ik1/1000).toFixed(2)),
+      );
+      return row(cells);
+    });
+    const busTable = new Table({ width:{size:100, type:WidthType.PERCENTAGE}, layout:FIXED_LAYOUT, rows:[busHead, ...busRows] });
+
+    // ============================================================
+    // Detailed step-by-step derivations (per-circuit)
+    // ============================================================
+    const U0 = getCircuitU(c.tab);
+    const steps = detailedCircuitSteps(c.tab, c, U0, state, {
+      cellTxt, row, pBody, pHead, pCenter, Table, TableRow, TableCell,
+      WidthType, AlignmentType, HeadingLevel, TableLayoutType, FIXED_LAYOUT,
+      SIZE_H3,
+    });
+
+    blocks.push(
+      new Paragraph({
+        children:[new TextRun({ text:`Circuit ${ci+1} — ${c.tab.name}`, font:FONT, color:BLACK, size:SIZE_H2, bold:true })],
+        heading:HeadingLevel.HEADING_2, spacing:{before:280, after:140}, pageBreakBefore: ci > 0,
+      }),
+      ...steps,
+      pHead("3.R  Quick-reference summary tables", HeadingLevel.HEADING_3, SIZE_H3),
+      pBody("Source impedances (both regimes, with R and X, not only |Z|):"),
+      srcTable,
+      pBody("Network elements (types and key parameters):"),
+      segTable,
+      pBody("Fault currents at every busbar (with R, X and |Z| for every sequence):"),
+      busTable,
+      pHead("3.R.per-source  Fault level at each busbar with each source considered in isolation", HeadingLevel.HEADING_3, SIZE_H3),
+      pBody("The table below lists the short-circuit current that would occur at each busbar if ONLY that source were connected and the remaining sources were disconnected. These values represent alternative fault-level scenarios, not additive source shares.", { italics: true }),
+      pBody("IMPORTANT: the listed per-source currents SHALL NOT be added arithmetically to obtain the total fault current. The combined fault level, produced by all sources acting in parallel, is shown in the main per-bus table above and in the step-by-step section 3.5.", { bold: true }),
+      contribTable,
+    );
+  });
+
+  const doc = new Document({
+    title: "Short-Circuit — Combined Calculation Report",
+    description: "Per IEC 60909-0 / IEC 60909-1 (sequence networks)",
+    styles: { default: { document: { run: { font:FONT, color:BLACK, size:SIZE_BODY } } } },
+    sections: [{
+      properties: { page: { margin: { top:720, right:720, bottom:720, left:720 } } },
+      footers: { default: new Footer({ children:[new Paragraph({ alignment:AlignmentType.CENTER, children:[
+        new TextRun({ text:"Page ", font:FONT, color:BLACK, size:SIZE_TBL }),
+        new TextRun({ children:[PageNumber.CURRENT], font:FONT, color:BLACK, size:SIZE_TBL })
+      ]})]})},
+      children: [
+        new Paragraph({ children:[new TextRun({ text:"Short-Circuit — Combined Calculation Report", font:FONT, color:BLACK, size:SIZE_H1, bold:true })], alignment:AlignmentType.CENTER, spacing:{after:140}}),
+        pCenter("Per IEC 60909-0 / IEC 60909-1 — sequence networks", { italics:true }),
+        pCenter(`Date: ${new Date().toISOString().slice(0,10)}`),
+
+        pHead("1. Project settings", HeadingLevel.HEADING_2, SIZE_H2), projTable,
+        pHead("2. Project overview", HeadingLevel.HEADING_2, SIZE_H2), ovTable,
+        pHead("3. Per-circuit calculation", HeadingLevel.HEADING_2, SIZE_H2), ...blocks,
+        pHead("4. Glossary of abbreviations", HeadingLevel.HEADING_2, SIZE_H2),
+        (() => {
+          const gH = row([cellTxt("Symbol", { bold:true }), cellTxt("Definition", { bold:true })], { tableHeader:true });
+          const gRows = GLOSSARY.map(([s, d]) => row([
+            cellTxt(s, { bold:true, align:AlignmentType.LEFT }),
+            cellTxt(d, { align:AlignmentType.LEFT }),
+          ]));
+          return new Table({ width:{size:100, type:WidthType.PERCENTAGE}, layout:FIXED_LAYOUT, rows:[gH, ...gRows] });
+        })(),
+
+        pHead("5. References", HeadingLevel.HEADING_2, SIZE_H2),
+        ...buildReferences(state).map(line => pBody(line)),
+
+        pHead("6. Disclaimer", HeadingLevel.HEADING_2, SIZE_H2),
+        new Paragraph({ alignment:AlignmentType.JUSTIFIED, spacing:{after:80, line:240, lineRule:"auto"}, children:[
+          new TextRun({ text:"This report is produced by a client-side calculator for educational and preliminary design purposes. The author bears no responsibility, liability or warranty for decisions made based on its output. Before use, every input, formula, intermediate value and final result must be verified against the applicable standard and actual installation conditions (sequence impedances, motor contribution, near-to-generator effects, earth-fault loop, protection coordination, etc.). Final designs must be checked and signed off by a qualified engineer.",
+            font:FONT, color:BLACK, size:18 })]}),
+      ],
+    }],
+  });
+
+  const blob = await Packer.toBlob(doc);
+  const ts = new Date().toISOString().slice(0, 10);
+  saveAs(blob, `short-circuit-project-${ts}.docx`);
+}
+
+// ============================================================================
+// INIT
+// ============================================================================
+initState();
+populateGlobalSelects();
+wireGlobals();
+syncGlobalsUi();
+renderAll();
+renderGlossary();
+runTests();
+</script>
+</body>
+</html>
