@@ -1,0 +1,31 @@
+pages_build_output_dir = "./"
+name = "ieccalc-license"
+main = "_lib/worker.js"
+compatibility_date = "2025-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Custom domain: configure in CF dashboard → Worker → Triggers → Custom Domains
+# → api.ieccalc.com
+
+# KV namespace (existing, for compatibility with v1 license records)
+[[kv_namespaces]]
+binding = "LICENSES"
+id = "9beecb5afec44d76a8f7f90168437c95"
+
+# D1 database (new in v2)
+[[d1_databases]]
+binding = "DB"
+database_name = "ieccalc"
+database_id = "b16d37b6-1ab6-4018-99d3-4a8fe05ace7b"
+
+# Secrets (set with `wrangler secret put NAME`):
+#   JWT_SECRET                 — openssl rand -hex 32
+#   LS_WEBHOOK_SIGNING_SECRET  — from Lemon Squeezy webhook settings
+#   LS_API_KEY                 — Lemon Squeezy API key
+#   RESEND_API_KEY             — Resend API key
+#   ADMIN_API_KEY              — long random; used by /admin endpoints
+
+[vars]
+SITE_URL = "https://ieccalc.com"
+LS_STORE_SUBDOMAIN = "ieccalc"
+FROM_EMAIL = "license@ieccalc.com"

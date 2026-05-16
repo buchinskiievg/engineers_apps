@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>My account — ieccalc.com</title>
+<style>
+  :root {
+    --bg:#c8ccd1; --panel-2:#ffffff; --ink:#000; --ink-soft:#1a1a1a; --muted:#3a3f44;
+    --line:#8a8f94; --line-soft:#b4b9bd;
+    --btn:#3c4043; --btn-hover:#23272a; --btn-ink:#fff;
+    --ok:#0c5826; --warn:#7a3a00; --err:#9b1c1c;
+    --sans:"Arial Narrow", Arial, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  *, *::before, *::after { box-sizing:border-box; }
+  body { margin:0; font-family:var(--sans); background:var(--bg); color:var(--ink); line-height:1.5; }
+  .container { max-width:1040px; margin:0 auto; padding:28px 18px 64px; }
+  .header { display:flex; justify-content:space-between; align-items:flex-start; gap:20px; flex-wrap:wrap; margin-bottom:22px; }
+  h1 { margin:0; font-size:24px; }
+  h2 { margin:22px 0 10px; font-size:17px; border-bottom:1px solid var(--line); padding-bottom:6px; }
+  a { color:var(--ink-soft); }
+  .home { text-decoration:none; font-size:12px; font-weight:700; color:var(--btn); }
+  .home:hover { color:var(--btn-hover); }
+  .card { background:var(--panel-2); border:1px solid var(--line); border-radius:4px; padding:18px 20px; margin-bottom:14px; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .row + .row { margin-top:8px; }
+  label { font-size:12px; font-weight:700; letter-spacing:0.04em; text-transform:uppercase; color:var(--muted); }
+  input[type=email], input[type=text] { font:inherit; padding:7px 10px; border:1px solid var(--line); border-radius:3px; min-width:260px; }
+  button.primary { font:inherit; font-weight:700; padding:8px 16px; background:var(--btn); color:#fff; border:0; border-radius:3px; cursor:pointer; }
+  button.primary:hover { background:var(--btn-hover); }
+  button.ghost { font:inherit; padding:7px 13px; background:transparent; border:1px solid var(--line); border-radius:3px; cursor:pointer; }
+  .msg { font-size:13px; margin-top:8px; }
+  .msg.ok  { color:var(--ok); }
+  .msg.err { color:var(--err); }
+  .lic { display:grid; grid-template-columns:auto 1fr auto auto; gap:10px 14px; align-items:center; padding:8px 0; border-bottom:1px dashed var(--line-soft); font-size:13px; }
+  .lic:last-child { border-bottom:0; }
+  .lic .slug { font-family:Consolas, monospace; font-weight:700; color:var(--muted); }
+  .lic .name { font-weight:700; }
+  .lic .period { font-size:11px; padding:2px 6px; border-radius:2px; background:#dff0e2; color:var(--ok); text-transform:uppercase; letter-spacing:0.04em; }
+  .lic .expires { font-size:11.5px; color:var(--muted); }
+
+  /* Cart */
+  .cart-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+  @media (max-width:760px) { .cart-grid { grid-template-columns:1fr; } }
+  .calc-pick { display:flex; gap:8px; align-items:flex-start; padding:8px 10px; border:1px solid var(--line-soft); border-radius:3px; margin-bottom:6px; cursor:pointer; }
+  .calc-pick:hover { background:#f4f6f8; }
+  .calc-pick input { margin-top:3px; }
+  .calc-pick .t { font-weight:700; font-size:13px; }
+  .calc-pick .d { font-size:11.5px; color:var(--muted); }
+  .period-pick { display:flex; gap:8px; flex-wrap:wrap; margin:6px 0 12px; }
+  .period-pick label { font-size:12px; font-weight:700; padding:6px 11px; border:1px solid var(--line); border-radius:3px; cursor:pointer; }
+  .period-pick input { display:none; }
+  .period-pick input:checked + span { color:var(--btn); }
+  .period-pick label:has(input:checked) { background:var(--btn); color:#fff; border-color:var(--btn); }
+  .quote { background:#f4f6f8; border:1px solid var(--line-soft); border-radius:3px; padding:12px 14px; font-size:13px; }
+  .quote .total { font-size:22px; font-weight:700; font-family:Consolas, monospace; }
+  .quote .badge { display:inline-block; background:var(--btn); color:#fff; padding:2px 7px; font-size:11px; font-weight:700; letter-spacing:0.04em; text-transform:uppercase; border-radius:2px; margin-left:6px; }
+</style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div>
+        <a class="home" href="/">← ieccalc.com</a>
+        <h1>My account</h1>
+      </div>
+      <div id="user-box"></div>
+    </div>
+
+    <div id="signed-out" class="card" style="display:none">
+      <h2 style="margin-top:0">Sign in with a one-time link</h2>
+      <p style="font-size:13px;color:var(--muted)">Enter your email — we'll send a one-time sign-in link. No password.</p>
+      <div class="row">
+        <input type="email" id="email" placeholder="you@example.com" />
+        <button class="primary" id="btn-request">Send sign-in link</button>
+      </div>
+      <div class="msg" id="auth-msg"></div>
+    </div>
+
+    <div id="signed-in" style="display:none">
+      <h2>My licences</h2>
+      <div class="card" id="lic-list"><div style="color:var(--muted);font-size:13px">Loading…</div></div>
+
+      <h2>Buy or extend a licence</h2>
+      <div class="card">
+        <div class="cart-grid">
+          <div>
+            <label>Pick calculators</label>
+            <div id="calc-picks" style="margin-top:6px"><div style="color:var(--muted);font-size:13px">Loading…</div></div>
+          </div>
+          <div>
+            <label>Period</label>
+            <div class="period-pick" id="period-pick">
+              <label><input type="radio" name="period" value="day"/><span>Day pass</span></label>
+              <label><input type="radio" name="period" value="month" checked/><span>Monthly</span></label>
+              <label><input type="radio" name="period" value="year"/><span>Yearly</span></label>
+              <label><input type="radio" name="period" value="lifetime"/><span>Lifetime</span></label>
+            </div>
+            <label>Quote</label>
+            <div class="quote" id="quote" style="margin-top:6px">Pick at least one calculator.</div>
+            <div class="row" style="margin-top:14px">
+              <button class="primary" id="btn-checkout" disabled>Go to checkout</button>
+            </div>
+            <div class="msg" id="cart-msg"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/_lib/api.js"></script>
+  <script>
+    const $ = sel => document.querySelector(sel);
+    const cartMsg = (text, cls = "") => { const el = $("#cart-msg"); el.textContent = text; el.className = "msg " + cls; };
+    const authMsg = (text, cls = "") => { const el = $("#auth-msg"); el.textContent = text; el.className = "msg " + cls; };
+
+    function esc(s) { return String(s||"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
+    function fmtDate(t) { return t ? new Date(t).toISOString().slice(0,10) : "—"; }
+
+    async function refresh() {
+      let session = null;
+      try { session = await IecApi.me(); } catch (e) { session = { authenticated: false }; }
+
+      if (!session.authenticated) {
+        $("#signed-out").style.display = "";
+        $("#signed-in").style.display = "none";
+        $("#user-box").innerHTML = "";
+        const intent = new URLSearchParams(location.search).get("intent");
+        if (intent === "signin") $("#email").focus();
+        return;
+      }
+
+      $("#signed-out").style.display = "none";
+      $("#signed-in").style.display  = "";
+      $("#user-box").innerHTML = `
+        <div style="text-align:right;font-size:12.5px;line-height:1.4">
+          Signed in as <b>${esc(session.user.email)}</b><br>
+          <button class="ghost" id="btn-signout" style="margin-top:6px">Sign out</button>
+        </div>`;
+      $("#btn-signout").addEventListener("click", async () => {
+        await IecApi.signOut().catch(()=>{});
+        location.reload();
+      });
+
+      // Render licences
+      const list = session.licenses || [];
+      $("#lic-list").innerHTML = list.length
+        ? list.map(l => `<div class="lic">
+            <span class="slug">#${esc(l.calc_slug)}</span>
+            <span class="name">${esc(l.calc_name)}</span>
+            <span class="period">${esc(l.period)}</span>
+            <span class="expires">expires: ${fmtDate(l.expires_at)}</span>
+          </div>`).join("")
+        : `<div style="color:var(--muted);font-size:13px">No licences yet. Pick calculators below to buy your first.</div>`;
+
+      // Cart
+      const { calculators } = await IecApi.calculators().catch(() => ({ calculators: [] }));
+      const pro = calculators.filter(c => c.category === "pro" && c.tier !== "archived");
+      $("#calc-picks").innerHTML = pro.map(c => `
+        <label class="calc-pick">
+          <input type="checkbox" value="${esc(c.slug)}">
+          <span>
+            <div class="t">#${esc(c.slug)} — ${esc(c.name)}</div>
+            <div class="d">${esc(c.short_desc || "")}</div>
+          </span>
+        </label>
+      `).join("") || `<div style="color:var(--muted);font-size:13px">No calculators available.</div>`;
+
+      $("#calc-picks").addEventListener("change", quoteCart);
+      $("#period-pick").addEventListener("change", quoteCart);
+      $("#btn-checkout").addEventListener("click", checkout);
+    }
+
+    async function buildCartItems() {
+      const period = document.querySelector('input[name="period"]:checked').value;
+      const picked = [...document.querySelectorAll("#calc-picks input:checked")].map(i => i.value);
+      return picked.map(slug => ({ calc_slug: slug, period }));
+    }
+
+    async function quoteCart() {
+      const items = await buildCartItems();
+      const btn = $("#btn-checkout");
+      if (items.length === 0) {
+        $("#quote").innerHTML = "Pick at least one calculator.";
+        btn.disabled = true;
+        cartMsg("");
+        return;
+      }
+      try {
+        const q = await IecApi.cartQuote(items);
+        if (q.error) {
+          $("#quote").innerHTML = `<span style="color:var(--err)">${esc(q.error)}</span>`;
+          btn.disabled = true;
+          return;
+        }
+        $("#quote").innerHTML = `
+          <div><b>${esc(q.rule_name)}</b>${q.badge ? `<span class="badge">${esc(q.badge)}</span>` : ""}</div>
+          <div style="margin-top:6px" class="total">$${q.total_usd.toFixed(2)}</div>
+          <div style="color:var(--muted);font-size:11.5px">${items.length} calc · ${items[0].period}</div>
+        `;
+        btn.disabled = false;
+        cartMsg("");
+      } catch (e) {
+        $("#quote").innerHTML = `<span style="color:var(--err)">${esc(e.message)}</span>`;
+        btn.disabled = true;
+      }
+    }
+
+    async function checkout() {
+      const items = await buildCartItems();
+      cartMsg("Building checkout…");
+      try {
+        const r = await IecApi.cartCheckout(items);
+        if (r.checkout_url) { location.href = r.checkout_url; return; }
+        cartMsg(r.error || "Checkout failed", "err");
+      } catch (e) {
+        cartMsg(e.message + (e.body?.quote ? ` (rule ${e.body.quote.rule_id})` : ""), "err");
+      }
+    }
+
+    // Sign-in form
+    $("#btn-request").addEventListener("click", async () => {
+      const email = $("#email").value.trim();
+      if (!email) { authMsg("Enter your email", "err"); return; }
+      authMsg("Sending…");
+      try {
+        await IecApi.requestLogin(email, "/account/");
+        authMsg(`Check ${email} for your sign-in link.`, "ok");
+      } catch (e) { authMsg(e.message, "err"); }
+    });
+
+    refresh();
+  </script>
+</body>
+</html>

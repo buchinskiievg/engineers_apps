@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Engineering content — ieccalc.com</title>
+<meta name="description" content="Engineering articles, worked examples and case studies for substation, cable and grounding design — IEC / IEEE / UAE-GCC context." />
+<style>
+  :root {
+    --bg:#c8ccd1; --panel-2:#ffffff; --ink:#000; --ink-soft:#1a1a1a; --muted:#3a3f44;
+    --line:#8a8f94; --line-soft:#b4b9bd; --btn:#3c4043;
+    --accent:#1a3a6a;
+    --sans:"Arial Narrow", Arial, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  *, *::before, *::after { box-sizing:border-box; }
+  body { margin:0; font-family:var(--sans); background:var(--bg); color:var(--ink); line-height:1.55; }
+  .container { max-width:880px; margin:0 auto; padding:28px 18px 64px; }
+  .home { font-size:12px; font-weight:700; color:var(--btn); text-decoration:none; }
+  h1 { margin:6px 0 4px; font-size:26px; }
+  .sub { color:var(--muted); font-size:13.5px; margin-bottom:20px; }
+  .article { background:var(--panel-2); border:1px solid var(--line); border-left:4px solid var(--accent); border-radius:4px; padding:18px 22px; text-decoration:none; color:var(--ink); display:block; }
+  .article + .article { margin-top:12px; }
+  .meta { font-size:11.5px; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; }
+  .title { font-size:18px; font-weight:700; margin:4px 0 6px; }
+  .excerpt { font-size:13.5px; color:var(--muted); }
+  .empty { background:var(--panel-2); border:1px dashed var(--line); border-radius:4px; padding:30px; text-align:center; color:var(--muted); font-size:13.5px; }
+</style>
+</head>
+<body>
+  <div class="container">
+    <a class="home" href="/">← ieccalc.com</a>
+    <h1>Engineering content</h1>
+    <div class="sub">Articles, worked examples and case studies — substation, cable, grounding, protection.</div>
+    <div id="list"><div class="empty">Loading…</div></div>
+  </div>
+
+  <script src="/_lib/api.js"></script>
+  <script>
+    function esc(s) { return String(s||"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
+    function fmtDate(t) { return t ? new Date(t).toISOString().slice(0,10) : ""; }
+
+    IecApi.articles().then(({ articles }) => {
+      document.getElementById("list").innerHTML = articles.length
+        ? articles.map(a => `<a class="article" href="/content/${esc(a.slug)}/">
+            <div class="meta">${fmtDate(a.published_at)}</div>
+            <div class="title">${esc(a.title)}</div>
+            <div class="excerpt">${esc(a.excerpt || "")}</div>
+          </a>`).join("")
+        : `<div class="empty">No articles published yet. First piece — substation grounding under high-resistivity rocky soil in the UAE — is in editing.</div>`;
+    }).catch(e => {
+      document.getElementById("list").innerHTML = `<div class="empty">Content list offline (${esc(e.message)}). Once the API is deployed, articles will appear here.</div>`;
+    });
+  </script>
+</body>
+</html>

@@ -3,46 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-<title>IEC Calculators — Free Online Engineering Tools | ieccalc.com</title>
-<meta name="description" content="Free online IEC calculators for power engineers — voltage drop (IEC 60364-5-52), short-circuit current (IEC 60909), more. Multi-feeder, sequence networks, BESS/diesel/transformer support. LV & MV up to 33 kV. Word report on every run. UAE / GCC and worldwide. Runs in your browser, no signup." />
-<meta name="keywords" content="IEC calculator, voltage drop calculator, short circuit calculator, IEC 60364-5-52, IEC 60909, IEC 60502, IEC 60076, electrical engineering tool, power engineering, free engineering calculator, BESS short circuit, DEWA cable sizing, MV fault current, sequence networks" />
-<meta name="author" content="Eng. Evgenii Buchinskii" />
-<meta name="robots" content="index, follow" />
-<meta name="theme-color" content="#3c4043" />
-<link rel="canonical" href="https://ieccalc.com/" />
-
-<!-- Open Graph (LinkedIn / Facebook / preview cards) -->
-<meta property="og:type" content="website" />
-<meta property="og:site_name" content="IEC Calculators" />
-<meta property="og:title" content="IEC Calculators — Free Online Engineering Tools" />
-<meta property="og:description" content="Free online IEC calculators for power engineers — voltage drop, short-circuit current and more. Built on IEC 60364, 60909, 60502, 60076. Word report on every run." />
-<meta property="og:url" content="https://ieccalc.com/" />
-<meta property="og:locale" content="en_US" />
-
-<!-- Twitter / X -->
-<meta name="twitter:card" content="summary" />
-<meta name="twitter:title" content="IEC Calculators — Free Online Engineering Tools" />
-<meta name="twitter:description" content="Free online voltage drop, short-circuit and more — built on IEC 60364, 60909. Word report on every run. ieccalc.com" />
-
-<!-- Schema.org structured data — software application -->
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "WebApplication",
-  "name": "IEC Calculators",
-  "url": "https://ieccalc.com/",
-  "description": "Free online IEC calculators for power engineers — voltage drop, short-circuit current, and more.",
-  "applicationCategory": "EngineeringApplication",
-  "operatingSystem": "Any (browser)",
-  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
-  "author": {
-    "@type": "Person",
-    "name": "Eng. Evgenii Buchinskii",
-    "url": "https://www.linkedin.com/in/evgenii-buchinskii-20351a2a6"
-  }
-}
-</script>
+<title>ieccalc.com — IEC engineering calculators by Eng. Evgenii Buchinskii</title>
+<meta name="description" content="Online IEC calculators for electrical / power engineers. UAE / GCC defaults, Word report on every run. Free and Professional tools + engineering content." />
 <style>
   :root {
     --bg:#c8ccd1; --bg-soft:#d8dbdf; --panel:#eef0f2; --panel-2:#ffffff;
@@ -50,37 +12,69 @@
     --line:#8a8f94; --line-soft:#b4b9bd;
     --btn:#3c4043; --btn-hover:#23272a; --btn-ink:#ffffff;
     --chip-bg:#3c4043; --chip-ink:#ffffff;
+    --accent-free:#0c5826; --accent-pro:#7a3a00; --accent-content:#1a3a6a;
     --sans:"Arial Narrow", Arial, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   }
   *, *::before, *::after { box-sizing: border-box; }
   body { margin:0; font-family:var(--sans); color:var(--ink); background:var(--bg); line-height:1.5; -webkit-font-smoothing:antialiased; }
-  .container { max-width:1040px; margin:0 auto; padding:32px 18px 64px; }
+  .container { max-width:1080px; margin:0 auto; padding:28px 18px 64px; }
+
+  .header-top { display:flex; justify-content:space-between; align-items:flex-start; gap:20px; flex-wrap:wrap; }
   .chips { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
   .chip { font-size:11px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; padding:3px 9px; border-radius:2px; background:var(--chip-bg); color:var(--chip-ink); }
   h1 { margin:0 0 6px; font-size:28px; font-weight:700; letter-spacing:-0.01em; }
-  .sub { color:var(--muted); font-size:14px; max-width:760px; }
-  .rule { height:1px; background:var(--line); margin:18px 0 22px; }
-  .header-top { display:flex; justify-content:space-between; align-items:flex-start; gap:20px; flex-wrap:wrap; }
-  .header-right { text-align:right; font-size:12px; color:var(--ink-soft); line-height:1.35; }
+  .sub { color:var(--muted); font-size:14px; max-width:720px; }
+  .header-right { text-align:right; font-size:12px; color:var(--ink-soft); line-height:1.4; }
   .author-name { font-weight:700; color:var(--ink); }
-  .author-email a, .author-wa-hint a { color:var(--ink-soft); text-decoration:none; }
-  .author-email a:hover, .author-wa-hint a:hover { text-decoration:underline; }
-  .author-wa-hint { font-size:11px; color:var(--muted); margin-top:4px; }
-  .author-links { display:flex; gap:6px; justify-content:flex-end; margin-top:6px; }
-  .author-links a { display:inline-flex; width:28px; height:28px; border-radius:3px; background:var(--btn); align-items:center; justify-content:center; text-decoration:none; }
-  .author-links a:hover { background:var(--btn-hover); }
-  .author-links svg { width:16px; height:16px; fill:#fff; }
+  .author-email a { color:var(--ink-soft); text-decoration:none; }
+  .author-email a:hover { text-decoration:underline; }
+  .account-link { display:inline-block; margin-top:6px; padding:5px 10px; background:var(--btn); color:#fff; text-decoration:none; border-radius:3px; font-size:11.5px; font-weight:700; letter-spacing:0.04em; text-transform:uppercase; }
+  .account-link:hover { background:var(--btn-hover); }
+  .account-link.secondary { background:transparent; color:var(--ink); border:1px solid var(--line); }
+  .account-link.secondary:hover { background:var(--panel); }
 
-  .apps { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  /* Tabs */
+  .tabs { display:flex; gap:0; margin:22px 0 0; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  .tab { background:transparent; border:0; padding:11px 18px 12px; font:inherit; font-weight:700; font-size:14px; letter-spacing:0.02em; cursor:pointer; color:var(--muted); border-bottom:3px solid transparent; margin-bottom:-1px; }
+  .tab:hover { color:var(--ink); }
+  .tab.active { color:var(--ink); border-bottom-color:var(--btn); }
+  .tab .count { font-size:11px; font-weight:700; color:var(--muted); margin-left:6px; }
+  .tab.active .count { color:var(--btn); }
+
+  .panel { padding:18px 0 0; }
+  .panel.hidden { display:none; }
+  .panel-intro { color:var(--muted); font-size:13px; margin-bottom:14px; max-width:760px; }
+
+  .apps { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
   @media (max-width: 760px) { .apps { grid-template-columns:1fr; } }
-  .app { display:block; background:var(--panel-2); border:1px solid var(--line); border-left:4px solid var(--btn); border-radius:4px; padding:18px 20px; text-decoration:none; color:var(--ink); transition:border-color .1s, transform .08s; }
+  .app { display:block; background:var(--panel-2); border:1px solid var(--line); border-left:4px solid var(--btn); border-radius:4px; padding:16px 18px; text-decoration:none; color:var(--ink); transition:border-color .1s, transform .08s; }
   .app:hover { border-color:var(--btn); transform:translateY(-1px); }
-  .app-no { font-family:"Consolas", monospace; font-size:12px; color:var(--muted); letter-spacing:0.08em; }
-  .app-title { font-size:18px; font-weight:700; margin:4px 0 6px; }
+  .app.free  { border-left-color: var(--accent-free); }
+  .app.pro   { border-left-color: var(--accent-pro); }
+  .app.coming-soon { opacity:0.65; cursor:default; }
+  .app-no { font-family:"Consolas", monospace; font-size:12px; color:var(--muted); letter-spacing:0.08em; display:flex; justify-content:space-between; align-items:center; }
+  .app-tag { font-size:10.5px; font-weight:700; padding:2px 6px; border-radius:2px; letter-spacing:0.05em; text-transform:uppercase; }
+  .app-tag.free    { background:#dff0e2; color:var(--accent-free); }
+  .app-tag.pro     { background:#f4e4c1; color:var(--accent-pro); }
+  .app-tag.beta    { background:#dbe7f5; color:var(--accent-content); }
+  .app-tag.coming  { background:#e3e3e3; color:var(--muted); }
+  .app-title { font-size:17px; font-weight:700; margin:4px 0 6px; }
   .app-sub { font-size:13px; color:var(--muted); line-height:1.45; }
   .app-refs { font-size:11px; color:var(--muted); margin-top:10px; padding-top:8px; border-top:1px dashed var(--line-soft); }
-  footer { margin-top:28px; padding-top:14px; border-top:1px solid var(--line); color:var(--ink-soft); font-size:12px; }
+
+  .article-card { display:block; background:var(--panel-2); border:1px solid var(--line); border-left:4px solid var(--accent-content); border-radius:4px; padding:16px 18px; text-decoration:none; color:var(--ink); }
+  .article-card + .article-card { margin-top:10px; }
+  .article-meta { font-size:11.5px; color:var(--muted); margin-bottom:4px; }
+  .article-title { font-size:17px; font-weight:700; margin:0 0 6px; }
+  .article-excerpt { font-size:13px; color:var(--muted); }
+
+  .empty { padding:30px 16px; background:var(--panel-2); border:1px dashed var(--line); border-radius:4px; color:var(--muted); font-size:13px; text-align:center; }
+
+  footer { margin-top:32px; padding-top:14px; border-top:1px solid var(--line); color:var(--ink-soft); font-size:12px; }
   footer .disclaimer { background:#f4e4c1; border:1px solid #c99c3c; color:#3a2e00; padding:10px 14px; border-radius:3px; line-height:1.5; }
+  .footer-nav { display:flex; gap:14px; margin-top:10px; flex-wrap:wrap; }
+  .footer-nav a { color:var(--ink-soft); text-decoration:none; }
+  .footer-nav a:hover { text-decoration:underline; }
 </style>
 </head>
 <body>
@@ -93,68 +87,154 @@
           <span class="chip">Word report</span>
           <span class="chip">Runs in your browser</span>
         </div>
-        <h1>Engineer's Apps</h1>
+        <h1>ieccalc.com — engineering tools by Eng. Evgenii Buchinskii</h1>
         <div class="sub">
-          Free online calculators for electrical / power engineers, aligned with IEC standards.
-          Every tool runs fully in your browser — no data leaves the page — and generates a
-          Word report that you can attach to your design file.
+          Online calculators for electrical / power engineers, aligned with IEC and IEEE standards.
+          Free tools cover the everyday parametric checks; Professional tools add sketch editors,
+          numerical solvers, lightning impulse, optimisation and full Word reports.
         </div>
       </div>
       <div class="header-right">
-        <div class="author-name">Developed by Eng. Evgenii Buchinskii</div>
+        <div class="author-name">Eng. Evgenii Buchinskii</div>
         <div class="author-email"><a href="mailto:buchinskii.evg@gmail.com">buchinskii.evg@gmail.com</a></div>
-        <div class="author-wa-hint">Join the discussion —<br>
-          <a href="https://chat.whatsapp.com/JW3utOLN0J46EMWArIJsY8" target="_blank" rel="noopener">Electrical Designers Middle East</a>
-        </div>
-        <div class="author-links">
-          <a href="https://www.linkedin.com/in/evgenii-buchinskii-20351a2a6" target="_blank" rel="noopener" title="LinkedIn">
-            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
-          </a>
-          <a href="https://chat.whatsapp.com/JW3utOLN0J46EMWArIJsY8" target="_blank" rel="noopener" title="WhatsApp group">
-            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
-          </a>
-        </div>
+        <a class="account-link" href="/account/">My account</a>
+        <a class="account-link secondary" href="/account/?intent=signin">Sign in</a>
       </div>
     </div>
 
-    <div class="rule"></div>
-
-    <div class="apps">
-      <a class="app" href="001/">
-        <div class="app-no">Calculator #001</div>
-        <div class="app-title">Voltage Drop — LV &amp; MV up to 33 kV</div>
-        <div class="app-sub">
-          Multi-feeder, multi-segment voltage drop per IEC 60364-5-52 Annex D (LV) and
-          IEC 60502-2 / IEC 60287 (MV). Built-in cable / OHL library (BS 5467, BS 7889,
-          IEC 60502-2, IEC 61089). Regional presets (UAE / GCC / UK / EU). Word report
-          with per-segment derivation.
-        </div>
-        <div class="app-refs">IEC 60364-5-52 · IEC 60502-2 · IEC 60287 · IEC 60228 · IEC 61089</div>
-      </a>
-      <a class="app" href="002/">
-        <div class="app-no">Calculator #002</div>
-        <div class="app-title">Short-Circuit — IEC 60909 (LV &amp; MV up to 33 kV)</div>
-        <div class="app-sub">
-          Positive / negative / zero sequence calculation of I″k3, I″k2, I″k1, peak
-          current ip and κ at every busbar. Multiple parallel sources (infinite bus,
-          transformer, manual Z, known I″k, BESS, diesel generator). Cable / OHL /
-          transformer elements with vector-group handling of zero-sequence.
-        </div>
-        <div class="app-refs">IEC 60909-0 · IEC 60909-1 · IEC 60909-4 · IEC 60076 · IEC 60502-2</div>
-      </a>
+    <div class="tabs" role="tablist">
+      <button class="tab active" data-tab="free"    role="tab" aria-selected="true">Free tools <span class="count" id="cnt-free"></span></button>
+      <button class="tab"        data-tab="pro"     role="tab" aria-selected="false">Professional tools <span class="count" id="cnt-pro"></span></button>
+      <button class="tab"        data-tab="content" role="tab" aria-selected="false">Content <span class="count" id="cnt-content"></span></button>
     </div>
+
+    <section class="panel" id="panel-free" role="tabpanel">
+      <div class="panel-intro">
+        Free tools — full IEC math, parametric input, compact Word report, no registration required.
+      </div>
+      <div class="apps" id="apps-free"><div class="empty">Loading…</div></div>
+    </section>
+
+    <section class="panel hidden" id="panel-pro" role="tabpanel">
+      <div class="panel-intro">
+        Professional tools — sketch editors, numerical solvers, optimiser, full report with maps and appendices.
+        Buy a per-calculator licence or the full bundle from your <a href="/account/">account page</a>.
+      </div>
+      <div class="apps" id="apps-pro"><div class="empty">Loading…</div></div>
+    </section>
+
+    <section class="panel hidden" id="panel-content" role="tabpanel">
+      <div class="panel-intro">
+        Engineering articles, worked examples and case studies — written for substation, cable
+        and grounding designers in UAE / GCC and the wider IEC space.
+      </div>
+      <div id="articles"><div class="empty">Loading…</div></div>
+    </section>
 
     <footer>
       <div class="disclaimer">
-        <strong>Disclaimer.</strong> These calculators are provided “as is” for educational
-        and preliminary design purposes only. The author, Eng. Evgenii Buchinskii, bears no
-        responsibility, liability or warranty of any kind (express or implied) for decisions
-        made based on their output. Before using any generated report, verify every input,
-        formula, intermediate value and final result against the applicable standard and
-        project-specific conditions. Final designs must be checked and signed off by a
-        qualified engineer.
+        <strong>Disclaimer.</strong> These calculators are provided “as is”. The author bears no
+        responsibility for decisions made on their output. Verify every input, formula and result
+        against the applicable standard. Final designs must be signed off by a qualified engineer.
+      </div>
+      <div class="footer-nav">
+        <a href="/account/">Account</a>
+        <a href="/content/">Content</a>
+        <a href="https://www.linkedin.com/in/evgenii-buchinskii-20351a2a6" target="_blank" rel="noopener">LinkedIn</a>
+        <a href="https://chat.whatsapp.com/JW3utOLN0J46EMWArIJsY8" target="_blank" rel="noopener">WhatsApp group</a>
       </div>
     </footer>
   </div>
+
+  <script src="/_lib/api.js"></script>
+  <script>
+    // Tab switching
+    const tabs = document.querySelectorAll(".tab");
+    tabs.forEach(t => t.addEventListener("click", () => {
+      tabs.forEach(x => { x.classList.remove("active"); x.setAttribute("aria-selected", "false"); });
+      t.classList.add("active"); t.setAttribute("aria-selected", "true");
+      document.querySelectorAll(".panel").forEach(p => p.classList.add("hidden"));
+      document.getElementById("panel-" + t.dataset.tab).classList.remove("hidden");
+      history.replaceState(null, "", "#" + t.dataset.tab);
+      window.IecApi && IecApi.logEvent("tab_switch", { feature: t.dataset.tab }).catch(() => {});
+    }));
+    const initTab = (location.hash || "").replace("#", "");
+    if (initTab && document.querySelector(`.tab[data-tab="${initTab}"]`)) {
+      document.querySelector(`.tab[data-tab="${initTab}"]`).click();
+    }
+
+    function calcCard(c) {
+      const tagClass = c.tier === "coming_soon" ? "coming" : (c.tier === "beta" ? "beta" : c.category);
+      const tagText  = c.tier === "coming_soon" ? "coming soon" : (c.tier === "beta" ? "beta" : c.category);
+      const cssClass = `app ${c.category}${c.tier === "coming_soon" ? " coming-soon" : ""}`;
+      const href     = c.tier === "coming_soon" ? "javascript:void(0)" : c.base_url;
+      return `<a class="${cssClass}" href="${href}">
+        <div class="app-no"><span>Calculator #${c.slug}</span><span class="app-tag ${tagClass}">${tagText}</span></div>
+        <div class="app-title">${escapeHtml(c.name)}</div>
+        <div class="app-sub">${escapeHtml(c.short_desc || "")}</div>
+        ${c.standards ? `<div class="app-refs">${escapeHtml(c.standards)}</div>` : ""}
+      </a>`;
+    }
+
+    function articleCard(a) {
+      const date = a.published_at ? new Date(a.published_at).toISOString().slice(0,10) : "";
+      return `<a class="article-card" href="/content/${a.slug}/">
+        <div class="article-meta">${date}</div>
+        <h3 class="article-title">${escapeHtml(a.title)}</h3>
+        <div class="article-excerpt">${escapeHtml(a.excerpt || "")}</div>
+      </a>`;
+    }
+
+    function escapeHtml(s) {
+      return String(s || "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+    }
+
+    async function load() {
+      try {
+        const { calculators } = await IecApi.calculators();
+        const free = calculators.filter(c => c.category === "free");
+        const pro  = calculators.filter(c => c.category === "pro");
+        document.getElementById("cnt-free").textContent = free.length || "";
+        document.getElementById("cnt-pro").textContent  = pro.length  || "";
+        document.getElementById("apps-free").innerHTML = free.length
+          ? free.map(calcCard).join("")
+          : `<div class="empty">No free tools yet — coming soon.</div>`;
+        document.getElementById("apps-pro").innerHTML  = pro.length
+          ? pro.map(calcCard).join("")
+          : `<div class="empty">No professional tools published yet.</div>`;
+      } catch (e) {
+        // Fallback: show static seed data so the page is useful even if API is offline
+        const seed = [
+          { slug:"001", name:"Voltage Drop — LV & MV up to 33 kV", category:"pro", tier:"active", base_url:"/001/",
+            short_desc:"Multi-feeder, multi-segment voltage drop per IEC 60364-5-52 Annex D (LV) and IEC 60502-2 / IEC 60287 (MV).",
+            standards:"IEC 60364-5-52 · IEC 60502-2 · IEC 60287 · IEC 60228 · IEC 61089" },
+          { slug:"002", name:"Short-Circuit — IEC 60909", category:"pro", tier:"active", base_url:"/002/",
+            short_desc:"Positive/negative/zero sequence Iʺk3, Iʺk2, Iʺk1, peak ip and κ at every busbar.",
+            standards:"IEC 60909-0 · IEC 60909-1 · IEC 60909-4" },
+          { slug:"003", name:"Substation Grounding Grid — IEEE 80", category:"pro", tier:"active", base_url:"/003/",
+            short_desc:"Multi-grid sizing per IEEE Std 80-2013 with sketch editor and full Word report.",
+            standards:"IEEE 80 · IEEE 81 · IEC 61936-1" },
+          { slug:"004", name:"Cable Ampacity — IEC 60287", category:"pro", tier:"active", base_url:"/004/",
+            short_desc:"Continuous current rating per IEC 60287 with derating; multi-cable trench CAD.",
+            standards:"IEC 60287 · IEC 60228 · IEC 60949" },
+        ];
+        const pro = seed.filter(c => c.category === "pro");
+        document.getElementById("cnt-pro").textContent = pro.length;
+        document.getElementById("apps-pro").innerHTML  = pro.map(calcCard).join("");
+        document.getElementById("apps-free").innerHTML = `<div class="empty">Free tools — coming soon. API offline (${escapeHtml(e.message)}).</div>`;
+      }
+
+      try {
+        const { articles } = await IecApi.articles();
+        document.getElementById("cnt-content").textContent = articles.length || "";
+        document.getElementById("articles").innerHTML = articles.length
+          ? articles.map(articleCard).join("")
+          : `<div class="empty">No articles published yet — first piece coming this month.</div>`;
+      } catch (e) {
+        document.getElementById("articles").innerHTML = `<div class="empty">Content loading offline (${escapeHtml(e.message)}).</div>`;
+      }
+    }
+    load();
+  </script>
 </body>
 </html>

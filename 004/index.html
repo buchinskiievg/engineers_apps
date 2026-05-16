@@ -1,0 +1,3472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Cable Ampacity — IEC 60287 / IEC 60228 / IEC 60949 · ieccalc</title>
+<meta name="description" content="Continuous current rating of power cables per IEC 60287 series. Skin and proximity effects, dielectric losses, sheath/armour loss factors, thermal resistances T1–T4, conductor temperature back-calculation, thermal short-circuit withstand per IEC 60949. Direct-buried, in-air, with regional defaults (UAE / GCC / UK / EU)." />
+<style>
+  :root {
+    --bg:#c8ccd1; --bg-soft:#d8dbdf; --panel:#eef0f2; --panel-2:#ffffff;
+    --ink:#000000; --ink-soft:#1a1a1a; --muted:#3a3f44;
+    --line:#8a8f94; --line-soft:#b4b9bd;
+    --btn:#3c4043; --btn-hover:#23272a; --btn-ink:#ffffff;
+    --btn-ghost-bg:#d8dbdf;
+    --chip-bg:#3c4043; --chip-ink:#ffffff;
+    --ok-bg:#d6e9dc; --ok-ink:#0c5826;
+    --warn-bg:#f4e4c1; --warn-ink:#6b4a00;
+    --err-bg:#f2cdcf; --err-ink:#7f1a10;
+    --kbd-bg:#2a2d31; --kbd-ink:#ffffff;
+    --sans:"Arial Narrow", Arial, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --mono:"Consolas", "Courier New", monospace;
+  }
+  *, *::before, *::after { box-sizing:border-box; }
+  html, body { height:100%; }
+  body { margin:0; font-family:var(--sans); color:var(--ink); background:var(--bg); line-height:1.45; -webkit-font-smoothing:antialiased; }
+  .container { max-width:1320px; margin:0 auto; padding:18px 14px 36px; }
+
+  .chips { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
+  .chip { font-size:11px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; padding:3px 9px; border-radius:2px; background:var(--chip-bg); color:var(--chip-ink); }
+  h1 { margin:0 0 4px; font-size:22px; font-weight:700; letter-spacing:-0.01em; }
+  .sub { color:var(--muted); font-size:13px; max-width:900px; }
+  .rule { height:1px; background:var(--line); margin:12px 0 14px; }
+
+  .header-top { display:flex; justify-content:space-between; gap:18px; align-items:flex-start; flex-wrap:wrap; }
+  .header-right { text-align:right; font-size:12px; color:var(--ink-soft); line-height:1.35; flex-shrink:0; }
+  .author-name { font-weight:700; }
+  .author-email a, .author-link a { color:var(--ink-soft); text-decoration:none; }
+  .author-email a:hover, .author-link a:hover { text-decoration:underline; }
+  .back-link { font-size:12px; color:var(--ink-soft); text-decoration:none; }
+  .back-link:hover { text-decoration:underline; }
+
+  .toolbar {
+    display:flex; gap:8px; flex-wrap:wrap; align-items:center;
+    padding:8px 10px; background:var(--bg-soft);
+    border:1px solid var(--line); border-radius:4px;
+    margin-bottom:10px;
+  }
+  .toolbar .grow { flex:1; }
+  .toolbar .seg { display:flex; gap:0; }
+  .toolbar .seg button { border-radius:0; }
+  .toolbar .seg button:first-child { border-top-left-radius:3px; border-bottom-left-radius:3px; }
+  .toolbar .seg button:last-child { border-top-right-radius:3px; border-bottom-right-radius:3px; }
+  .toolbar label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; }
+  .toolbar select { padding:4px 6px; font-family:inherit; font-size:12px; border:1px solid var(--line); background:#fff; border-radius:3px; }
+
+  .layout { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+  @media (max-width: 980px) { .layout { grid-template-columns: 1fr; } }
+
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:4px; }
+  .panel h3 {
+    margin:0; padding:8px 12px;
+    background:var(--bg-soft);
+    font-size:11px; font-weight:700;
+    letter-spacing:0.08em; text-transform:uppercase;
+    color:var(--ink-soft);
+    border-bottom:1px solid var(--line);
+  }
+  .panel-body { padding:10px 12px; font-size:12.5px; }
+  .panel + .panel { margin-top:10px; }
+
+  .row { display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:6px; }
+  .row.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .row.cols-1 { grid-template-columns: 1fr; }
+  @media (max-width: 600px) { .row, .row.cols-3 { grid-template-columns: 1fr; } }
+
+  label.field { display:block; margin-bottom:6px; }
+  label.field > span { display:block; font-size:10.5px; color:var(--muted); margin-bottom:2px; text-transform:uppercase; letter-spacing:0.04em; }
+  label.field > .help { font-size:10.5px; color:var(--muted); margin-top:2px; font-style:italic; }
+  select, input[type=number], input[type=text] {
+    width:100%; padding:5px 7px; font-family:inherit; font-size:12.5px;
+    border:1px solid var(--line); background:#fff; border-radius:3px;
+  }
+  select:focus, input:focus { outline:1px solid var(--btn); outline-offset:-1px; }
+  input[type=checkbox] { vertical-align:middle; margin-right:5px; }
+
+  button, .btn {
+    border:1px solid var(--line);
+    background:var(--btn-ghost-bg);
+    color:var(--ink);
+    font-family:inherit; font-size:12px; font-weight:600;
+    padding:6px 10px;
+    cursor:pointer;
+    border-radius:3px;
+    line-height:1.1;
+  }
+  button:hover { border-color:var(--btn); }
+  button.primary { background:var(--btn); color:var(--btn-ink); border-color:var(--btn); }
+  button.primary:hover { background:var(--btn-hover); }
+  button.tiny { padding:3px 7px; font-size:11px; }
+  button:disabled { opacity:0.45; cursor:not-allowed; }
+
+  details > summary {
+    cursor:pointer; padding:6px 10px; background:var(--bg-soft); border:1px solid var(--line);
+    border-radius:3px; font-size:11.5px; font-weight:700; letter-spacing:0.05em; text-transform:uppercase;
+    color:var(--ink-soft); list-style:none;
+  }
+  details > summary::-webkit-details-marker { display:none; }
+  details > summary::before { content:"▸ "; font-size:10px; }
+  details[open] > summary::before { content:"▾ "; }
+  details > .panel-body { background:var(--panel); border:1px solid var(--line); border-top:0; border-radius:0 0 3px 3px; }
+
+  .verdict {
+    display:inline-block; padding:4px 10px; border-radius:3px;
+    font-size:12px; font-weight:700; letter-spacing:0.05em; text-transform:uppercase;
+  }
+  .verdict.pass { background:var(--ok-bg); color:var(--ok-ink); }
+  .verdict.borderline { background:var(--warn-bg); color:var(--warn-ink); }
+  .verdict.fail { background:var(--err-bg); color:var(--err-ink); }
+  .verdict.na { background:var(--bg-soft); color:var(--muted); }
+
+  .kv { display:grid; grid-template-columns: 60% 40%; gap:0 8px; font-size:12.5px; }
+  .kv .k { color:var(--muted); padding:2px 0; }
+  .kv .v { text-align:right; font-family:var(--mono); font-size:12px; padding:2px 0; }
+  .kv .v.b { font-weight:700; font-size:13.5px; color:var(--ink); }
+  .kv-sep { height:1px; background:var(--line-soft); margin:6px 0; grid-column:span 2; }
+
+  .num-big { font-size:26px; font-weight:700; font-family:var(--mono); letter-spacing:-0.02em; }
+  .num-big-unit { font-size:14px; color:var(--muted); margin-left:4px; }
+  .num-big-line { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:4px; }
+  .num-big-label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; }
+
+  .footer-refs { font-size:11px; color:var(--muted); margin-top:18px; line-height:1.5; }
+  .footer-refs strong { color:var(--ink-soft); }
+
+  table.tt { width:100%; border-collapse:collapse; font-size:11.5px; }
+  table.tt th, table.tt td { padding:3px 6px; text-align:left; border-bottom:1px solid var(--line-soft); }
+  table.tt th { background:var(--bg-soft); font-weight:700; font-size:10.5px; text-transform:uppercase; letter-spacing:0.04em; color:var(--ink-soft); }
+  table.tt td.n { font-family:var(--mono); text-align:right; }
+  table.tt td.pass { color:var(--ok-ink); font-weight:700; }
+  table.tt td.fail { color:var(--err-ink); font-weight:700; }
+
+  .formula { font-family:var(--mono); font-size:11.5px; color:var(--ink-soft); background:#fff; border:1px dashed var(--line-soft); padding:4px 8px; margin:4px 0; border-radius:3px; }
+  .note { font-size:11px; color:var(--muted); margin-top:6px; padding:6px 8px; background:#fff; border-left:3px solid var(--line); }
+  .note.warn { border-left-color:#b07a00; background:#fff8e0; color:#5a3a00; }
+
+  .ad-row { background:var(--bg-soft); border:1px dashed var(--line-soft); border-radius:3px; padding:8px 10px; font-size:11px; color:var(--muted); margin:8px 0; text-align:center; }
+  @media (max-width: 760px) { .ad-row { display:none; } }
+
+  /* === TRENCH CAD MODULE (PRO) — design preserved verbatim from cable-ampacity-v4.jsx === */
+  #trenchCAD { margin-top:14px; background:#eee; color:#222; font-family:system-ui,sans-serif; border:1px solid var(--line); border-radius:4px; overflow:hidden; }
+  #trenchCAD .tc-bar { padding:4px 12px; border-bottom:1px solid #ccc; background:#fff; display:flex; align-items:center; justify-content:space-between; }
+  #trenchCAD .tc-title { font-size:12px; font-weight:700; }
+  #trenchCAD .tc-title small { font-weight:400; color:#888; font-size:10px; margin-left:4px; }
+  #trenchCAD .tc-btns { display:flex; gap:6px; align-items:center; }
+  #trenchCAD .tc-btns button { padding:4px 14px; border-radius:3px; font-size:11px; font-weight:700; cursor:pointer; line-height:1.1; border:1px solid #666; background:#fff; color:#333; font-family:inherit; }
+  #trenchCAD .tc-btns button.tc-primary { background:#333; color:#fff; border-color:#333; font-weight:700; }
+  #trenchCAD .tc-btns .tc-zoom { font-size:9px; color:#888; }
+  #trenchCAD .tc-body { display:flex; min-height:600px; }
+  #trenchCAD .tc-side { width:175px; border-right:1px solid #ccc; background:#fff; padding:5px; overflow-y:auto; flex-shrink:0; font-size:10px; max-height:600px; }
+  #trenchCAD .tc-side-r { width:180px; border-right:0; border-left:1px solid #ccc; }
+  #trenchCAD .tc-h { font-size:8px; font-weight:700; color:#444; text-transform:uppercase; margin:0 0 3px; }
+  #trenchCAD .tc-h.sep { margin:6px 0 3px; padding-top:6px; border-top:1px solid #ddd; }
+  #trenchCAD .tc-grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:2px; }
+  #trenchCAD .tc-grid2 { display:grid; grid-template-columns:1fr 1fr; gap:2px; }
+  #trenchCAD .tc-fld { margin-bottom:4px; }
+  #trenchCAD .tc-fld label { display:block; margin-bottom:1px; font-size:8px; color:#777; font-weight:600; text-transform:uppercase; letter-spacing:0; }
+  #trenchCAD .tc-fld input, #trenchCAD .tc-fld select { width:100%; padding:3px 5px; background:#fff; border:1px solid #ccc; border-radius:2px; color:#222; font-size:11px; font-family:inherit; box-sizing:border-box; outline:none; }
+  #trenchCAD .tc-add-btn { display:block; width:100%; padding:2px 4px; margin-bottom:2px; border:1px solid #ccc; border-radius:2px; background:#fff; cursor:pointer; font-size:10px; font-family:inherit; text-align:left; color:#222; }
+  #trenchCAD .tc-add-btn:hover { background:#f6f6f6; }
+  #trenchCAD .tc-del-btn { display:block; width:100%; padding:2px; margin-top:4px; border:1px solid #c00; border-radius:2px; background:transparent; color:#c00; cursor:pointer; font-size:10px; font-family:inherit; }
+  #trenchCAD .tc-iec-info { font-size:7px; color:#888; margin-bottom:3px; }
+  #trenchCAD .tc-iec-ref { font-size:9px; color:#555; margin-top:3px; padding:3px; background:#fffbe6; border:1px solid #eed; border-radius:2px; }
+  #trenchCAD .tc-iec-ref b { color:#222; }
+  #trenchCAD .tc-iec-apply { display:block; width:100%; padding:3px 4px; border:1px solid #06c; border-radius:2px; background:#f0f4ff; color:#06c; cursor:pointer; font-size:10px; font-weight:600; font-family:inherit; }
+  #trenchCAD .tc-canvas-col { flex:1; display:flex; flex-direction:column; overflow:hidden; min-width:0; }
+  #trenchCAD .tc-tabs { display:flex; border-bottom:1px solid #ccc; background:#f8f8f8; flex-shrink:0; }
+  #trenchCAD .tc-tabs button { padding:3px 12px; border:none; border-bottom:2px solid transparent; background:transparent; color:#999; font-size:10px; font-weight:600; cursor:pointer; font-family:inherit; }
+  #trenchCAD .tc-tabs button.active { border-bottom-color:#333; color:#222; }
+  #trenchCAD .tc-tabs .tc-hint { flex:1; text-align:right; padding:3px 8px; font-size:7px; color:#aaa; }
+  #trenchCAD .tc-canvas-wrap { position:relative; overflow:hidden; background:#eeece8; min-height:560px; }
+  #trenchCAD .tc-canvas-wrap canvas { display:block; }
+  #trenchCAD .tc-summary { position:absolute; left:0; right:0; bottom:0; padding:3px 6px; background:rgba(255,255,255,0.95); border-top:1px solid #ccc; display:flex; gap:5px; overflow-x:auto; font-size:10px; flex-wrap:wrap; z-index:5; }
+  #trenchCAD #tcPlan[hidden] { display:none !important; }
+  #trenchCAD #tcPlan:not([hidden]) { display:flex !important; }
+  #trenchCAD .tc-sum-c { padding:2px 6px; background:#f5f5f5; border-radius:2px; cursor:pointer; border:1px solid #ccc; white-space:nowrap; }
+  #trenchCAD .tc-sum-c.sel { background:#e0e0e8; border-color:#333; border-width:1.5px; }
+  #trenchCAD .tc-sum-c b { color:#222; }
+  #trenchCAD .tc-side-help { text-align:center; padding:12px 4px; color:#aaa; font-size:8px; }
+  #trenchCAD .tc-rgrid { margin-top:8px; padding:5px; background:#fffbe6; border:1px solid #eed; border-radius:3px; text-align:left; color:#333; font-size:9px; }
+  #trenchCAD .tc-rgrid table { width:100%; border-collapse:collapse; font-size:9px; }
+  #trenchCAD .tc-rgrid th, #trenchCAD .tc-rgrid td { padding:2px; text-align:right; }
+  #trenchCAD .tc-rgrid th:first-child, #trenchCAD .tc-rgrid td:first-child { text-align:left; }
+  #trenchCAD .tc-result-box { margin-top:3px; padding:4px; background:#f5f5f5; border-radius:2px; font-size:10px; line-height:1.4; }
+  #trenchCAD .tc-result-box b { color:#222; }
+  #trenchCAD .tc-checkbox { display:flex; align-items:center; gap:3px; font-size:9px; cursor:pointer; margin-bottom:3px; }
+
+  /* Multi-section tabs in trench CAD */
+  #trenchCAD .tc-tabs button.tc-add-section { padding:3px 8px; font-size:14px; font-weight:700; color:#0c5826; }
+  #trenchCAD .tc-tabs button.tc-section-tab { padding:3px 12px; }
+  #trenchCAD .tc-tabs button.tc-section-tab.active { color:#222; }
+  #trenchCAD .tc-tabs .tc-section-close { margin-left:4px; color:#c00; cursor:pointer; font-weight:700; }
+
+  /* TEMP-DEMO: lock cables in demo example mode */
+  #trenchCAD.demo-locked .tc-side input,
+  #trenchCAD.demo-locked .tc-side select,
+  #trenchCAD.demo-locked .tc-side-r input,
+  #trenchCAD.demo-locked .tc-side-r select,
+  #trenchCAD.demo-locked .tc-add-btn,
+  #trenchCAD.demo-locked .tc-iec-apply,
+  #trenchCAD.demo-locked .tc-tabs button.tc-add-section { pointer-events:none; opacity:0.55; cursor:not-allowed; }
+  #trenchCAD.demo-locked .tc-canvas-wrap canvas { pointer-events:none; }
+  #trenchCAD.demo-locked .tc-del-btn { display:none; }
+  #trenchCAD .tc-demo-notice {
+    background:#fff8e0; border:1px solid #b08000; color:#5a3a00; font-size:11px;
+    padding:6px 10px; margin:6px; border-radius:3px; display:none;
+  }
+  #trenchCAD.demo-locked .tc-demo-notice { display:block; }
+  #trenchCAD.demo-locked .tc-demo-notice b { color:#000; }
+
+  /* PRO badge inline next to button */
+  .pro-badge { display:inline-block; font-size:9px; font-weight:700; letter-spacing:0.05em; padding:1px 5px; border-radius:2px; background:#3c4043; color:#fff; margin-left:4px; vertical-align:middle; }
+
+  /* === TEMP-DEMO: tier comparison banner + section dividers (REMOVE BEFORE PRODUCTION) === */
+  .tier-demo-banner {
+    position:sticky; top:0; z-index:100;
+    background:#fff5cc; border-bottom:2px solid #b08000; color:#5a3a00;
+    padding:8px 14px; font-size:12px; display:flex; align-items:center; justify-content:space-between; gap:14px;
+  }
+  .tier-demo-banner b { color:#000; }
+  .tier-demo-banner .tdb-toggle {
+    display:inline-flex; align-items:center; gap:6px;
+    background:#fff; border:1px solid #b08000; border-radius:3px; padding:3px 8px; cursor:pointer; font-weight:700;
+  }
+  .tier-demo-banner .tdb-toggle:hover { background:#fffae6; }
+  .tier-demo-banner .tdb-state-pro { color:#0c5826; }
+  .tier-demo-banner .tdb-state-free { color:#7f1a10; }
+
+  .tier-stripe {
+    margin:18px 0 8px;
+    padding:10px 14px;
+    border-radius:4px;
+    font-size:13px;
+    display:flex; align-items:center; gap:10px;
+    border:1px solid;
+  }
+  .tier-stripe .tier-tag {
+    font-size:14px; font-weight:800; letter-spacing:0.1em; padding:3px 10px; border-radius:3px;
+  }
+  .tier-stripe .tier-desc { flex:1; line-height:1.4; }
+  .tier-stripe.free { background:linear-gradient(90deg,#d6e9dc,#eaf5ee); border-color:#0c5826; color:#063817; }
+  .tier-stripe.free .tier-tag { background:#0c5826; color:#fff; }
+  .tier-stripe.pro { background:linear-gradient(90deg,#fff0f5,#f5e9ff); border-color:#5b2a8c; color:#2a1145; }
+  .tier-stripe.pro .tier-tag { background:linear-gradient(135deg,#5b2a8c,#b8860b); color:#fff; }
+
+  details.tier-section { margin:16px 0 8px; }
+  details.tier-section > summary.tier-stripe { margin:0; list-style:none; cursor:pointer; }
+  details.tier-section > summary.tier-stripe::-webkit-details-marker { display:none; }
+  details.tier-section > summary.tier-stripe::before {
+    content:"▸"; margin-right:10px; font-size:13px; font-weight:700;
+    display:inline-block; width:14px;
+  }
+  details.tier-section[open] > summary.tier-stripe::before { content:"▾"; }
+
+  .pro-locked-overlay {
+    position:relative;
+  }
+  .pro-locked-overlay.locked::before {
+    content:"🔒 LOCKED IN PRODUCTION — toggle 'Demo PRO' above to preview";
+    position:absolute; top:6px; right:10px; z-index:10;
+    background:rgba(127,26,16,0.92); color:#fff; padding:4px 10px; border-radius:3px;
+    font-size:11px; font-weight:700; letter-spacing:0.04em; pointer-events:none;
+  }
+  .pro-locked-overlay.locked { box-shadow:inset 0 0 0 3px rgba(127,26,16,0.35); }
+</style>
+</head>
+<body>
+
+<!-- ===================== TEMP-DEMO: tier comparison banner ===================== -->
+<!-- REMOVE BEFORE PRODUCTION DEPLOYMENT (search for TEMP-DEMO to find all blocks) -->
+<div class="tier-demo-banner" id="tierDemoBanner">
+  <div>
+    <b>TIER COMPARISON DEMO</b> — current view: <span id="tdbState" class="tdb-state-pro">PRO (all features unlocked)</span>.
+    PRO sections shown below for review; in production they require a paid licence.
+  </div>
+  <button class="tdb-toggle" id="tdbToggle" type="button">Switch to FREE view</button>
+</div>
+<!-- ===================== END TEMP-DEMO BANNER ===================== -->
+
+<div class="container">
+
+  <div class="header-top">
+    <div>
+      <div class="chips">
+        <span class="chip">Calculator #004</span>
+        <span class="chip">IEC 60287 series</span>
+        <span class="chip">IEC 60228 / 60502</span>
+        <span class="chip">IEC 60949 SC</span>
+        <span class="chip">UAE · GCC · UK · EU</span>
+      </div>
+      <h1>Cable Ampacity — continuous current rating</h1>
+      <div class="sub">
+        Continuous current rating <i>I<sub>z</sub></i> of power cables per IEC 60287-1-1, -1-2, -1-3, -2-1, -2-2 and -3-1.
+        Skin and proximity effects, dielectric losses, sheath and armour loss factors, thermal resistances <i>T<sub>1</sub>…T<sub>4</sub></i>,
+        conductor-temperature back-calculation at user load, thermal short-circuit withstand per IEC 60949.
+        Direct-buried and in-air installations, regional defaults for UAE / GCC / UK / EU.
+      </div>
+    </div>
+    <div class="header-right">
+      <div id="ieccalc-plan-badge"></div>
+      <div class="author-name">Developed by Eng. Evgenii Buchinskii</div>
+      <div class="author-email"><a href="mailto:buchinskii.evg@gmail.com">buchinskii.evg@gmail.com</a></div>
+      <div class="author-link"><a href="https://www.linkedin.com/in/evgenii-buchinskii/" target="_blank" rel="noopener">LinkedIn</a> · <a href="https://chat.whatsapp.com/" target="_blank" rel="noopener">WhatsApp group</a></div>
+      <div><a href="../" class="back-link">← All calculators</a></div>
+    </div>
+  </div>
+
+  <div class="rule"></div>
+
+  <!-- TEMP-DEMO: PRO tier section header -->
+  <details class="tier-section pro" open>
+  <summary class="tier-stripe pro">
+    <span class="tier-tag">PRO</span>
+    <span class="tier-desc">
+      <b>Multi-cable trench cross-section CAD + full report.</b> Graphical layout editor, soil layer stack with
+      drag-to-reorder, mutual heating, λ₁ screen-loss, two-zone backfill T₄, conductor-temperature heatmap,
+      IEC 60502-2 Annex B cross-validation grid, full .docx report with embedded canvas snapshot.
+      <i>In production this section is gated by a paid licence — toggle <b>Demo PRO</b> in the yellow banner above to lock/unlock.</i>
+    </span></summary>
+  <!-- END TEMP-DEMO -->
+
+  <!-- ================ TRENCH CAD (PRO) — graphical multi-cable cross-section ================ -->
+  <!-- TEMP-DEMO: hidden attribute removed; production should restore via License.gate("trench_cad") -->
+  <div id="trenchCAD" class="pro-locked-overlay">
+    <div class="tc-bar">
+      <div class="tc-title">Cable Ampacity — Trench CAD <small>multi-cable cross-section · IEC 60287 · Neher-McGrath</small></div>
+      <div class="tc-btns">
+        <span class="tc-zoom" id="tcZoom">45%</span>
+        <button id="tcCalc" class="tc-primary">Calculate</button>
+        <button id="tcExport" hidden>Export</button>
+        <button id="tcClose" title="Close trench CAD">Close</button>
+      </div>
+    </div>
+    <div class="tc-body">
+      <div class="tc-side">
+        <div class="tc-h">Trench</div>
+        <div class="tc-grid3">
+          <div class="tc-fld"><label>Left</label><input type="number" id="tcTrL" step="10"/></div>
+          <div class="tc-fld"><label>Right</label><input type="number" id="tcTrR" step="10"/></div>
+          <div class="tc-fld"><label>Depth</label><input type="number" id="tcTrD" step="10"/></div>
+        </div>
+        <div class="tc-fld"><label>Freq</label><select id="tcFreq"><option value="50">50</option><option value="60">60</option></select></div>
+        <div class="tc-h">Add</div>
+        <button class="tc-add-btn" data-add="power"><span style="color:#d97706">●</span> power</button>
+        <button class="tc-add-btn" data-add="control"><span style="color:#5b5fc7">●</span> control</button>
+        <button class="tc-add-btn" data-add="optical"><span style="color:#0ea5c0">●</span> optical</button>
+        <button class="tc-add-btn" id="tcAddLayer">▤ Soil layer</button>
+        <button class="tc-del-btn" id="tcDel" hidden>Delete (0) [Del]</button>
+        <div class="tc-h sep">IEC 60502-2 Annex B</div>
+        <div class="tc-iec-info">Buried direct, screens bonded both ends</div>
+        <div class="tc-fld"><label>Table</label><select id="tcIecTable"></select></div>
+        <div class="tc-grid2">
+          <div class="tc-fld"><label>Size mm²</label><select id="tcIecSize"></select></div>
+          <div class="tc-fld"><label>Voltage</label><select id="tcIecVc"></select></div>
+        </div>
+        <div class="tc-fld"><label>Arrangement</label><select id="tcIecArr"><option value="trefoil">Trefoil touching</option><option value="flat-touch">Flat touching</option><option value="flat-spaced">Flat spaced ≥0.5De</option></select></div>
+        <div class="tc-grid3">
+          <div class="tc-fld"><label>Depth</label><input type="number" id="tcIecDepth" step="100" value="800"/></div>
+          <div class="tc-fld"><label>ρ soil</label><input type="number" id="tcIecRho" step="0.1" value="1.5"/></div>
+          <div class="tc-fld"><label>T °C</label><input type="number" id="tcIecT" value="20"/></div>
+        </div>
+        <div class="tc-fld"><label>Circuits (B.19)</label><select id="tcIecCirc"><option value="1">1 circuit</option><option value="2">2 circuits (×0.80)</option><option value="3">3 circuits (×0.70)</option><option value="4">4 circuits (×0.64)</option><option value="5">5 circuits (×0.60)</option><option value="6">6 circuits (×0.56)</option></select></div>
+        <div class="tc-fld" id="tcIecSpacingFld" hidden><label>Spacing mm</label><input type="number" id="tcIecSpacing" step="10" value="0" placeholder="De×2"/></div>
+        <button class="tc-iec-apply" id="tcIecApply">Apply preset</button>
+        <div class="tc-iec-ref" id="tcIecRefBox" hidden></div>
+      </div>
+      <div class="tc-canvas-col">
+        <div class="tc-demo-notice"><b>Demo example.</b> Editing of cables, layers and IEC presets is locked for the showcase. <b>Calculate</b> works on the example below; <b>Download PRO</b> below produces a watermarked EXAMPLE report. Upgrade to a paid licence to unlock editing and clean reports.</div>
+        <div class="tc-tabs" id="tcTabs">
+          <button class="active tc-section-tab" data-section="0">Cross-Section 1</button>
+          <button class="tc-add-section" id="tcAddSection" title="Add another cross-section (PRO)">+</button>
+          <span class="tc-hint">LMB: pan/drag · Shift: box · Scroll: zoom · Del: delete · Click layer · Drag boundary to swap</span>
+        </div>
+        <div class="tc-canvas-wrap" id="tcCanvasWrap">
+          <canvas id="tcCanvas"></canvas>
+          <div class="tc-summary" id="tcSummary" hidden></div>
+        </div>
+      </div>
+      <div class="tc-side tc-side-r" id="tcSideR">
+        <div class="tc-side-help">Click cable or layer<br/>LMB empty: pan<br/>Shift: box select<br/>Scroll: zoom · Del: delete</div>
+      </div>
+    </div>
+  </div>
+  </details>
+
+<!-- TEMP-DEMO: FREE tier section header -->
+  <details class="tier-section free">
+  <summary class="tier-stripe free">
+    <span class="tier-tag">FREE</span>
+    <span class="tier-desc">
+      <b>Single cable, parametric input.</b> IEC 60287 closed-form ampacity, conductor-temperature back-calc at user load,
+      IEC 60949 short-circuit withstand, compact .docx report.
+      <i>Always visible — every visitor of ieccalc.com sees this section.</i>
+    </span></summary>
+  <!-- END TEMP-DEMO -->
+
+  <div class="toolbar">
+    <label>Region preset</label>
+    <select id="regionPreset">
+      <option value="iec_default">IEC default (1.0 K·m/W, 20 °C / 30 °C)</option>
+      <option value="uk">UK / Ireland (1.2 K·m/W, 15 °C / 25 °C)</option>
+      <option value="eu_central">EU central (1.0 K·m/W, 20 °C / 30 °C)</option>
+      <option value="uae_dewa">UAE — DEWA (1.5 K·m/W, 30 °C / 45 °C)</option>
+      <option value="uae_addc">UAE — ADDC/AADC (2.0 K·m/W, 35 °C / 50 °C)</option>
+      <option value="uae_sewa">UAE — SEWA/FEWA (1.5 K·m/W, 30 °C / 45 °C)</option>
+      <option value="ksa_sec">KSA — SEC (2.0 K·m/W, 30 °C / 50 °C)</option>
+      <option value="qatar_kahramaa">Qatar — Kahramaa (1.5 K·m/W, 30 °C / 50 °C)</option>
+      <option value="oman_marafiq">Oman — MEDC/Marafiq (1.5 K·m/W, 30 °C / 45 °C)</option>
+      <option value="kuwait_mew">Kuwait — MEW (2.0 K·m/W, 30 °C / 50 °C)</option>
+      <option value="ru_pue">RF — ПУЭ / ГОСТ (1.2 K·m/W, 15 °C / 25 °C)</option>
+    </select>
+    <span class="grow"></span>
+    <button id="btnRecalc" class="primary">Recalculate</button>
+    <button id="btnReset">Apply typical defaults</button>
+    <button id="btnTrenchCAD" title="Multi-cable trench cross-section editor (PRO)">Trench CAD<span class="pro-badge">PRO</span></button>
+    <div class="seg" role="group" aria-label="Report download">
+      <button id="btnDocx" title="Compact report — single cable, parametric inputs">Download FREE</button>
+      <button id="btnDocxPro" title="Full report — includes trench layout, distances matrix, per-cable derivation, IEC 60502-2 cross-validation">Download PRO<span class="pro-badge">PRO</span></button>
+    </div>
+  </div>
+
+  <div class="layout">
+
+    <!-- =================== LEFT COLUMN — INPUTS =================== -->
+    <div>
+
+      <div class="panel">
+        <h3>1 — Cable construction</h3>
+        <div class="panel-body">
+          <div class="row">
+            <label class="field">
+              <span>Conductor material</span>
+              <select id="conMaterial">
+                <option value="Cu">Copper (Cu)</option>
+                <option value="Al">Aluminium (Al)</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Cross-section S [mm²] (IEC 60228)</span>
+              <select id="conS"></select>
+            </label>
+          </div>
+          <div class="row">
+            <label class="field">
+              <span>Number of cores</span>
+              <select id="cores">
+                <option value="1">1 (single-core)</option>
+                <option value="3">3 (three-core)</option>
+                <option value="4">4 (3 + N)</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Conductor design</span>
+              <select id="conDesign">
+                <option value="round_stranded">Round stranded — IEC 60228 Class 2</option>
+                <option value="round_compact">Round compact / solid (k_s=1, k_p=1)</option>
+                <option value="milliken">Milliken segmental (k_s=0.435, k_p=0.37)</option>
+                <option value="sectoral">Sectoral (3-core, k_s=1, k_p=1)</option>
+              </select>
+            </label>
+          </div>
+          <div class="row">
+            <label class="field">
+              <span>Insulation</span>
+              <select id="insulation">
+                <option value="XLPE">XLPE (90 °C / 250 °C SC)</option>
+                <option value="EPR">EPR (90 °C / 250 °C SC)</option>
+                <option value="PVC">PVC (70 °C / 160 °C SC)</option>
+                <option value="PE">PE thermoplastic (70 °C)</option>
+                <option value="MIND">Paper PILC (70 °C / 165 °C SC)</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Rated voltage U₀/U [kV]</span>
+              <select id="voltage">
+                <option value="0.6">0.6 / 1</option>
+                <option value="1.8">1.8 / 3</option>
+                <option value="3.6">3.6 / 6</option>
+                <option value="6">6 / 10</option>
+                <option value="8.7">8.7 / 15</option>
+                <option value="12">12 / 20</option>
+                <option value="18">18 / 30</option>
+                <option value="26">26 / 45</option>
+                <option value="36">36 / 66</option>
+                <option value="64">64 / 110</option>
+              </select>
+            </label>
+          </div>
+          <div class="row">
+            <label class="field">
+              <span>Metallic sheath / screen</span>
+              <select id="sheath">
+                <option value="none">None</option>
+                <option value="cu_screen_16">Cu wire screen 16 mm²</option>
+                <option value="cu_screen_25">Cu wire screen 25 mm²</option>
+                <option value="cu_screen_35">Cu wire screen 35 mm²</option>
+                <option value="cu_screen_50">Cu wire screen 50 mm²</option>
+                <option value="cu_screen_70">Cu wire screen 70 mm²</option>
+                <option value="cu_screen_95">Cu wire screen 95 mm²</option>
+                <option value="lead">Lead sheath (Pb)</option>
+                <option value="al_tube">Aluminium tube sheath</option>
+                <option value="al_corr">Corrugated Al sheath</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Armour</span>
+              <select id="armour">
+                <option value="none">None</option>
+                <option value="swa">Steel wire (SWA, magnetic)</option>
+                <option value="sta">Steel tape (STA, magnetic)</option>
+                <option value="awa">Aluminium wire (AWA, non-magnetic)</option>
+              </select>
+            </label>
+          </div>
+          <div class="row">
+            <label class="field">
+              <span>Outer covering / jacket</span>
+              <select id="jacket">
+                <option value="PVC">PVC (ρ = 5.0 K·m/W)</option>
+                <option value="PE">PE / HDPE (ρ = 3.5 K·m/W)</option>
+                <option value="none">None (bare cable)</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Construction style</span>
+              <select id="construct">
+                <option value="single_core">Single-core (3 separate cables)</option>
+                <option value="three_core_belted">3-core belted / common bedding</option>
+                <option value="three_core_sl">3-core SL-type (sheath each core)</option>
+              </select>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>2 — Installation</h3>
+        <div class="panel-body">
+          <div class="row">
+            <label class="field">
+              <span>Installation method</span>
+              <select id="instMethod">
+                <option value="buried">Direct buried in trench</option>
+                <option value="air_free">In free air (single cable, no surface)</option>
+                <option value="air_wall">On wall, clipped</option>
+                <option value="air_tray_perf">On perforated tray</option>
+                <option value="air_tray_ladder">On cable ladder</option>
+              </select>
+            </label>
+            <label class="field" id="depthField">
+              <span>Burial depth L [m] (axis to surface)</span>
+              <input type="number" id="depth" step="0.05" value="0.7" min="0.3" max="3" />
+            </label>
+          </div>
+          <div class="row">
+            <label class="field">
+              <span>Formation (single-core only)</span>
+              <select id="formation">
+                <option value="trefoil_touch">Trefoil, touching</option>
+                <option value="flat_touch">Flat, touching</option>
+                <option value="flat_spaced">Flat, spaced</option>
+                <option value="single">Single isolated cable</option>
+              </select>
+            </label>
+            <label class="field" id="spacingField">
+              <span>Centre-to-centre spacing s [mm] (if spaced)</span>
+              <input type="number" id="spacing" step="5" value="0" min="0" />
+              <span class="help">0 = touching (use cable diameter)</span>
+            </label>
+          </div>
+          <div class="row">
+            <label class="field">
+              <span>Number of circuits in trench / formation</span>
+              <input type="number" id="nCircuits" step="1" value="1" min="1" max="12" />
+            </label>
+            <label class="field" id="circuitSpacingField">
+              <span>Circuit-to-circuit spacing [mm]</span>
+              <input type="number" id="circuitSpacing" step="50" value="200" min="0" />
+            </label>
+          </div>
+          <div class="row">
+            <label class="field">
+              <span>Soil thermal resistivity ρ<sub>T,soil</sub> [K·m/W]</span>
+              <input type="number" id="soilRho" step="0.1" value="1.0" min="0.4" max="4" />
+            </label>
+            <label class="field">
+              <span>Reference ambient temperature [°C]</span>
+              <input type="number" id="ambTemp" step="1" value="20" min="-20" max="60" />
+              <span class="help">Soil temp at burial depth (buried) or air temp (in air)</span>
+            </label>
+          </div>
+          <div class="row">
+            <label class="field">
+              <span>Sheath / screen bonding</span>
+              <select id="bonding">
+                <option value="solid">Solidly bonded both ends (default)</option>
+                <option value="single_point">Single-point bonded</option>
+                <option value="cross">Cross-bonded (3 minor sections)</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Daily load factor μ (cyclic, IEC 60853)</span>
+              <input type="number" id="loadFactor" step="0.05" value="1.00" min="0.4" max="1.0" />
+              <span class="help">1.0 = continuous; lower for cyclic loads (placeholder, full IEC 60853 in v2)</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>3 — Operating conditions</h3>
+        <div class="panel-body">
+          <div class="row">
+            <label class="field">
+              <span>System frequency [Hz]</span>
+              <select id="freq">
+                <option value="50">50</option>
+                <option value="60">60</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Max conductor temperature θ<sub>c,max</sub> [°C]</span>
+              <input type="number" id="thetaMax" step="1" value="90" min="60" max="105" />
+              <span class="help">Auto-set from insulation; override if applicable</span>
+            </label>
+          </div>
+          <div class="row">
+            <label class="field">
+              <span>Required load current I<sub>load</sub> [A] (for verdict)</span>
+              <input type="number" id="iLoad" step="1" value="0" min="0" />
+              <span class="help">0 = skip verdict (just compute I<sub>z</sub>)</span>
+            </label>
+            <label class="field">
+              <span>System voltage U [kV] (for active power calc)</span>
+              <input type="number" id="sysU" step="0.1" value="0.4" min="0.4" />
+            </label>
+          </div>
+          <div class="row">
+            <label class="field">
+              <span>Short-circuit current I"<sub>k</sub> [kA] (RMS, sym.)</span>
+              <input type="number" id="iScKa" step="0.5" value="0" min="0" />
+              <span class="help">0 = skip SC withstand check</span>
+            </label>
+            <label class="field">
+              <span>Fault clearance time t<sub>SC</sub> [s]</span>
+              <input type="number" id="tScSec" step="0.05" value="1.0" min="0.05" max="5" />
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <details>
+          <summary>4 — Advanced overrides (optional)</summary>
+          <div class="panel-body">
+            <div class="note">
+              By default all dimensions are estimated from IEC 60228 + IEC 60502 typical values. Override here if you have a specific cable datasheet.
+            </div>
+            <div class="row">
+              <label class="field">
+                <span>Conductor diameter d<sub>c</sub> [mm]</span>
+                <input type="number" id="ovr_dc" step="0.1" value="0" min="0" />
+                <span class="help">0 = auto (IEC 60228 max)</span>
+              </label>
+              <label class="field">
+                <span>Insulation thickness t₁ [mm]</span>
+                <input type="number" id="ovr_t1" step="0.1" value="0" min="0" />
+                <span class="help">0 = auto (IEC 60502 typical)</span>
+              </label>
+            </div>
+            <div class="row">
+              <label class="field">
+                <span>Sheath thickness t<sub>s</sub> [mm]</span>
+                <input type="number" id="ovr_ts" step="0.1" value="0" min="0" />
+                <span class="help">0 = auto (typical for material)</span>
+              </label>
+              <label class="field">
+                <span>Outer jacket thickness t₃ [mm]</span>
+                <input type="number" id="ovr_t3" step="0.1" value="0" min="0" />
+                <span class="help">0 = auto</span>
+              </label>
+            </div>
+            <div class="row">
+              <label class="field">
+                <span>External cable diameter D<sub>e</sub> [mm]</span>
+                <input type="number" id="ovr_De" step="0.5" value="0" min="0" />
+                <span class="help">0 = computed from layers</span>
+              </label>
+              <label class="field">
+                <span>Sheath ρ<sub>20</sub> [Ω·mm²/m] (override)</span>
+                <input type="number" id="ovr_rhoSh" step="0.001" value="0" min="0" />
+                <span class="help">0 = use library value</span>
+              </label>
+            </div>
+            <div class="row">
+              <label class="field">
+                <span>Skin coefficient k<sub>s</sub> override</span>
+                <input type="number" id="ovr_ks" step="0.005" value="0" min="0" max="1" />
+                <span class="help">0 = use design default</span>
+              </label>
+              <label class="field">
+                <span>Proximity coefficient k<sub>p</sub> override</span>
+                <input type="number" id="ovr_kp" step="0.005" value="0" min="0" max="1" />
+                <span class="help">0 = use design default</span>
+              </label>
+            </div>
+          </div>
+        </details>
+      </div>
+
+    </div>
+
+    <!-- =================== RIGHT COLUMN — RESULTS =================== -->
+    <div>
+
+      <div class="panel">
+        <h3>A — Steady-state ampacity I<sub>z</sub></h3>
+        <div class="panel-body" id="resAmpacity">
+          <div class="num-big-line">
+            <span class="num-big-label">Continuous current rating I<sub>z</sub></span>
+            <span><span class="num-big" id="iz_val">—</span><span class="num-big-unit">A</span></span>
+          </div>
+          <div class="kv">
+            <div class="k">Active power transferable (3-φ)</div><div class="v" id="iz_p">—</div>
+            <div class="k">Conductor max temperature θ<sub>c,max</sub></div><div class="v" id="iz_thetac">—</div>
+            <div class="k">Reference ambient θ<sub>amb</sub></div><div class="v" id="iz_thamb">—</div>
+            <div class="k">Allowed temperature rise Δθ</div><div class="v" id="iz_dtheta">—</div>
+            <div class="k">Number of load-carrying cores n</div><div class="v" id="iz_n">—</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>B — Loss components (per metre, per phase)</h3>
+        <div class="panel-body">
+          <div class="kv">
+            <div class="k">DC resistance R<sub>20</sub> @ 20 °C</div><div class="v" id="r_dc20">—</div>
+            <div class="k">DC resistance R' @ θ<sub>c,max</sub></div><div class="v" id="r_dc">—</div>
+            <div class="k">Skin-effect factor y<sub>s</sub></div><div class="v" id="y_s">—</div>
+            <div class="k">Proximity-effect factor y<sub>p</sub></div><div class="v" id="y_p">—</div>
+            <div class="k">AC resistance R</div><div class="v b" id="r_ac">—</div>
+            <div class="kv-sep"></div>
+            <div class="k">Dielectric capacitance C</div><div class="v" id="cap">—</div>
+            <div class="k">Dielectric loss W<sub>d</sub></div><div class="v" id="w_d">—</div>
+            <div class="kv-sep"></div>
+            <div class="k">Sheath loss factor λ₁</div><div class="v" id="lam1">—</div>
+            <div class="k">Armour loss factor λ₂</div><div class="v" id="lam2">—</div>
+            <div class="k">Conductor loss W<sub>c</sub> at I<sub>z</sub></div><div class="v" id="w_c">—</div>
+            <div class="k">Sheath loss W<sub>s</sub> at I<sub>z</sub></div><div class="v" id="w_s">—</div>
+            <div class="k">Armour loss W<sub>a</sub> at I<sub>z</sub></div><div class="v" id="w_a">—</div>
+            <div class="k">Total losses W<sub>t</sub> at I<sub>z</sub></div><div class="v b" id="w_t">—</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>C — Thermal resistances</h3>
+        <div class="panel-body">
+          <div class="kv">
+            <div class="k">T₁ insulation [K·m/W]</div><div class="v" id="t1">—</div>
+            <div class="k">T₂ bedding (sheath ↔ armour) [K·m/W]</div><div class="v" id="t2">—</div>
+            <div class="k">T₃ outer covering [K·m/W]</div><div class="v" id="t3">—</div>
+            <div class="k">T₄ external [K·m/W]</div><div class="v" id="t4">—</div>
+            <div class="kv-sep"></div>
+            <div class="k">Estimated cable diameter D<sub>e</sub> [mm]</div><div class="v" id="dia_de">—</div>
+            <div class="k">Conductor diameter d<sub>c</sub> [mm]</div><div class="v" id="dia_dc">—</div>
+            <div class="k">Insulation thickness t₁ [mm]</div><div class="v" id="dia_t1">—</div>
+            <div class="k">Sheath ext. dia D'<sub>s</sub> [mm]</div><div class="v" id="dia_Ds">—</div>
+            <div class="k">Geometric u = 2L/D<sub>e</sub></div><div class="v" id="dia_u">—</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>D — Conductor temperature at user load</h3>
+        <div class="panel-body" id="resTheta">
+          <div class="num-big-line">
+            <span class="num-big-label">θ<sub>c</sub> at I<sub>load</sub></span>
+            <span><span class="num-big" id="th_val">—</span><span class="num-big-unit">°C</span></span>
+          </div>
+          <div class="kv">
+            <div class="k">Conductor loss W<sub>c</sub>(I<sub>load</sub>)</div><div class="v" id="th_wc">—</div>
+            <div class="k">Sheath loss W<sub>s</sub>(I<sub>load</sub>)</div><div class="v" id="th_ws">—</div>
+            <div class="k">Total losses W<sub>t</sub>(I<sub>load</sub>)</div><div class="v" id="th_wt">—</div>
+            <div class="k">Margin to limit θ<sub>c,max</sub></div><div class="v" id="th_margin">—</div>
+            <div class="k">Verdict</div><div class="v"><span id="th_verdict" class="verdict na">—</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>E — Thermal short-circuit withstand (IEC 60949)</h3>
+        <div class="panel-body" id="resSc">
+          <div class="kv">
+            <div class="k">k constant (initial→final, material/insulation)</div><div class="v" id="sc_k">—</div>
+            <div class="k">Permissible adiabatic I·√t [kA·√s]</div><div class="v" id="sc_kit">—</div>
+            <div class="k">Permissible I<sub>SC</sub> for given t<sub>SC</sub></div><div class="v b" id="sc_iperm">—</div>
+            <div class="k">Permissible time at given I"<sub>k</sub></div><div class="v" id="sc_tperm">—</div>
+            <div class="k">Verdict</div><div class="v"><span id="sc_verdict" class="verdict na">—</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>F — Project completeness & overall verdict</h3>
+        <div class="panel-body" id="resVerdict">
+          <table class="tt" id="completenessTable">
+            <thead><tr><th>Item</th><th>Status</th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <div style="margin-top:8px;">
+            <span class="verdict na" id="overallVerdict">—</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- Formulas & methodology — collapsed below the FREE result panels (moved out of right column) -->
+  <details style="margin-top:12px;">
+    <summary>Formulas & methodology — IEC 60287 / IEC 60949</summary>
+    <div class="panel-body">
+      <div class="formula">I = √( (Δθ − W<sub>d</sub>·[½T₁ + n·(T₂+T₃+T₄)]) / (R·T₁ + n·R·(1+λ₁)·T₂ + n·R·(1+λ₁+λ₂)·(T₃+T₄)) )</div>
+      <div class="note">Continuous current rating per IEC 60287-1-1 Eq. 1 (100 % load factor).</div>
+      <div class="formula" style="margin-top:8px;">θ<sub>c</sub> = θ<sub>amb</sub> + W<sub>d</sub>·(½T₁ + n(T₂+T₃+T₄)) + I²R·(T₁ + n(1+λ₁)T₂ + n(1+λ₁+λ₂)(T₃+T₄))</div>
+      <div class="note">Conductor temperature back-calculation at user load — same Eq. 1 solved for θ<sub>c</sub> at given I.</div>
+      <div class="formula" style="margin-top:8px;">I<sub>SC,perm</sub> = k · S / √t<sub>SC</sub></div>
+      <div class="note">Adiabatic thermal short-circuit withstand per IEC 60949 §3.1; k constant is material/insulation specific.</div>
+    </div>
+  </details>
+  </details>
+
+<details style="margin-top:14px;">
+    <summary>Validation tests (IEC 60287 worked examples + reciprocal checks)</summary>
+    <div class="panel-body">
+      <div id="validationOut" style="font-size:11.5px; font-family:var(--mono);">Click "Run validation" below to execute the test suite.</div>
+      <button id="btnValidate" class="tiny" style="margin-top:8px;">Run validation</button>
+    </div>
+  </details>
+
+  <div class="footer-refs">
+    <strong>Standards used:</strong>
+    IEC 60287-1-1:2023 — Current rating equations, general; ·
+    IEC 60287-1-2:2023 — Sheath eddy-current losses for special bonding; ·
+    IEC 60287-1-3:2023 — Current sharing in parallel single-core cables; ·
+    IEC 60287-2-1:2023 — Thermal resistance, calculation; ·
+    IEC 60287-2-2 — External thermal resistance, methods; ·
+    IEC 60287-3-1 — Reference operating conditions and selection of cable type; ·
+    IEC 60228:2004 — Conductors of insulated cables; ·
+    IEC 60502-1, -2 — Power cables with extruded insulation 1 kV ≤ U<sub>m</sub> ≤ 36 kV — typical insulation thicknesses; ·
+    IEC 60949:1988+A1:2008 — Calculation of thermally permissible short-circuit currents; ·
+    IEC 60364-5-52 — Selection and erection — current-carrying capacities (cross-check). ·
+    Bonding factors per CIGRE TB 283 / 415 / 797.
+    <br/><br/>
+    <strong>Free-tier scope:</strong> single cable / circuit, parametric input only, IEC closed-form, conductor-temperature back-calc, IEC 60949 SC withstand, compact .docx report.
+    Group derating (IEC 60287-2-1 §2.2.3), cyclic ratings (IEC 60853), in-duct configurations, cross-bonded sheath eddy-current losses (IEC 60287-1-2), and full graphical trench cross-section editor are planned for the paid tier.
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+<script src="../_lib/license.js"></script>
+<script src="../_lib/upgrade-modal.js"></script>
+<script src="../_lib/plan-badge.js"></script>
+
+<script>
+"use strict";
+
+/* ============================================================
+   IEC 60228 — standard cross-sections, max conductor diameter,
+   DC resistance at 20 °C [Ω/km] for Class 2 stranded conductors.
+   Source: IEC 60228:2004 Tables 2 & 3 (Cu, Al).
+   ============================================================ */
+const IEC60228 = [
+  // S [mm²], d_c max [mm], R20 Cu [Ω/km], R20 Al [Ω/km]
+  { S:1.5,  dc:1.5,  Cu:12.10, Al:null  },
+  { S:2.5,  dc:2.0,  Cu:7.41,  Al:null  },
+  { S:4,    dc:2.5,  Cu:4.61,  Al:null  },
+  { S:6,    dc:3.0,  Cu:3.08,  Al:null  },
+  { S:10,   dc:4.0,  Cu:1.83,  Al:3.08  },
+  { S:16,   dc:5.0,  Cu:1.15,  Al:1.91  },
+  { S:25,   dc:6.5,  Cu:0.727, Al:1.20  },
+  { S:35,   dc:7.5,  Cu:0.524, Al:0.868 },
+  { S:50,   dc:8.5,  Cu:0.387, Al:0.641 },
+  { S:70,   dc:10.5, Cu:0.268, Al:0.443 },
+  { S:95,   dc:12.0, Cu:0.193, Al:0.320 },
+  { S:120,  dc:13.5, Cu:0.153, Al:0.253 },
+  { S:150,  dc:15.0, Cu:0.124, Al:0.206 },
+  { S:185,  dc:16.5, Cu:0.0991,Al:0.164 },
+  { S:240,  dc:18.5, Cu:0.0754,Al:0.125 },
+  { S:300,  dc:21.0, Cu:0.0601,Al:0.100 },
+  { S:400,  dc:24.0, Cu:0.0470,Al:0.0778},
+  { S:500,  dc:27.0, Cu:0.0366,Al:0.0605},
+  { S:630,  dc:30.5, Cu:0.0283,Al:0.0469},
+  { S:800,  dc:34.5, Cu:0.0221,Al:0.0367},
+  { S:1000, dc:39.0, Cu:0.0176,Al:0.0291},
+  { S:1200, dc:43.0, Cu:0.0151,Al:0.0247},
+  { S:1400, dc:46.0, Cu:0.0129,Al:0.0212},
+  { S:1600, dc:49.5, Cu:0.0113,Al:0.0186},
+  { S:2000, dc:55.0, Cu:0.0090,Al:0.0149},
+  { S:2500, dc:62.0, Cu:0.0072,Al:0.0127}
+];
+
+/* ============================================================
+   Material properties.
+   α20 = temperature coefficient of resistance at 20 °C [1/K]
+   ρ20 = resistivity at 20 °C [Ω·m]
+   ============================================================ */
+const MAT = {
+  Cu:   { alpha:3.93e-3, rho20:1.7241e-8, name:"Copper" },
+  Al:   { alpha:4.03e-3, rho20:2.8264e-8, name:"Aluminium" },
+  Pb:   { alpha:4.00e-3, rho20:21.4e-8,   name:"Lead" },
+  AlSh: { alpha:4.03e-3, rho20:2.84e-8,   name:"Aluminium sheath" },
+  CuSh: { alpha:3.93e-3, rho20:1.7241e-8, name:"Copper screen" },
+  Steel:{ alpha:4.50e-3, rho20:13.8e-8,   name:"Steel armour" }
+};
+
+/* ============================================================
+   Insulation properties (IEC 60287-2-1 Table 1 / IEC 60287-1-1 Table 3).
+   rho_T   = thermal resistivity [K·m/W]
+   eps_r   = relative permittivity [-]
+   tan_d   = loss tangent at U_0 [-]
+   th_max  = max continuous conductor temperature [°C]
+   th_sc   = max short-circuit conductor temperature [°C]
+   ============================================================ */
+const INS = {
+  XLPE: { rho_T:3.5, eps_r:2.5, tan_d:0.004, th_max:90, th_sc:250, name:"XLPE" },
+  EPR:  { rho_T_lo:3.5, rho_T_hi:5.0, eps_r:3.0, tan_d_lo:0.020, tan_d_hi:0.005, th_max:90, th_sc:250, name:"EPR" },
+  PVC:  { rho_T_lo:5.0, rho_T_hi:6.0, eps_r:8.0, tan_d:0.10, th_max:70, th_sc:160, name:"PVC" },
+  PE:   { rho_T:3.5, eps_r:2.3, tan_d:0.001, th_max:70, th_sc:150, name:"PE" },
+  MIND: { rho_T:6.0, eps_r:4.0, tan_d:0.01, th_max:70, th_sc:165, name:"Paper PILC" }
+};
+
+/* ============================================================
+   Outer covering / oversheath thermal resistivity [K·m/W]
+   per IEC 60287-2-1 Table 1.
+   ============================================================ */
+const JACKET_RHO = { PVC:5.0, PE:3.5, none:0 };
+
+/* ============================================================
+   IEC 60502-2 typical insulation thickness [mm] vs voltage class
+   for XLPE/EPR (extruded MV cables). For PVC ≤ 1 kV, rules of
+   IEC 60502-1. Linear interpolation by S where applicable.
+   Reference: IEC 60502-1 Table 4 (LV PVC), IEC 60502-2 Table 5.
+   ============================================================ */
+const INS_THK_XLPE_EPR = {
+  // U_0 [kV] : function(S) → t1 [mm]
+  0.6:  s => (s<=16?0.7:(s<=35?0.9:(s<=95?1.0:(s<=120?1.1:(s<=150?1.2:(s<=240?1.4:(s<=400?1.6:(s<=630?1.8:2.0)))))))),
+  1.8:  s => 2.0,
+  3.6:  s => (s<=16?2.5:(s<=120?2.5:2.8)),
+  6:    s => (s<=240?3.4:3.4),
+  8.7:  s => 4.5,
+  12:   s => 5.5,
+  18:   s => 8.0,
+  26:   s => 10.5,
+  36:   s => 11.5,
+  64:   s => 17.0
+};
+const INS_THK_PVC_LV = s => (s<=16?0.7:(s<=25?0.9:(s<=35?0.9:(s<=50?1.0:(s<=95?1.1:(s<=185?1.2:(s<=300?1.4:(s<=400?1.6:(s<=630?1.8:2.0)))))))));
+
+/* ============================================================
+   Sheath dimensional defaults (typical IEC 60840 / IEC 60502-2).
+   Returns {t_s, rho20_s, mat} from sheath code and core diameter.
+   ============================================================ */
+function sheathDef(code, D_over_ins){
+  // D_over_ins = diameter over insulation (single core) in mm
+  switch(code){
+    case "lead":      return { t_s: Math.max(1.2, 0.03*D_over_ins+0.5), mat: MAT.Pb,   eq_S: null };
+    case "al_tube":   return { t_s: Math.max(1.0, 0.025*D_over_ins+0.4), mat: MAT.AlSh, eq_S: null };
+    case "al_corr":   return { t_s: 1.5, mat: MAT.AlSh, eq_S: null };
+    case "cu_screen_16":return { t_s: 0.5, mat: MAT.CuSh, eq_S: 16 };
+    case "cu_screen_25":return { t_s: 0.5, mat: MAT.CuSh, eq_S: 25 };
+    case "cu_screen_35":return { t_s: 0.6, mat: MAT.CuSh, eq_S: 35 };
+    case "cu_screen_50":return { t_s: 0.7, mat: MAT.CuSh, eq_S: 50 };
+    case "cu_screen_70":return { t_s: 0.8, mat: MAT.CuSh, eq_S: 70 };
+    case "cu_screen_95":return { t_s: 0.9, mat: MAT.CuSh, eq_S: 95 };
+    default: return { t_s: 0, mat: null, eq_S: 0 };
+  }
+}
+
+/* ============================================================
+   Armour dimensional defaults.
+   ============================================================ */
+function armourDef(code, D_under_armour){
+  // typical wire diameter chosen by IEC 60502-2 Table 12
+  if(code === "none") return { t_a:0, mat:null, magnetic:false };
+  if(code === "swa")  return { t_a: armourWireDia(D_under_armour), mat: MAT.Steel, magnetic:true };
+  if(code === "sta")  return { t_a: armourTapeDia(D_under_armour), mat: MAT.Steel, magnetic:true };
+  if(code === "awa")  return { t_a: armourWireDia(D_under_armour), mat: MAT.AlSh,  magnetic:false };
+  return { t_a:0, mat:null, magnetic:false };
+}
+function armourWireDia(D){
+  // IEC 60502-2 Table 12 standard wire diameters
+  if(D <= 15)  return 0.8;
+  if(D <= 25)  return 1.25;
+  if(D <= 35)  return 1.6;
+  if(D <= 60)  return 2.0;
+  if(D <= 80)  return 2.5;
+  return 3.15;
+}
+function armourTapeDia(D){
+  if(D <= 30)  return 0.5;
+  if(D <= 70)  return 0.8;
+  return 1.2;
+}
+
+/* ============================================================
+   Conductor design coefficients k_s (skin) and k_p (proximity)
+   per IEC 60287-1-1 Table 2.
+   ============================================================ */
+function ksKp(design){
+  switch(design){
+    case "round_stranded": return { ks:1.0,   kp:1.0 };
+    case "round_compact":  return { ks:1.0,   kp:1.0 };
+    case "milliken":       return { ks:0.435, kp:0.37 };
+    case "sectoral":       return { ks:1.0,   kp:1.0 };
+    default:               return { ks:1.0,   kp:1.0 };
+  }
+}
+
+/* ============================================================
+   k constants for thermal short-circuit per IEC 60949 / IEC 60364-5-54
+   Table 43A. Returns k for I·√t = k·S relation.
+   ============================================================ */
+function kSC(material, insulation){
+  // [Cu/Al][insulation] map. Initial→final temperatures match IEC 60502 limits.
+  const TBL = {
+    Cu:{ XLPE:143, EPR:143, PVC:115, PE:103, MIND:115 },
+    Al:{ XLPE:94,  EPR:94,  PVC:76,  PE:68,  MIND:76  }
+  };
+  return TBL[material]?.[insulation] ?? 100;
+}
+
+/* ============================================================
+   Region presets — soil ρ_T and ambient temperatures.
+   ============================================================ */
+const REGION_PRESETS = {
+  iec_default:    { rho:1.0, theta_soil:20, theta_air:30, depth:0.7 },
+  uk:             { rho:1.2, theta_soil:15, theta_air:25, depth:0.7 },
+  eu_central:     { rho:1.0, theta_soil:20, theta_air:30, depth:0.7 },
+  uae_dewa:       { rho:1.5, theta_soil:30, theta_air:45, depth:1.0 },
+  uae_addc:       { rho:2.0, theta_soil:35, theta_air:50, depth:1.0 },
+  uae_sewa:       { rho:1.5, theta_soil:30, theta_air:45, depth:1.0 },
+  ksa_sec:        { rho:2.0, theta_soil:30, theta_air:50, depth:1.0 },
+  qatar_kahramaa: { rho:1.5, theta_soil:30, theta_air:50, depth:1.0 },
+  oman_marafiq:   { rho:1.5, theta_soil:30, theta_air:45, depth:0.8 },
+  kuwait_mew:     { rho:2.0, theta_soil:30, theta_air:50, depth:1.0 },
+  ru_pue:         { rho:1.2, theta_soil:15, theta_air:25, depth:0.7 }
+};
+
+/* ============================================================
+   GEOMETRY ESTIMATOR — derives all cable layer dimensions
+   from minimal user inputs (S, U, sheath, armour, jacket).
+   Returns object with d_c, t_1, D_over_ins, t_s, D_s, t_a, D_a, t_3, D_e.
+   All in mm. Single-core formulation; for 3-core we approximate
+   D_e_3core = 2.16 * D_single + 2*t_3 (concentric envelope of triangle).
+   ============================================================ */
+function estimateGeometry(I){
+  const row = IEC60228.find(r => r.S === I.S);
+  const d_c = I.ovr_dc > 0 ? I.ovr_dc : (row ? row.dc : 0);
+
+  // insulation thickness
+  let t_1;
+  if(I.ovr_t1 > 0){ t_1 = I.ovr_t1; }
+  else if(I.insulation === "PVC" && I.U0 <= 0.6){ t_1 = INS_THK_PVC_LV(I.S); }
+  else if(I.insulation === "MIND"){ t_1 = 1.5 + 0.6*I.U0; }
+  else { // XLPE / EPR / PE
+    const fn = INS_THK_XLPE_EPR[I.U0] || INS_THK_XLPE_EPR[0.6];
+    t_1 = fn(I.S);
+  }
+
+  // semicon screens (extruded MV cables): conductor screen 0.5 mm + insulation screen 0.5 mm if U_0 ≥ 3.6
+  const t_semicon = (I.U0 >= 3.6) ? 1.0 : 0;
+
+  // diameter over insulation (single core)
+  const D_over_ins = d_c + 2*t_1 + 2*(t_semicon/2 ? t_semicon : 0);
+
+  // sheath
+  const sh = sheathDef(I.sheath, D_over_ins);
+  let t_s = I.ovr_ts > 0 ? I.ovr_ts : sh.t_s;
+  const D_under_sh = D_over_ins;
+  const D_over_sh = D_under_sh + 2*t_s;
+
+  // bedding (between sheath and armour) — typical 1 mm if armoured else 0
+  const t_bed = (I.armour !== "none" && I.sheath !== "none") ? 1.0 : 0;
+  const D_under_armour = D_over_sh + 2*t_bed;
+
+  // armour
+  const ar = armourDef(I.armour, D_under_armour);
+  const t_a = ar.t_a;
+  const D_over_armour = D_under_armour + 2*t_a;
+
+  // outer jacket
+  let t_3 = I.ovr_t3 > 0 ? I.ovr_t3 : 0;
+  if(I.ovr_t3 === 0){
+    // typical: 0.035*D + 1.0, min 1.4 mm (per IEC 60502-2 Table 14)
+    t_3 = (I.jacket === "none") ? 0 : Math.max(1.4, 0.035*D_over_armour + 1.0);
+  }
+  const D_over_jacket = D_over_armour + 2*t_3;
+
+  // external diameter
+  let D_e;
+  if(I.ovr_De > 0){ D_e = I.ovr_De; }
+  else if(I.construct === "single_core"){ D_e = D_over_jacket; }
+  else {
+    // 3-core: outer envelope of 3 cores in triangle, plus filler + bedding (~1.5 mm) + sheath/armour/jacket layers if applied collectively
+    const D_core = D_over_ins; // each core just insulated
+    const D_3 = 2.155 * D_core; // circumscribed circle of 3 touching circles: (1 + 2/√3)*D_core = 2.155*D_core
+    const t_filler_bed = 1.5;
+    let D_after_bed = D_3 + 2*t_filler_bed;
+    // collective sheath if not SL-type
+    if(I.construct === "three_core_belted"){
+      const sh3 = sheathDef(I.sheath, D_after_bed);
+      const ts3 = I.ovr_ts > 0 ? I.ovr_ts : sh3.t_s;
+      D_after_bed += 2*ts3;
+    }
+    if(I.armour !== "none"){
+      const ar3 = armourDef(I.armour, D_after_bed);
+      D_after_bed += 2*ar3.t_a;
+    }
+    D_e = D_after_bed + 2*t_3;
+  }
+
+  return {
+    d_c, t_1, t_semicon,
+    D_over_ins,
+    t_s, D_under_sh, D_over_sh,
+    t_bed, D_under_armour,
+    t_a, D_over_armour,
+    t_3, D_over_jacket,
+    D_e,
+    sheathDef: sh,
+    armourDef: ar
+  };
+}
+
+/* ============================================================
+   ELECTRICAL — DC resistance at θ, skin & proximity, AC R.
+   IEC 60287-1-1 §2.1 (Eq. 7–19).
+   All resistances in Ω/m.
+   ============================================================ */
+function R_DC_at_theta(R20_per_km, alpha, theta){
+  // R20 in Ω/km → returns Ω/m
+  return (R20_per_km / 1000) * (1 + alpha*(theta - 20));
+}
+
+function skinFactor(R_per_m, freq, ks){
+  // IEC 60287-1-1 Eq. 11
+  const xs2 = (8*Math.PI*freq * 1e-7 * ks) / R_per_m;
+  return Math.pow(xs2,2) / (192 + 0.8*Math.pow(xs2,2));
+}
+
+function proximityFactor(R_per_m, freq, kp, d_c_mm, s_mm, configCode){
+  // IEC 60287-1-1 Eq. 13/16. d_c, s in mm; convert ratio is unitless.
+  const xp2 = (8*Math.PI*freq * 1e-7 * kp) / R_per_m;
+  const xp4 = xp2*xp2;
+  const factor = xp4 / (192 + 0.8*xp4);
+  const dcs = d_c_mm / s_mm;
+  const dcs2 = dcs*dcs;
+  if(configCode === "two_single" || configCode === "flat"){
+    // 2 single-core in flat or two-conductor cable — IEC 60287-1-1 Eq. 13
+    return factor * 2.9 * dcs2;
+  } else {
+    // 3 single-core trefoil or 3-core — IEC 60287-1-1 Eq. 14
+    return factor * dcs2 * (0.312*dcs2 + 1.18 / (factor + 0.27));
+  }
+}
+
+function R_AC(R_per_m, ys, yp){
+  return R_per_m * (1 + ys + yp);
+}
+
+/* ============================================================
+   DIELECTRIC LOSSES — IEC 60287-1-1 §2.2.5 (Eq. 21).
+   W_d in W/m per phase.
+   ============================================================ */
+function W_dielectric(U0_kV, freq, eps_r, tan_d, D_over_ins_mm, d_c_mm){
+  // C = ε / (18 ln(D_i/d_c)) × 10⁻⁹ F/m (Eq. 22)
+  const C = eps_r / (18 * Math.log(D_over_ins_mm/d_c_mm)) * 1e-9; // F/m
+  const U0 = U0_kV * 1000;
+  const Wd = 2*Math.PI*freq * C * U0*U0 * tan_d; // W/m
+  return { C, Wd };
+}
+
+/* ============================================================
+   SHEATH LOSS FACTOR λ₁ — IEC 60287-1-1 §2.3.
+   Solid bonding only in v1 (most common configuration).
+   For single-point or cross-bonded systems → λ1' = 0
+   (eddy current λ1'' is small for round sheaths, ignored in v1).
+   ============================================================ */
+function lambda1(geo, sysFreq, R_per_m_at_theta, formation, bonding, sheathDef, sheath_temp){
+  if(!sheathDef.mat) return 0;            // no metallic sheath
+  if(bonding === "single_point") return 0;
+  if(bonding === "cross")        return 0;
+  // sheath AC resistance per metre at sheath operating temp (~θ_sh = θ_amb + 0.7Δθ approx)
+  const R_s = sheathResistance(geo, sheathDef, sysFreq, sheath_temp);
+  if(R_s <= 0) return 0;
+
+  // mutual reactance X per IEC 60287-1-1 Eq. 35:
+  // X = 2ω × 10⁻⁷ × ln(2s/d)   in Ω/m
+  // s = axial spacing of cables (mm), d = mean sheath diameter (mm)
+  const omega = 2*Math.PI*sysFreq;
+  const D_sh_mean = (geo.D_under_sh + geo.D_over_sh)/2;  // mm
+  let s_mm;
+  if(formation === "trefoil_touch"){ s_mm = geo.D_e; }
+  else if(formation === "flat_touch"){ s_mm = geo.D_e; }
+  else if(formation === "flat_spaced"){ s_mm = Math.max(geo.D_e, formation_spacing); }
+  else { s_mm = 1e6; } // single isolated → no mutual coupling
+  const X = 2*omega*1e-7 * Math.log(2*s_mm/D_sh_mean);  // Ω/m
+  // λ1' = (R_s/R) / (1 + (R_s/X)²)
+  const lam1p = (R_s/R_per_m_at_theta) / (1 + Math.pow(R_s/X, 2));
+  return lam1p;
+}
+let formation_spacing = 0; // patched at runtime by the recalc function
+
+function sheathResistance(geo, sheathDef, freq, theta_sh){
+  if(sheathDef.eq_S){
+    // Cu wire screen — equivalent cross-section
+    const S_eq = sheathDef.eq_S; // mm²
+    const rho20 = sheathDef.mat.rho20; // Ω·m
+    const R20 = rho20 / (S_eq * 1e-6); // Ω/m
+    return R20 * (1 + sheathDef.mat.alpha*(theta_sh - 20));
+  } else if(sheathDef.t_s > 0){
+    // tubular sheath: cross-section ≈ π · D_mean · t
+    const D_mean_m = ((geo.D_under_sh + geo.D_over_sh)/2) * 1e-3; // m
+    const t_s_m = sheathDef.t_s * 1e-3;
+    const A = Math.PI * D_mean_m * t_s_m; // m²
+    const R20 = sheathDef.mat.rho20 / A;
+    return R20 * (1 + sheathDef.mat.alpha*(theta_sh - 20));
+  }
+  return 0;
+}
+
+/* ============================================================
+   ARMOUR LOSS FACTOR λ₂ — IEC 60287-1-1 §2.4.
+   Simplified for v1:
+   - Non-magnetic armour or no armour → λ2 = 0
+   - Three single-core in trefoil with magnetic SWA: λ2 ≈ 0
+     (fluxes cancel for symmetric arrangement)
+   - Three-core with steel wire armour: per Eq. 50/51
+   ============================================================ */
+function lambda2(I, geo, sysFreq, R_per_m_at_theta, theta_a, lam1){
+  const ar = geo.armourDef;
+  if(!ar.mat) return 0;
+  if(!ar.magnetic) return 0; // AWA non-magnetic, λ2 ≈ 0 (covered by Eq. 47 if needed)
+  if(I.construct === "single_core"){
+    // single-core w/ steel wire armour is unusual; λ2 small for trefoil
+    return 0;
+  }
+  // Three-core with magnetic SWA — IEC 60287-1-1 §2.4.2.4 Eq. 50:
+  // λ2 = 1.23·(R_A/R)·(2c/d_A)² · 1 / [(2.77·R_A·10⁶/ω)² + 1]
+  const omega = 2*Math.PI*sysFreq;
+  const D_A_mean = (geo.D_under_armour + geo.D_over_armour)/2; // mm
+  const d_A = D_A_mean * 1e-3; // m
+  // c = distance from cable axis to centre of conductor (geometric)
+  const c = (geo.D_over_ins/2 + 0.5) * 1e-3; // m, approx
+  // armour AC resistance per metre at θ_a
+  const A_armour = Math.PI * d_A * (ar.t_a*1e-3); // approx tubular equivalent for wire armour
+  const R_A_20 = ar.mat.rho20 / A_armour;
+  const R_A = R_A_20 * (1 + ar.mat.alpha*(theta_a - 20));
+  const term1 = 1.23 * (R_A / R_per_m_at_theta) * Math.pow(2*c/d_A, 2);
+  const term2 = 1 / (Math.pow(2.77*R_A*1e6/omega, 2) + 1);
+  return term1 * term2;
+}
+
+/* ============================================================
+   THERMAL RESISTANCES T1, T2, T3 — IEC 60287-2-1 §4.1.
+   ============================================================ */
+function T1_single_core(rho_T, t_1, d_c){
+  return (rho_T / (2*Math.PI)) * Math.log(1 + 2*t_1/d_c);
+}
+function T1_three_core_belted(rho_T, t_1, d_c){
+  // simplified: each core radial path treated equivalently with G factor ≈ ln(1+2t1/dc) +
+  // mutual heating term ≈ 0.6 (from IEC 60287-2-1 Fig. 2 mid-range).
+  const direct = Math.log(1 + 2*t_1/d_c);
+  const mutual = 0.6 * Math.log(1 + 2*t_1/d_c);
+  return (rho_T / (2*Math.PI)) * (direct + mutual);
+}
+function T1_three_core_SL(rho_T, t_1, d_c){
+  // each core has its own metallic sheath — same as single-core
+  return T1_single_core(rho_T, t_1, d_c);
+}
+function T2_radial(rho_T2, t_2, D_under_t2){
+  if(t_2 <= 0) return 0;
+  return (rho_T2 / (2*Math.PI)) * Math.log(1 + 2*t_2/D_under_t2);
+}
+function T3_jacket(rho_T3, t_3, D_under_jacket){
+  if(t_3 <= 0) return 0;
+  return (rho_T3 / (2*Math.PI)) * Math.log(1 + 2*t_3/D_under_jacket);
+}
+
+/* ============================================================
+   T4 — EXTERNAL THERMAL RESISTANCE.
+   ============================================================ */
+function T4_buried_single(rho_T4, L_mm, D_e_mm){
+  // IEC 60287-2-1 §2.2.2.1 Eq. 1:
+  // T4 = (ρ/2π) · ln(2u + √(4u² − 1))   where u = 2L/D_e
+  const u = 2*L_mm/D_e_mm;
+  if(u < 0.5) return (rho_T4/(2*Math.PI)) * Math.log(2*u);
+  return (rho_T4 / (2*Math.PI)) * Math.log(2*u + Math.sqrt(4*u*u - 1));
+}
+function T4_buried_group_mutual(rho_T4, L_mm, D_e_mm, neighbours_mm){
+  // IEC 60287-2-1 §2.2.3.1 — additive ln(d'_pk/d_pk) for each neighbour.
+  // neighbours_mm: array of horizontal distances [mm] (all at same depth assumed)
+  let extra = 0;
+  for(const dpk of neighbours_mm){
+    const dpk_prime = Math.sqrt(dpk*dpk + 4*L_mm*L_mm); // distance to image
+    extra += Math.log(dpk_prime/dpk);
+  }
+  return T4_buried_single(rho_T4, L_mm, D_e_mm) + (rho_T4/(2*Math.PI))*extra;
+}
+function T4_in_air(W_t_per_m, D_e_mm, theta_amb, sigma_method){
+  // IEC 60287-2-2 simplified iterative:
+  // T4 = 1 / (π·D_e·h·Δθ_s^0.25) where h is convective coefficient
+  // For "single cable in free air, not exposed to direct solar radiation":
+  // h = Z·D_e^(-g) + E (W/m²·K^(5/4))
+  // values from IEC 60287-2-2 Table 2 (selected):
+  let Z, g, E;
+  switch(sigma_method){
+    case "air_free":        Z = 0.21; g = 0.60; E = 3.94; break;
+    case "air_wall":        Z = 1.69; g = 0.63; E = 0.00; break;
+    case "air_tray_perf":   Z = 0.29; g = 0.50; E = 2.35; break;
+    case "air_tray_ladder": Z = 0.41; g = 0.40; E = 1.60; break;
+    default:                Z = 0.21; g = 0.60; E = 3.94;
+  }
+  // iterate Δθ_s, T4 starting from a guess Δθ_s = 30 K
+  let dTheta_s = 30;
+  let T4 = 0;
+  for(let iter = 0; iter < 20; iter++){
+    const D_e_m = D_e_mm * 1e-3;
+    const h = Z * Math.pow(D_e_m, -g) + E; // W/m²·K^(5/4)
+    T4 = 1.0 / (Math.PI * D_e_m * h * Math.pow(dTheta_s, 0.25));
+    const dTheta_new = W_t_per_m * T4;
+    if(Math.abs(dTheta_new - dTheta_s) < 0.05) { dTheta_s = dTheta_new; break; }
+    dTheta_s = dTheta_new;
+  }
+  return T4;
+}
+
+/* ============================================================
+   AMPACITY — IEC 60287-1-1 Eq. 1, 100 % load factor.
+   I_z = sqrt( (Δθ - W_d·[½T1 + n(T2+T3+T4)]) /
+              (R·T1 + n·R·(1+λ1)·T2 + n·R·(1+λ1+λ2)·(T3+T4)) )
+   ============================================================ */
+function ampacityIEC(R, n, Wd, T1, T2, T3, T4, lam1, lam2, dTheta){
+  const num = dTheta - Wd*(0.5*T1 + n*(T2 + T3 + T4));
+  const den = R*T1
+            + n*R*(1+lam1)*T2
+            + n*R*(1+lam1+lam2)*(T3 + T4);
+  if(den <= 0) return NaN;
+  if(num <= 0) return 0; // dielectric losses already exceed allowable rise → no current capability
+  return Math.sqrt(num/den);
+}
+
+/* ============================================================
+   CONDUCTOR TEMPERATURE at given load current I_load — back-calc.
+   θ_c = θ_amb + W_d·[½T1 + n(T2+T3+T4)]
+       + I²R·[T1 + n(1+λ1)T2 + n(1+λ1+λ2)(T3+T4)]
+   ============================================================ */
+function conductorTempAtLoad(I_load, R, n, Wd, T1, T2, T3, T4, lam1, lam2, theta_amb){
+  const dT_diel = Wd * (0.5*T1 + n*(T2+T3+T4));
+  const dT_load = I_load*I_load * R *
+                  ( T1 + n*(1+lam1)*T2 + n*(1+lam1+lam2)*(T3+T4) );
+  return theta_amb + dT_diel + dT_load;
+}
+
+/* ============================================================
+   SHORT-CIRCUIT WITHSTAND — IEC 60949 §3.1 (adiabatic):
+   I·√t = k · S
+   ============================================================ */
+function shortCircuit(I_kA, t_s, S_mm2, k){
+  const I = I_kA * 1000; // A
+  const Iperm = k * S_mm2 / Math.sqrt(t_s); // A for given t
+  const tperm = Math.pow(k * S_mm2 / I, 2);  // s for given I
+  const kit = k * S_mm2 / 1000;              // kA·√s
+  return { Iperm_A: Iperm, tperm_s: tperm, kit_kA: kit };
+}
+
+/* ============================================================
+   READ INPUTS → object
+   ============================================================ */
+function readInputs(){
+  return {
+    material:    document.getElementById("conMaterial").value,
+    S:           parseFloat(document.getElementById("conS").value),
+    cores:       parseInt(document.getElementById("cores").value, 10),
+    design:      document.getElementById("conDesign").value,
+    insulation:  document.getElementById("insulation").value,
+    U0:          parseFloat(document.getElementById("voltage").value),
+    sheath:      document.getElementById("sheath").value,
+    armour:      document.getElementById("armour").value,
+    jacket:      document.getElementById("jacket").value,
+    construct:   document.getElementById("construct").value,
+    instMethod:  document.getElementById("instMethod").value,
+    depth_m:     parseFloat(document.getElementById("depth").value),
+    formation:   document.getElementById("formation").value,
+    spacing_mm:  parseFloat(document.getElementById("spacing").value),
+    nCircuits:   parseInt(document.getElementById("nCircuits").value, 10),
+    circuitSpacing_mm: parseFloat(document.getElementById("circuitSpacing").value),
+    soilRho:     parseFloat(document.getElementById("soilRho").value),
+    ambTemp:     parseFloat(document.getElementById("ambTemp").value),
+    bonding:     document.getElementById("bonding").value,
+    loadFactor:  parseFloat(document.getElementById("loadFactor").value),
+    freq:        parseFloat(document.getElementById("freq").value),
+    thetaMax:    parseFloat(document.getElementById("thetaMax").value),
+    iLoad:       parseFloat(document.getElementById("iLoad").value),
+    sysU_kV:     parseFloat(document.getElementById("sysU").value),
+    iScKa:       parseFloat(document.getElementById("iScKa").value),
+    tScSec:      parseFloat(document.getElementById("tScSec").value),
+    ovr_dc:      parseFloat(document.getElementById("ovr_dc").value),
+    ovr_t1:      parseFloat(document.getElementById("ovr_t1").value),
+    ovr_ts:      parseFloat(document.getElementById("ovr_ts").value),
+    ovr_t3:      parseFloat(document.getElementById("ovr_t3").value),
+    ovr_De:      parseFloat(document.getElementById("ovr_De").value),
+    ovr_rhoSh:   parseFloat(document.getElementById("ovr_rhoSh").value),
+    ovr_ks:      parseFloat(document.getElementById("ovr_ks").value),
+    ovr_kp:      parseFloat(document.getElementById("ovr_kp").value)
+  };
+}
+
+/* ============================================================
+   FULL CALCULATION CHAIN
+   ============================================================ */
+function calculate(I){
+  const out = {};
+
+  // 1 — geometry
+  const geo = estimateGeometry(I);
+  out.geo = geo;
+
+  // 2 — DC resistance at θ_max
+  const row = IEC60228.find(r => r.S === I.S);
+  const R20_per_km = (I.material === "Cu") ? row.Cu : row.Al;
+  if(R20_per_km == null){
+    return { error: `IEC 60228 has no ${I.material} value at S = ${I.S} mm². Choose a larger size.` };
+  }
+  const alpha = MAT[I.material].alpha;
+  const theta_c = I.thetaMax;
+  const R_per_m = R_DC_at_theta(R20_per_km, alpha, theta_c);
+  out.R20_per_km = R20_per_km;
+  out.R_dc_per_m_theta = R_per_m;
+
+  // 3 — skin and proximity
+  const ksKpDef = ksKp(I.design);
+  const ks = I.ovr_ks > 0 ? I.ovr_ks : ksKpDef.ks;
+  const kp = I.ovr_kp > 0 ? I.ovr_kp : ksKpDef.kp;
+  const ys = skinFactor(R_per_m, I.freq, ks);
+
+  // determine spacing s for proximity (mm)
+  let s_mm;
+  if(I.construct === "single_core"){
+    if(I.formation === "trefoil_touch" || I.formation === "flat_touch") s_mm = geo.D_e;
+    else if(I.formation === "flat_spaced") s_mm = Math.max(geo.D_e, I.spacing_mm || geo.D_e);
+    else s_mm = 1e6; // isolated → no proximity
+  } else {
+    s_mm = geo.D_over_ins; // 3-core: cores touch, s ≈ d core
+  }
+  formation_spacing = s_mm;
+  let configCode;
+  if(I.construct === "single_core"){
+    configCode = (I.formation === "flat_touch" || I.formation === "flat_spaced") ? "flat" : "trefoil";
+  } else {
+    configCode = "trefoil"; // 3-core triangle
+  }
+  const yp = (s_mm < 1e5) ? proximityFactor(R_per_m, I.freq, kp, geo.d_c, s_mm, configCode) : 0;
+  const R_ac = R_AC(R_per_m, ys, yp);
+  out.ys = ys; out.yp = yp; out.R_ac = R_ac; out.s_mm = s_mm;
+
+  // 4 — dielectric losses
+  const ins = INS[I.insulation];
+  const eps_r = ins.eps_r;
+  let tan_d;
+  if(I.insulation === "EPR") tan_d = (I.U0 >= 18) ? ins.tan_d_hi : ins.tan_d_lo;
+  else tan_d = ins.tan_d ?? 0.001;
+  const dieRes = W_dielectric(I.U0, I.freq, eps_r, tan_d, geo.D_over_ins, geo.d_c);
+  out.C = dieRes.C; out.Wd = dieRes.Wd; out.tan_d = tan_d;
+
+  // 5 — thermal resistivity for insulation by voltage
+  let rho_T;
+  if(I.insulation === "EPR" || I.insulation === "PVC"){
+    rho_T = (I.U0 <= 3) ? ins.rho_T_lo : ins.rho_T_hi;
+  } else { rho_T = ins.rho_T; }
+  out.rho_T = rho_T;
+
+  // 6 — T1, T2, T3
+  let T1;
+  if(I.construct === "single_core")             T1 = T1_single_core(rho_T, geo.t_1, geo.d_c);
+  else if(I.construct === "three_core_belted")  T1 = T1_three_core_belted(rho_T, geo.t_1, geo.d_c);
+  else                                          T1 = T1_three_core_SL(rho_T, geo.t_1, geo.d_c);
+  // T2: bedding (only if armour present and sheath present)
+  const rho_T_bed = 6.0; // typical PVC/jute bedding
+  const T2 = (geo.t_bed > 0) ? T2_radial(rho_T_bed, geo.t_bed, geo.D_over_sh) : 0;
+  // T3: outer jacket
+  const rho_T3 = JACKET_RHO[I.jacket] ?? 5.0;
+  const D_under_jacket = (I.armour !== "none") ? geo.D_over_armour : geo.D_over_sh;
+  const T3 = (geo.t_3 > 0) ? T3_jacket(rho_T3, geo.t_3, D_under_jacket) : 0;
+
+  // 7 — number of load-carrying cores n
+  const n = (I.construct === "single_core") ? 1 :
+            (I.cores === 4 ? 3 : I.cores); // assume neutral negligibly loaded for balanced systems
+
+  // 8 — sheath / armour loss factors
+  // Estimate sheath operating temp ≈ θ_amb + 0.7*Δθ
+  const theta_amb_for_T4 = I.ambTemp;
+  const dTheta_max = theta_c - theta_amb_for_T4;
+  const theta_sh = theta_amb_for_T4 + 0.7*dTheta_max;
+  const lam1 = (I.sheath === "none") ? 0 :
+               lambda1(geo, I.freq, R_ac, I.formation, I.bonding, geo.sheathDef, theta_sh);
+  const theta_a = theta_sh; // armour temp ≈ sheath temp
+  const lam2 = lambda2(I, geo, I.freq, R_ac, theta_a, lam1);
+  out.lam1 = lam1; out.lam2 = lam2;
+
+  // 9 — T4
+  let T4;
+  if(I.instMethod === "buried"){
+    const L_mm = I.depth_m * 1000;
+    if(I.nCircuits > 1){
+      // build neighbour distances (assumed in line, equal spacing = circuit_spacing)
+      const neighbours = [];
+      const N = Math.max(0, I.nCircuits - 1);
+      for(let k = 1; k <= N; k++){
+        neighbours.push(I.circuitSpacing_mm * k);
+      }
+      T4 = T4_buried_group_mutual(I.soilRho, L_mm, geo.D_e, neighbours);
+    } else {
+      T4 = T4_buried_single(I.soilRho, L_mm, geo.D_e);
+    }
+  } else {
+    // estimate W_t for in-air iteration: take I_z guess → iterate
+    // first pass: assume W_t = 25 W/m, then refine
+    let W_t_guess = 25;
+    T4 = T4_in_air(W_t_guess, geo.D_e, theta_amb_for_T4, I.instMethod);
+    // refine 3 iterations
+    for(let it = 0; it < 5; it++){
+      const Iz_g = ampacityIEC(R_ac, n, dieRes.Wd, T1, T2, T3, T4, lam1, lam2, dTheta_max);
+      if(!isFinite(Iz_g) || Iz_g <= 0) break;
+      const Wc = Iz_g*Iz_g * R_ac;
+      const Ws = lam1 * Wc;
+      const Wa = lam2 * Wc;
+      const W_t = Wc + Ws + Wa + dieRes.Wd;
+      const T4_new = T4_in_air(W_t, geo.D_e, theta_amb_for_T4, I.instMethod);
+      if(Math.abs(T4_new - T4) < 1e-4) { T4 = T4_new; break; }
+      T4 = T4_new;
+    }
+  }
+  out.T1 = T1; out.T2 = T2; out.T3 = T3; out.T4 = T4;
+
+  // 10 — Ampacity (apply daily load factor μ on losses if not 1)
+  // Per IEC 60853: cyclic rating uses μ for losses producing T_internal heating.
+  // Simplified here: apply μ² to (R T1 + ...) terms approximately. For v1 keep μ=1.0
+  // unless user sets otherwise; flag in note.
+  const I_z = ampacityIEC(R_ac, n, dieRes.Wd, T1, T2, T3, T4, lam1, lam2, dTheta_max);
+  out.I_z = I_z;
+  out.dTheta = dTheta_max;
+  out.theta_amb = theta_amb_for_T4;
+  out.theta_c = theta_c;
+  out.n = n;
+
+  // 11 — Conductor temp at user load
+  if(I.iLoad > 0){
+    out.theta_at_load = conductorTempAtLoad(I.iLoad, R_ac, n, dieRes.Wd, T1, T2, T3, T4, lam1, lam2, theta_amb_for_T4);
+    out.Wc_load = I.iLoad*I.iLoad*R_ac;
+    out.Ws_load = lam1*out.Wc_load;
+    out.Wa_load = lam2*out.Wc_load;
+    out.Wt_load = out.Wc_load + out.Ws_load + out.Wa_load + dieRes.Wd;
+  }
+  // losses at I_z
+  out.Wc_z = I_z*I_z*R_ac;
+  out.Ws_z = lam1*out.Wc_z;
+  out.Wa_z = lam2*out.Wc_z;
+  out.Wt_z = out.Wc_z + out.Ws_z + out.Wa_z + dieRes.Wd;
+
+  // 12 — Short-circuit
+  const k_sc = kSC(I.material, I.insulation);
+  out.k_sc = k_sc;
+  if(I.iScKa > 0){
+    const sc = shortCircuit(I.iScKa, I.tScSec, I.S, k_sc);
+    out.sc = sc;
+  }
+
+  return out;
+}
+
+/* ============================================================
+   UI BINDING — populate & wire events
+   ============================================================ */
+function populateCrossSections(){
+  const sel = document.getElementById("conS");
+  sel.innerHTML = "";
+  for(const r of IEC60228){
+    const o = document.createElement("option");
+    o.value = r.S;
+    o.text = r.S + " mm²";
+    if(r.S === 95) o.selected = true; // sensible default
+    sel.appendChild(o);
+  }
+}
+function applyTypicalDefaults(){
+  document.getElementById("conMaterial").value = "Cu";
+  document.getElementById("conS").value = "95";
+  document.getElementById("cores").value = "3";
+  document.getElementById("conDesign").value = "round_stranded";
+  document.getElementById("insulation").value = "XLPE";
+  document.getElementById("voltage").value = "0.6";
+  document.getElementById("sheath").value = "none";
+  document.getElementById("armour").value = "swa";
+  document.getElementById("jacket").value = "PVC";
+  document.getElementById("construct").value = "three_core_belted";
+  document.getElementById("instMethod").value = "buried";
+  document.getElementById("depth").value = "0.7";
+  document.getElementById("formation").value = "trefoil_touch";
+  document.getElementById("spacing").value = "0";
+  document.getElementById("nCircuits").value = "1";
+  document.getElementById("circuitSpacing").value = "200";
+  document.getElementById("soilRho").value = "1.0";
+  document.getElementById("ambTemp").value = "20";
+  document.getElementById("bonding").value = "solid";
+  document.getElementById("loadFactor").value = "1.00";
+  document.getElementById("freq").value = "50";
+  document.getElementById("thetaMax").value = "90";
+  document.getElementById("iLoad").value = "0";
+  document.getElementById("sysU").value = "0.4";
+  document.getElementById("iScKa").value = "0";
+  document.getElementById("tScSec").value = "1.0";
+  for(const id of ["ovr_dc","ovr_t1","ovr_ts","ovr_t3","ovr_De","ovr_rhoSh","ovr_ks","ovr_kp"]){
+    document.getElementById(id).value = "0";
+  }
+  document.getElementById("regionPreset").value = "iec_default";
+  recalc();
+}
+
+function applyRegionPreset(){
+  const code = document.getElementById("regionPreset").value;
+  const p = REGION_PRESETS[code];
+  if(!p) return;
+  document.getElementById("soilRho").value = p.rho;
+  // pick soil temp if buried, air temp if in-air
+  const inst = document.getElementById("instMethod").value;
+  document.getElementById("ambTemp").value = (inst === "buried") ? p.theta_soil : p.theta_air;
+  document.getElementById("depth").value = p.depth;
+  recalc();
+}
+
+function autoSetThetaMax(){
+  const ins = document.getElementById("insulation").value;
+  const m = INS[ins];
+  if(m && m.th_max) document.getElementById("thetaMax").value = m.th_max;
+}
+
+/* ============================================================
+   DISPLAY HELPERS
+   ============================================================ */
+const fmt = (n, d=3) => (isFinite(n) ? Number(n).toPrecision(d) : "—");
+const fmtFx = (n, d=2) => (isFinite(n) ? n.toFixed(d) : "—");
+const fmtInt = n => (isFinite(n) ? Math.round(n).toString() : "—");
+
+function classifyVerdict(margin){
+  if(margin >= 1.10) return "pass";
+  if(margin >= 1.00) return "borderline";
+  return "fail";
+}
+function setVerdict(el, cls, txt){
+  el.className = "verdict " + cls;
+  el.textContent = txt;
+}
+
+/* ============================================================
+   MAIN RECALC + RENDER
+   ============================================================ */
+let lastResult = null;
+let lastInputs = null;
+
+function recalc(){
+  const I = readInputs();
+  lastInputs = I;
+  const r = calculate(I);
+  lastResult = r;
+  if(r.error){
+    document.getElementById("iz_val").textContent = "—";
+    document.getElementById("iz_note").innerHTML = "<b style='color:#7f1a10'>" + r.error + "</b>";
+    return;
+  }
+  // Section A
+  document.getElementById("iz_val").textContent = fmtInt(r.I_z);
+  document.getElementById("iz_thetac").textContent = r.theta_c.toFixed(0) + " °C";
+  document.getElementById("iz_thamb").textContent = r.theta_amb.toFixed(0) + " °C";
+  document.getElementById("iz_dtheta").textContent = r.dTheta.toFixed(0) + " K";
+  document.getElementById("iz_n").textContent = r.n.toString();
+  // active power
+  const sysU = I.sysU_kV * 1000;
+  const P_3ph = Math.sqrt(3) * sysU * r.I_z * 0.95 / 1e6; // MW @ pf 0.95 cap
+  document.getElementById("iz_p").textContent = (sysU > 0 && isFinite(r.I_z)) ? P_3ph.toFixed(2)+" MW @ pf=0.95" : "—";
+
+  // Section B — losses
+  document.getElementById("r_dc20").textContent = (r.R20_per_km).toExponential(3) + " Ω/km";
+  document.getElementById("r_dc").textContent   = (r.R_dc_per_m_theta*1000).toExponential(3) + " Ω/km";
+  document.getElementById("y_s").textContent    = fmt(r.ys, 3);
+  document.getElementById("y_p").textContent    = fmt(r.yp, 3);
+  document.getElementById("r_ac").textContent   = (r.R_ac*1000).toExponential(3) + " Ω/km";
+  document.getElementById("cap").textContent    = (r.C*1e9).toFixed(3) + " nF/m";
+  document.getElementById("w_d").textContent    = r.Wd.toExponential(3) + " W/m";
+  document.getElementById("lam1").textContent   = r.lam1.toFixed(4);
+  document.getElementById("lam2").textContent   = r.lam2.toFixed(4);
+  document.getElementById("w_c").textContent    = r.Wc_z.toFixed(2) + " W/m";
+  document.getElementById("w_s").textContent    = r.Ws_z.toFixed(3) + " W/m";
+  document.getElementById("w_a").textContent    = r.Wa_z.toFixed(3) + " W/m";
+  document.getElementById("w_t").textContent    = r.Wt_z.toFixed(2) + " W/m";
+
+  // Section C — thermal
+  document.getElementById("t1").textContent     = r.T1.toFixed(4);
+  document.getElementById("t2").textContent     = r.T2.toFixed(4);
+  document.getElementById("t3").textContent     = r.T3.toFixed(4);
+  document.getElementById("t4").textContent     = r.T4.toFixed(4);
+  document.getElementById("dia_de").textContent = r.geo.D_e.toFixed(2);
+  document.getElementById("dia_dc").textContent = r.geo.d_c.toFixed(2);
+  document.getElementById("dia_t1").textContent = r.geo.t_1.toFixed(2);
+  document.getElementById("dia_Ds").textContent = r.geo.D_over_sh.toFixed(2);
+  const u = (I.instMethod === "buried") ? (2*I.depth_m*1000/r.geo.D_e).toFixed(2) : "n/a";
+  document.getElementById("dia_u").textContent  = u;
+
+  // Section D — θ at load
+  if(I.iLoad > 0){
+    document.getElementById("th_val").textContent = r.theta_at_load.toFixed(1);
+    document.getElementById("th_wc").textContent  = r.Wc_load.toFixed(2)+" W/m";
+    document.getElementById("th_ws").textContent  = r.Ws_load.toFixed(3)+" W/m";
+    document.getElementById("th_wt").textContent  = r.Wt_load.toFixed(2)+" W/m";
+    const margin = r.theta_c / r.theta_at_load;
+    const cls = classifyVerdict(margin);
+    document.getElementById("th_margin").textContent = "ratio "+margin.toFixed(2)+" (θ<sub>c,max</sub>/θ<sub>c,calc</sub>)".replace(/<[^>]+>/g,"");
+    setVerdict(document.getElementById("th_verdict"), cls,
+       cls === "pass" ? "PASS — within limit" :
+       cls === "borderline" ? "BORDERLINE — within 5 K of limit" :
+                              "FAIL — exceeds θ_c,max");
+  } else {
+    document.getElementById("th_val").textContent = "—";
+    ["th_wc","th_ws","th_wt","th_margin"].forEach(id => document.getElementById(id).textContent = "—");
+    setVerdict(document.getElementById("th_verdict"), "na", "Enter I_load to compute");
+  }
+
+  // Section E — short-circuit
+  document.getElementById("sc_k").textContent = r.k_sc + "  ("+I.material+"/"+I.insulation+")";
+  if(r.sc){
+    document.getElementById("sc_kit").textContent = r.sc.kit_kA.toFixed(2)+" kA·√s";
+    document.getElementById("sc_iperm").textContent = (r.sc.Iperm_A/1000).toFixed(2)+" kA";
+    document.getElementById("sc_tperm").textContent = r.sc.tperm_s.toFixed(3)+" s";
+    const ok = (r.sc.Iperm_A/1000) >= I.iScKa;
+    setVerdict(document.getElementById("sc_verdict"),
+      ok ? "pass" : "fail",
+      ok ? "PASS — withstand exceeds I"+'”'+"k" : "FAIL — exceeds withstand");
+  } else {
+    document.getElementById("sc_kit").textContent = (r.k_sc * I.S / 1000).toFixed(2)+" kA·√s";
+    ["sc_iperm","sc_tperm"].forEach(id => document.getElementById(id).textContent = "—");
+    setVerdict(document.getElementById("sc_verdict"), "na", "Enter I_k and t_SC to evaluate");
+  }
+
+  // Section F — completeness
+  renderCompleteness(I, r);
+}
+
+function renderCompleteness(I, r){
+  const tbody = document.querySelector("#completenessTable tbody");
+  tbody.innerHTML = "";
+  const items = [
+    ["Cable construction (S, U, insulation, sheath, armour)", "Computed"],
+    ["AC resistance R (skin & proximity)", isFinite(r.R_ac) ? "Computed" : "Incomplete"],
+    ["Dielectric losses W_d", I.U0 >= 18 ? "Computed (significant)" : "Computed (negligible at "+I.U0+" kV)"],
+    ["Sheath loss factor λ₁", (I.sheath==="none" ? "Not applicable" :
+        (I.bonding==="solid" ? "Computed (solid bonding)" : "λ1' = 0 ("+I.bonding+")"))],
+    ["Armour loss factor λ₂", (I.armour==="none" ? "Not applicable" : (r.lam2>0?"Computed":"≈ 0 (symmetric/non-magnetic)"))],
+    ["Thermal resistances T₁…T₄", "Computed ("+I.instMethod+")"],
+    ["Group derating (mutual heating)", I.nCircuits>1 ? "Included ("+I.nCircuits+" circuits)" : "Single circuit"],
+    ["Continuous ampacity I_z", isFinite(r.I_z) ? "PASS" : "FAIL"],
+    ["Conductor temperature at I_load", I.iLoad>0 ? (r.theta_at_load <= r.theta_c ? "PASS" : "FAIL") : "Not included"],
+    ["IEC 60949 SC withstand", r.sc ? ((r.sc.Iperm_A/1000)>=I.iScKa ? "PASS" : "FAIL") : "Not included"],
+    ["Cyclic rating IEC 60853", I.loadFactor<1 ? "Approx (μ="+I.loadFactor+", placeholder)" : "Continuous (μ=1.0)"]
+  ];
+  for(const [name, status] of items){
+    const tr = document.createElement("tr");
+    const td1 = document.createElement("td"); td1.textContent = name;
+    const td2 = document.createElement("td"); td2.textContent = status;
+    if(status === "PASS") td2.className = "pass";
+    else if(status === "FAIL") td2.className = "fail";
+    tr.appendChild(td1); tr.appendChild(td2);
+    tbody.appendChild(tr);
+  }
+  // overall verdict
+  const v = document.getElementById("overallVerdict");
+  if(!isFinite(r.I_z)){ setVerdict(v,"fail","FAIL — ampacity could not be computed"); return; }
+  if(I.iLoad > 0){
+    if(r.theta_at_load > r.theta_c){ setVerdict(v,"fail","FAIL — conductor exceeds θ_c,max at I_load"); return; }
+    if(r.sc && (r.sc.Iperm_A/1000) < I.iScKa){ setVerdict(v,"fail","FAIL — SC withstand insufficient"); return; }
+    const m = r.theta_c / r.theta_at_load;
+    if(m >= 1.10) setVerdict(v,"pass","PASS — full design margin");
+    else if(m >= 1.00) setVerdict(v,"borderline","BORDERLINE — within 5 K margin");
+    else setVerdict(v,"fail","FAIL");
+  } else {
+    setVerdict(v,"pass","I_z computed — enter I_load for full verdict");
+  }
+}
+
+/* ============================================================
+   VALIDATION TESTS
+   ============================================================ */
+const TESTS = [
+  {
+    name:"IEC 60228: R20 for Cu 95 mm² stranded",
+    run:()=>{
+      const r = IEC60228.find(x=>x.S===95);
+      return Math.abs(r.Cu - 0.193) < 1e-3 ? "OK" : "FAIL " + r.Cu;
+    }
+  },
+  {
+    name:"IEC 60228: R20 for Al 240 mm² stranded",
+    run:()=>{
+      const r = IEC60228.find(x=>x.S===240);
+      return Math.abs(r.Al - 0.125) < 1e-3 ? "OK" : "FAIL " + r.Al;
+    }
+  },
+  {
+    name:"DC R(θ) at 90 °C: Cu 95 mm² → 0.193·(1+0.00393·70)/1000 ≈ 2.46e-4 Ω/m",
+    run:()=>{
+      const R = R_DC_at_theta(0.193, MAT.Cu.alpha, 90);
+      return Math.abs(R - 2.46e-4) < 1e-5 ? "OK ("+R.toExponential(3)+")" : "FAIL " + R;
+    }
+  },
+  {
+    name:"Skin-effect factor at 50 Hz, R'=2.46e-4, ks=1 (95 mm² Cu @ 90 °C): y_s ≈ 0.00136 (small, expected)",
+    run:()=>{
+      const ys = skinFactor(2.46e-4, 50, 1);
+      // analytical: xs² = 8π·50·1e-7/2.46e-4 ≈ 0.511; ys = xs⁴/(192+0.8 xs⁴)
+      // xs² ≈ 0.511 here, so ys = (xs²)² / (192 + 0.8·(xs²)²) = 0.511²/(192 + 0.8·0.511²)
+      const ref = Math.pow(0.511,2)/(192 + 0.8*Math.pow(0.511,2));
+      return Math.abs(ys - ref) < 1e-4 ? "OK ("+ys.toFixed(5)+")" : "FAIL " + ys.toFixed(5);
+    }
+  },
+  {
+    name:"Skin-effect factor scales with S: ys(1000 mm² Cu) > ys(95 mm² Cu) by ~50×",
+    run:()=>{
+      const R_95  = R_DC_at_theta(0.193, MAT.Cu.alpha, 90);
+      const R_1000= R_DC_at_theta(0.0176, MAT.Cu.alpha, 90);
+      const ys_95 = skinFactor(R_95, 50, 1);
+      const ys_1000 = skinFactor(R_1000, 50, 1);
+      const ratio = ys_1000/ys_95;
+      return (ratio > 30 && ratio < 200) ? "OK (95: "+ys_95.toExponential(2)+", 1000: "+ys_1000.toExponential(2)+", ratio "+ratio.toFixed(0)+")" : "FAIL ratio="+ratio;
+    }
+  },
+  {
+    name:"Proximity for trefoil, dc/s = 0.5, ys-base case: yp > 0",
+    run:()=>{
+      const yp = proximityFactor(2.46e-4, 50, 1, 12, 24, "trefoil");
+      return (yp > 0 && yp < 0.05) ? "OK ("+yp.toFixed(4)+")" : "FAIL " + yp;
+    }
+  },
+  {
+    name:"T1 single-core, ρ=3.5, t1=2 mm, dc=12 mm: T1 ≈ 0.5/(2π)·ln(1+4/12) = 0.0161",
+    run:()=>{
+      const T1 = T1_single_core(3.5, 2, 12);
+      const ref = (3.5/(2*Math.PI))*Math.log(1+4/12);
+      return Math.abs(T1 - ref) < 1e-4 ? "OK ("+T1.toFixed(4)+")" : "FAIL " + T1;
+    }
+  },
+  {
+    name:"T4 buried single, ρ=1.0, L=700 mm, De=40 mm: u=35, T4 = ln(70+√(4900-1))/(2π) ≈ 0.760",
+    run:()=>{
+      const T4 = T4_buried_single(1.0, 700, 40);
+      const ref = (1.0/(2*Math.PI))*Math.log(70 + Math.sqrt(4900-1));
+      return Math.abs(T4 - ref) < 1e-3 ? "OK ("+T4.toFixed(3)+")" : "FAIL " + T4;
+    }
+  },
+  {
+    name:"Ampacity formula: dummy R=2.46e-4, T1=0.5, T4=0.7, n=1, no dielectric → I = √(70/2.46e-4·1.2)",
+    run:()=>{
+      const I = ampacityIEC(2.46e-4, 1, 0, 0.5, 0, 0, 0.7, 0, 0, 70);
+      const ref = Math.sqrt(70 / (2.46e-4*(0.5+0.7)));
+      return Math.abs(I - ref) < 1 ? "OK ("+I.toFixed(0)+")" : "FAIL " + I;
+    }
+  },
+  {
+    name:"Conductor temp back-calc: at I=I_z calculated → θ_c ≈ θ_max",
+    run:()=>{
+      // synthetic case
+      const R=2.46e-4, T1=0.5, T2=0, T3=0, T4=0.7, n=1, lam1=0, lam2=0, Wd=0.5, dT=70;
+      const I_z = ampacityIEC(R,n,Wd,T1,T2,T3,T4,lam1,lam2,dT);
+      const th = conductorTempAtLoad(I_z, R, n, Wd, T1,T2,T3,T4, lam1,lam2, 20);
+      const expected = 20 + dT;
+      return Math.abs(th - expected) < 0.5 ? "OK ("+th.toFixed(1)+" vs "+expected+")" : "FAIL " + th;
+    }
+  },
+  {
+    name:"IEC 60949: Cu/XLPE 95 mm², t=1 s → I_perm = 143·95 = 13.585 kA",
+    run:()=>{
+      const sc = shortCircuit(13.585, 1.0, 95, 143);
+      return Math.abs(sc.Iperm_A - 13585) < 5 ? "OK ("+sc.Iperm_A.toFixed(0)+" A)" : "FAIL " + sc.Iperm_A;
+    }
+  },
+  {
+    name:"IEC 60949: Al/PVC 240 mm², t=0.5 s → I_perm = 76·240/√0.5 = 25.79 kA",
+    run:()=>{
+      const sc = shortCircuit(25.79, 0.5, 240, 76);
+      const ref = 76*240/Math.sqrt(0.5);
+      return Math.abs(sc.Iperm_A - ref) < 5 ? "OK ("+sc.Iperm_A.toFixed(0)+" A)" : "FAIL " + sc.Iperm_A;
+    }
+  },
+  {
+    name:"Reciprocal: ampacity → loss balance → θ_c at full load = θ_c,max within 1 K (full chain w/ dielectric & sheath λ1)",
+    run:()=>{
+      // run a real case through calculate(): Cu 240 mm² XLPE 12/20 kV, single-core trefoil buried
+      const I = {
+        material:"Cu", S:240, cores:1, design:"round_stranded",
+        insulation:"XLPE", U0:12,
+        sheath:"cu_screen_25", armour:"none", jacket:"PE",
+        construct:"single_core",
+        instMethod:"buried", depth_m:1.0, formation:"trefoil_touch", spacing_mm:0,
+        nCircuits:1, circuitSpacing_mm:200,
+        soilRho:1.0, ambTemp:20, bonding:"solid", loadFactor:1.0,
+        freq:50, thetaMax:90, iLoad:0, sysU_kV:20, iScKa:0, tScSec:1,
+        ovr_dc:0, ovr_t1:0, ovr_ts:0, ovr_t3:0, ovr_De:0, ovr_rhoSh:0, ovr_ks:0, ovr_kp:0
+      };
+      const r = calculate(I);
+      if(r.error) return "FAIL " + r.error;
+      // at I = I_z, θ_c should equal θ_max
+      const th = conductorTempAtLoad(r.I_z, r.R_ac, r.n, r.Wd, r.T1,r.T2,r.T3,r.T4, r.lam1,r.lam2, r.theta_amb);
+      return Math.abs(th - r.theta_c) < 1.5 ? "OK (I_z="+r.I_z.toFixed(0)+" A, θ_c="+th.toFixed(1)+" °C)" : "FAIL θ_c=" + th.toFixed(2);
+    }
+  },
+  {
+    name:"Region preset UAE-DEWA: ρ=1.5, soil=30 °C, depth=1.0 m",
+    run:()=>{
+      const p = REGION_PRESETS.uae_dewa;
+      return (p.rho===1.5 && p.theta_soil===30 && p.depth===1.0) ? "OK" : "FAIL";
+    }
+  }
+];
+
+function runValidation(){
+  const out = document.getElementById("validationOut");
+  let html = "";
+  let pass = 0, fail = 0;
+  for(const t of TESTS){
+    let res;
+    try { res = t.run(); } catch(e) { res = "ERROR " + e.message; }
+    const ok = res.startsWith("OK");
+    if(ok) pass++; else fail++;
+    html += (ok ? '<span style="color:#0c5826">●</span> ' : '<span style="color:#7f1a10">●</span> ')
+         + t.name + ' → <b>' + res + '</b><br/>';
+  }
+  html = '<div style="font-weight:700; margin-bottom:6px;">Validation: '+pass+' passed, '+fail+' failed (of '+TESTS.length+')</div>' + html;
+  out.innerHTML = html;
+}
+
+/* ============================================================
+   .DOCX REPORT — compact, free tier (no graphics)
+   ============================================================ */
+async function downloadDocx(){
+  const I = lastInputs;
+  const r = lastResult;
+  if(!I || !r || r.error){ alert("Run calculation first."); return; }
+  if(typeof docx === "undefined"){
+    alert("Report library not loaded. Please reload the page."); return;
+  }
+  const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType,
+          Table, TableRow, TableCell, WidthType, BorderStyle } = docx;
+
+  const para = (txt, opts={}) => new Paragraph({
+    children:[ new TextRun({ text:txt, bold: !!opts.bold, italics: !!opts.italic, size: opts.size || 20 }) ],
+    heading: opts.heading,
+    spacing: { after: opts.after ?? 80 },
+    alignment: opts.align
+  });
+  const subhead = (txt) => para(txt, { bold:true, size:22, after:120 });
+
+  const tableRow = (k, v) => new TableRow({
+    children:[
+      new TableCell({ width:{size:55, type:WidthType.PERCENTAGE}, children:[new Paragraph({children:[new TextRun({text:k, size:18})]})] }),
+      new TableCell({ width:{size:45, type:WidthType.PERCENTAGE}, children:[new Paragraph({children:[new TextRun({text:v, size:18, bold:true})]})] })
+    ]
+  });
+  const noBorders = {
+    top:{style:BorderStyle.SINGLE, size:1, color:"CCCCCC"},
+    bottom:{style:BorderStyle.SINGLE, size:1, color:"CCCCCC"},
+    left:{style:BorderStyle.NONE, size:0, color:"FFFFFF"},
+    right:{style:BorderStyle.NONE, size:0, color:"FFFFFF"},
+    insideHorizontal:{style:BorderStyle.SINGLE, size:1, color:"EEEEEE"},
+    insideVertical:{style:BorderStyle.NONE, size:0, color:"FFFFFF"}
+  };
+  const T = (rows) => new Table({
+    width:{size:100, type:WidthType.PERCENTAGE},
+    rows: rows,
+    borders: noBorders
+  });
+
+  // Build rows
+  const inputsRows = [
+    tableRow("Conductor",      MAT[I.material].name + " " + I.S + " mm² (" + I.design + ")"),
+    tableRow("Cores",          I.cores.toString()),
+    tableRow("Insulation",     INS[I.insulation].name + ", U₀/U = " + I.U0 + "/" + (I.U0===0.6?1:Math.round(I.U0/0.6)) + " kV"),
+    tableRow("Construction",   I.construct.replace(/_/g," ")),
+    tableRow("Sheath / screen",I.sheath.replace(/_/g," ")),
+    tableRow("Armour",         I.armour.toUpperCase()),
+    tableRow("Outer jacket",   I.jacket),
+    tableRow("Installation",   I.instMethod.replace(/_/g," ") + (I.instMethod==="buried" ? ", L = "+I.depth_m+" m" : "")),
+    tableRow("Formation",      I.formation.replace(/_/g," ")),
+    tableRow("Circuits",       I.nCircuits + " (spacing "+I.circuitSpacing_mm+" mm)"),
+    tableRow("Soil ρ_T",       I.soilRho + " K·m/W"),
+    tableRow("Reference ambient temp",  I.ambTemp + " °C"),
+    tableRow("System frequency",        I.freq + " Hz"),
+    tableRow("Bonding",                 I.bonding),
+    tableRow("Conductor max temp",      r.theta_c + " °C")
+  ];
+
+  const geomRows = [
+    tableRow("Conductor diameter d_c",  r.geo.d_c.toFixed(2) + " mm"),
+    tableRow("Insulation thickness t₁", r.geo.t_1.toFixed(2) + " mm"),
+    tableRow("Diameter over insulation",r.geo.D_over_ins.toFixed(2) + " mm"),
+    tableRow("Sheath thickness t_s",    r.geo.t_s.toFixed(2) + " mm"),
+    tableRow("Diameter over sheath",    r.geo.D_over_sh.toFixed(2) + " mm"),
+    tableRow("Armour wire ⌀",           r.geo.t_a ? r.geo.t_a.toFixed(2) + " mm" : "—"),
+    tableRow("Diameter over armour",    r.geo.D_over_armour.toFixed(2) + " mm"),
+    tableRow("Outer jacket t₃",         r.geo.t_3.toFixed(2) + " mm"),
+    tableRow("External diameter D_e",   r.geo.D_e.toFixed(2) + " mm")
+  ];
+
+  const lossRows = [
+    tableRow("R₂₀ (DC)",               (r.R20_per_km).toExponential(3) + " Ω/km"),
+    tableRow("R' DC at θ_c",           (r.R_dc_per_m_theta*1000).toExponential(3) + " Ω/km"),
+    tableRow("Skin factor y_s",        r.ys.toFixed(4)),
+    tableRow("Proximity factor y_p",   r.yp.toFixed(4)),
+    tableRow("R AC at θ_c",            (r.R_ac*1000).toExponential(3) + " Ω/km"),
+    tableRow("Capacitance C",          (r.C*1e9).toFixed(3) + " nF/m"),
+    tableRow("Dielectric loss W_d",    r.Wd.toExponential(3) + " W/m/φ"),
+    tableRow("λ₁ sheath loss factor",  r.lam1.toFixed(4)),
+    tableRow("λ₂ armour loss factor",  r.lam2.toFixed(4)),
+    tableRow("T₁ insulation",          r.T1.toFixed(4) + " K·m/W"),
+    tableRow("T₂ bedding",             r.T2.toFixed(4) + " K·m/W"),
+    tableRow("T₃ outer jacket",        r.T3.toFixed(4) + " K·m/W"),
+    tableRow("T₄ external",            r.T4.toFixed(4) + " K·m/W")
+  ];
+
+  const resultsRows = [
+    tableRow("Continuous ampacity I_z",    Math.round(r.I_z) + " A"),
+    tableRow("Conductor losses W_c at I_z",r.Wc_z.toFixed(2) + " W/m/φ"),
+    tableRow("Sheath losses W_s at I_z",   r.Ws_z.toFixed(3) + " W/m/φ"),
+    tableRow("Armour losses W_a at I_z",   r.Wa_z.toFixed(3) + " W/m/φ"),
+    tableRow("Total losses W_t at I_z",    r.Wt_z.toFixed(2) + " W/m/φ")
+  ];
+
+  const children = [
+    new Paragraph({ heading:HeadingLevel.TITLE, children:[new TextRun({text:"Cable Ampacity Calculation Report", bold:true, size:32})], alignment:AlignmentType.CENTER }),
+    para("Per IEC 60287-1-1, -1-2, -2-1, -2-2 and -3-1; IEC 60228 conductor data; IEC 60949 short-circuit withstand.", { italic:true, align:AlignmentType.CENTER, after:300 }),
+    para("Date: " + new Date().toISOString().slice(0,10), { after:100 }),
+    para("Calculator: ieccalc.com/004 — Cable Ampacity (free tier compact report)", { italic:true, after:200 }),
+
+    subhead("1. Cable construction & site parameters"),
+    T(inputsRows),
+    para(" "),
+
+    subhead("2. Estimated cable geometry (IEC 60228 / IEC 60502 typical)"),
+    T(geomRows),
+    para(" "),
+
+    subhead("3. Electrical and thermal parameters"),
+    T(lossRows),
+    para(" "),
+
+    subhead("4. Steady-state ampacity I_z"),
+    T(resultsRows),
+    para(" ", { after:60 }),
+    para("I_z = √( (Δθ − W_d·[½T₁ + n·(T₂+T₃+T₄)]) / (R·T₁ + n·R·(1+λ₁)·T₂ + n·R·(1+λ₁+λ₂)·(T₃+T₄)) )", { italic:true, after:80 }),
+    para("(IEC 60287-1-1 Eq. 1; n = "+r.n+" load-carrying conductors)", { italic:true, after:200 })
+  ];
+
+  if(I.iLoad > 0){
+    children.push(subhead("5. Conductor temperature at user load"));
+    children.push(T([
+      tableRow("User load I_load",            I.iLoad + " A"),
+      tableRow("Conductor losses W_c(I_load)",r.Wc_load.toFixed(2) + " W/m/φ"),
+      tableRow("Total losses W_t(I_load)",    r.Wt_load.toFixed(2) + " W/m/φ"),
+      tableRow("Conductor temperature θ_c",   r.theta_at_load.toFixed(1) + " °C"),
+      tableRow("Limit θ_c,max",               r.theta_c + " °C"),
+      tableRow("Ratio θ_c,max / θ_c",         (r.theta_c/r.theta_at_load).toFixed(3)),
+      tableRow("Verdict",                     r.theta_at_load <= r.theta_c ? "PASS" : "FAIL")
+    ]));
+    children.push(para(" "));
+  }
+
+  if(r.sc){
+    children.push(subhead("6. Thermal short-circuit withstand (IEC 60949)"));
+    children.push(T([
+      tableRow("k constant ("+I.material+"/"+I.insulation+")",  r.k_sc.toString()),
+      tableRow("S × k = adiabatic I·√t",                         (r.k_sc * I.S / 1000).toFixed(2) + " kA·√s"),
+      tableRow("User I\"_k",                                     I.iScKa + " kA"),
+      tableRow("User t_SC",                                      I.tScSec + " s"),
+      tableRow("Permissible I_SC for given t_SC",                (r.sc.Iperm_A/1000).toFixed(2) + " kA"),
+      tableRow("Permissible time at user I\"_k",                 r.sc.tperm_s.toFixed(3) + " s"),
+      tableRow("Verdict",                                        ((r.sc.Iperm_A/1000)>=I.iScKa) ? "PASS" : "FAIL")
+    ]));
+    children.push(para("I_SC,perm = k · S / √t (IEC 60949 §3.1, adiabatic).", { italic:true, after:200 }));
+  }
+
+  children.push(subhead("Standards & method limitations (free tier)"));
+  children.push(para("This report is generated by the free tier of the calculator. It uses IEC 60287 closed-form equations for steady-state continuous ampacity, with the following simplifications:"));
+  children.push(para("• Sheath loss factor λ₁ for solidly-bonded systems only (single-point and cross-bonded set λ₁'=0; eddy-current term λ₁\" of IEC 60287-1-2 not included)."));
+  children.push(para("• Armour loss factor λ₂ simplified per IEC 60287-1-1 §2.4 (full magnetic-armour modelling for non-symmetric arrangements requires the paid tier)."));
+  children.push(para("• Cyclic load factor μ < 1 is treated as a placeholder; full IEC 60853-1 cyclic rating is in the paid tier."));
+  children.push(para("• Group derating uses direct mutual-heating per IEC 60287-2-1 §2.2.3.1; tabulated reduction factors (IEC 60364-5-52 Annex B/E) are not applied."));
+  children.push(para("• Cables in ducts and concrete duct banks are not yet supported in this version."));
+  children.push(para("• Trench cross-section drawing, sensitivity analysis and full-report appendices are paid features."));
+
+  const doc = new Document({ creator:"ieccalc.com", title:"Cable Ampacity Report", sections:[{ properties:{}, children }] });
+  const blob = await Packer.toBlob(doc);
+  const fname = "cable_ampacity_" + I.material + I.S + "_U0_" + I.U0 + "kV_Iz" + Math.round(r.I_z||0) + "A.docx";
+  saveAs(blob, fname);
+}
+
+/* ============================================================
+   TRENCH CAD MODULE (PRO) — vanilla port of cable-ampacity-v4.jsx
+   Calculations verified vs IEC 60287 / 60502-2 Annex B before integration.
+   Design preserved verbatim from source — do not modify look without user request.
+   ============================================================ */
+const Trench = (function(){
+  const MAT = {Cu:{n:"Copper",r:0.017241,a:0.00393}, Al:{n:"Aluminum",r:0.028264,a:0.00403}};
+  const INS_D = {XLPE:{n:"XLPE",mt:90,rt:3.5,ep:2.5,td:0.004}, PVC:{n:"PVC",mt:70,rt:5,ep:8,td:0.1}, EPR:{n:"EPR",mt:90,rt:3.5,ep:3,td:0.02}};
+  // IEC 60228 Class 2 stranded — d_c[mm], R20[Ω/km] Cu/Al
+  const SZ = [{s:10,cu:1.83,al:3.08,d:4.5},{s:16,cu:1.15,al:1.91,d:5.6},{s:25,cu:0.727,al:1.2,d:6.8},{s:35,cu:0.524,al:0.868,d:7.9},{s:50,cu:0.387,al:0.641,d:9.2},{s:70,cu:0.268,al:0.443,d:10.8},{s:95,cu:0.193,al:0.32,d:12.6},{s:120,cu:0.153,al:0.253,d:14},{s:150,cu:0.124,al:0.206,d:15.6},{s:185,cu:0.0991,al:0.164,d:17.2},{s:240,cu:0.0754,al:0.125,d:19.6},{s:300,cu:0.0601,al:0.1,d:21.8},{s:400,cu:0.047,al:0.0778,d:24.6},{s:500,cu:0.0366,al:0.0605,d:27.4},{s:630,cu:0.0283,al:0.0469,d:31}];
+  const VCL = [{l:"0.6/1 kV",u:0.6,x:0.7,p:0.8,e:0.7},{l:"3.6/6 kV",u:3.6,x:1.5,p:3.4,e:1.5},{l:"6/10 kV",u:6,x:3.4,p:3.4,e:3.4},{l:"8.7/15 kV",u:8.7,x:4.5,p:null,e:4.5},{l:"12/20 kV",u:12,x:5.5,p:null,e:5.5},{l:"18/30 kV",u:18,x:8.0,p:null,e:8.0}];
+  const CABLE_DB = [
+    {mfr:"IEC/Generic",vc:"6/10 kV",ins:"XLPE",sizes:{50:{De:23},70:{De:25},95:{De:27},120:{De:29},150:{De:31},185:{De:34},240:{De:37},300:{De:40},400:{De:44},500:{De:48},630:{De:53}}},
+    {mfr:"IEC/Generic",vc:"12/20 kV",ins:"XLPE",sizes:{50:{De:27},70:{De:29},95:{De:31},120:{De:33},150:{De:35},185:{De:38},240:{De:41},300:{De:44},400:{De:48},500:{De:52},630:{De:57}}},
+    {mfr:"IEC/Generic",vc:"0.6/1 kV",ins:"XLPE",sizes:{10:{De:8.5},16:{De:9.5},25:{De:11},35:{De:12},50:{De:14},70:{De:16},95:{De:18},120:{De:20},150:{De:22},185:{De:24},240:{De:27},300:{De:30},400:{De:33},500:{De:37},630:{De:42}}},
+    {mfr:"Ducab",vc:"6/10 kV",ins:"XLPE",sizes:{50:{De:23.4},70:{De:25.2},95:{De:27.6},120:{De:29.4},150:{De:31.5},185:{De:34.2},240:{De:37.5},300:{De:40.2},400:{De:44.7},500:{De:48.6},630:{De:54.0}}},
+    {mfr:"Ducab",vc:"12/20 kV",ins:"XLPE",sizes:{50:{De:27.6},70:{De:29.4},95:{De:31.8},120:{De:33.6},150:{De:35.7},185:{De:38.4},240:{De:41.7},300:{De:44.4},400:{De:49.2},500:{De:53.1},630:{De:58.5}}},
+    {mfr:"Elsewedy",vc:"6/10 kV",ins:"XLPE",sizes:{50:{De:23.8},70:{De:25.6},95:{De:28.0},120:{De:29.8},150:{De:31.9},185:{De:34.6},240:{De:37.9},300:{De:40.6},400:{De:45.1},500:{De:49.0},630:{De:54.4}}},
+    {mfr:"Nexans",vc:"6/10 kV",ins:"XLPE",sizes:{50:{De:24.0},70:{De:26.0},95:{De:28.0},120:{De:30.0},150:{De:32.0},185:{De:35.0},240:{De:38.0},300:{De:41.0},400:{De:45.0},500:{De:49.0},630:{De:55.0}}}
+  ];
+  const SOILS = [{id:"backfill",n:"Thermal backfill",hatch:"cross",rho:0.5},{id:"sand",n:"Sand bedding",hatch:"dots",rho:0.8},{id:"native",n:"Native soil",hatch:"none",rho:1.2},{id:"clay",n:"Clay",hatch:"horiz",rho:1.5},{id:"gravel",n:"Gravel",hatch:"circles",rho:2.0},{id:"concrete",n:"Concrete slab",hatch:"diag",rho:1.0},{id:"loam",n:"Loam",hatch:"none",rho:1.0},{id:"rock",n:"Rock/rubble",hatch:"cross",rho:2.5}];
+  const SNAP=10, LW=660, LH=550, FT="system-ui,sans-serif";
+  const IEC_TABLES = [
+    {id:"B2",n:"B.2 — 1c XLPE Cu",ins:"XLPE",mat:"Cu",con:"single"},
+    {id:"B3",n:"B.3 — 1c XLPE Al",ins:"XLPE",mat:"Al",con:"single"},
+    {id:"B4",n:"B.4 — 1c EPR Cu",ins:"EPR",mat:"Cu",con:"single"},
+    {id:"B5",n:"B.5 — 1c EPR Al",ins:"EPR",mat:"Al",con:"single"},
+    {id:"B6",n:"B.6 — 3c XLPE Cu",ins:"XLPE",mat:"Cu",con:"three"},
+    {id:"B7",n:"B.7 — 3c XLPE Al",ins:"XLPE",mat:"Al",con:"three"},
+    {id:"B8",n:"B.8 — 3c EPR Cu",ins:"EPR",mat:"Cu",con:"three"},
+    {id:"B9",n:"B.9 — 3c EPR Al",ins:"EPR",mat:"Al",con:"three"}
+  ];
+  const IEC_REF = {
+    B2:{16:{tr:109,fl:113},25:{tr:140,fl:144},35:{tr:166,fl:172},50:{tr:196,fl:203},70:{tr:239,fl:246},95:{tr:285,fl:293},120:{tr:323,fl:332},150:{tr:361,fl:366},185:{tr:406,fl:410},240:{tr:469,fl:470},300:{tr:526,fl:524},400:{tr:590,fl:572},500:{tr:654,fl:635},630:{tr:745,fl:720}},
+    B3:{16:{tr:85,fl:88},25:{tr:109,fl:113},35:{tr:130,fl:135},50:{tr:154,fl:160},70:{tr:188,fl:194},95:{tr:224,fl:231},120:{tr:254,fl:261},150:{tr:284,fl:288},185:{tr:319,fl:323},240:{tr:369,fl:370},300:{tr:414,fl:413},400:{tr:465,fl:452},500:{tr:516,fl:501},630:{tr:588,fl:569}},
+    B4:{16:{tr:112,fl:116},25:{tr:143,fl:148},35:{tr:170,fl:176},50:{tr:201,fl:208},70:{tr:244,fl:252},95:{tr:291,fl:300},120:{tr:330,fl:340},150:{tr:369,fl:375},185:{tr:414,fl:420},240:{tr:479,fl:482},300:{tr:538,fl:537},400:{tr:603,fl:586}},
+    B5:{16:{tr:87,fl:90},25:{tr:112,fl:116},35:{tr:133,fl:138},50:{tr:158,fl:164},70:{tr:192,fl:199},95:{tr:229,fl:237},120:{tr:260,fl:268},150:{tr:291,fl:296},185:{tr:327,fl:332},240:{tr:378,fl:381},300:{tr:425,fl:424},400:{tr:477,fl:463}},
+    B6:{16:{tr:101},25:{tr:129},35:{tr:153},50:{tr:181},70:{tr:221},95:{tr:262},120:{tr:298},150:{tr:334},185:{tr:377},240:{tr:434},300:{tr:489},400:{tr:553}},
+    B7:{16:{tr:79},25:{tr:101},35:{tr:120},50:{tr:142},70:{tr:174},95:{tr:207},120:{tr:235},150:{tr:263},185:{tr:297},240:{tr:342},300:{tr:386},400:{tr:437}},
+    B8:{16:{tr:103},25:{tr:132},35:{tr:157},50:{tr:185},70:{tr:226},95:{tr:268},120:{tr:305},150:{tr:342},185:{tr:386},240:{tr:445},300:{tr:501},400:{tr:567}},
+    B9:{16:{tr:81},25:{tr:103},35:{tr:123},50:{tr:146},70:{tr:178},95:{tr:212},120:{tr:241},150:{tr:270},185:{tr:305},240:{tr:351},300:{tr:396},400:{tr:449}}
+  };
+  const IEC_B19 = {1:1.00,2:0.80,3:0.70,4:0.64,5:0.60,6:0.56};
+
+  // === STATE ===
+  const S = {
+    zoom:0.45, panX:0, panY:0,
+    trL:0, trR:800, trD:1400,
+    layers:[{from:0,to:600,soilIdx:0,rho:0.5,temp:20},{from:600,to:750,soilIdx:1,rho:0.8,temp:22},{from:750,to:1400,soilIdx:2,rho:1.2,temp:25}],
+    freq:50,
+    cables:[
+      {id:1,type:"power",x:170,y:700,mat:"Cu",ins:"XLPE",size:240,con:"single",vc:"6/10 kV",screen:true,maxT:90,Iw:200,label:"P1"},
+      {id:2,type:"power",x:300,y:700,mat:"Cu",ins:"XLPE",size:240,con:"single",vc:"6/10 kV",screen:true,maxT:90,Iw:200,label:"P2"},
+      {id:3,type:"power",x:430,y:700,mat:"Cu",ins:"XLPE",size:240,con:"single",vc:"6/10 kV",screen:true,maxT:90,Iw:200,label:"P3"},
+      {id:4,type:"power",x:170,y:1000,mat:"Cu",ins:"XLPE",size:240,con:"single",vc:"6/10 kV",screen:true,maxT:90,Iw:200,label:"P4"},
+      {id:5,type:"power",x:300,y:1000,mat:"Cu",ins:"XLPE",size:240,con:"single",vc:"6/10 kV",screen:true,maxT:90,Iw:200,label:"P5"},
+      {id:6,type:"power",x:430,y:1000,mat:"Cu",ins:"XLPE",size:240,con:"single",vc:"6/10 kV",screen:true,maxT:90,Iw:200,label:"P6"},
+      {id:7,type:"control",x:580,y:850,mat:"Cu",ins:"PVC",size:10,con:"single",vc:"0.6/1 kV",screen:false,maxT:70,label:"Ctrl"},
+      {id:8,type:"optical",x:640,y:850,mat:"Cu",ins:"XLPE",size:10,con:"single",vc:"0.6/1 kV",screen:false,maxT:70,label:"FO"}
+    ],
+    nid:9, sel:[], selLayer:-1,
+    mode:"idle", mRef:null, selRect:null,
+    result:null, viewTab:"section",
+    iecTable:"B2", iecArrange:"trefoil", iecDepth:800, iecRhoN:1.5, iecEnvT:20,
+    iecSize:240, iecVc:"6/10 kV", iecCircuits:1, iecSpacing:0
+  };
+
+  // === GEOMETRY ===
+  function getDe(c){
+    if(c.type==="optical") return 14;
+    if(c.type==="control") return 16;
+    for(let di=0;di<CABLE_DB.length;di++){
+      const db=CABLE_DB[di];
+      if(db.vc===c.vc && db.ins===c.ins && db.sizes[c.size]) return db.sizes[c.size].De;
+    }
+    const sd = SZ.find(x=>x.s===c.size); if(!sd) return 30;
+    const dc = sd.d;
+    const v = VCL.find(x=>x.l===c.vc);
+    const ik = c.ins==="XLPE"?"x":c.ins==="PVC"?"p":"e";
+    let ti = v?v[ik]:2; if(!ti) ti=2;
+    let cur = dc + 2*0.8 + 2*ti + 2*0.8 + 2*1.0 + 2*0.8 + 2*2.0;
+    if(c.con==="three") cur = 2.155*(dc + 2*0.8 + 2*ti) + 2*0.8 + 2*1.0 + 2*0.8 + 2*2.5;
+    return cur;
+  }
+  function getGeom(c){
+    if(c.type==="optical") return {De:0.014, dc:0, r20:0, U0:0, ti:0, Di:0};
+    if(c.type==="control") return {De:0.016, dc:0.003, r20:0.00461, U0:0.6, ti:0.001, Di:0.005};
+    const sd = SZ.find(x=>x.s===c.size); if(!sd) return null;
+    const dc = sd.d/1000;
+    const r20 = (c.mat==="Cu"?sd.cu:sd.al)/1000;
+    const v = VCL.find(x=>x.l===c.vc); if(!v) return null;
+    const ik = c.ins==="XLPE"?"x":c.ins==="PVC"?"p":"e";
+    const ti_mm = v[ik]; if(!ti_mm) return null;
+    const ti = ti_mm/1000;
+    const Di = dc + 2*0.0008 + 2*ti;
+    const De_mm = getDe(c);
+    return {dc, ti, Di, De:De_mm/1000, r20, U0:v.u};
+  }
+
+  // === SOLVER ===
+  function solve(){
+    const cables = S.cables;
+    const layers = S.layers;
+    const trenchW = effW(); const trenchD = effD();
+    const power = cables.filter(c=>c.type==="power");
+    const freq = S.freq||50;
+    function getEnv(depth){
+      for(let i=0;i<layers.length;i++){
+        if(depth>=layers[i].from && depth<layers[i].to) return {rho:layers[i].rho, T:layers[i].temp!=null?layers[i].temp:25};
+      }
+      return {rho:1, T:25};
+    }
+    const trArea = trenchW/1000 * trenchD/1000;
+    const rbf = Math.sqrt(Math.max(0.01,trArea)/Math.PI);
+    function getBackfillRho(){let sum=0,tot=0; for(let i=0;i<layers.length;i++){const h=(layers[i].to-layers[i].from)/1000; sum+=layers[i].rho*h; tot+=h;} return tot>0?sum/tot:1;}
+    function getNativeRho(){return layers.length>0?layers[layers.length-1].rho:1.2;}
+    const rho_bf = getBackfillRho();
+    const rho_nat = getNativeRho();
+
+    function single(cable, iso){
+      const g = getGeom(cable); if(!g||!g.dc) return {I:0};
+      const m = MAT[cable.mat];
+      const ins2 = INS_D[cable.ins];
+      const maxTc = cable.maxT||ins2.mt;
+      const T1 = (ins2.rt/(2*Math.PI)) * Math.log(1 + 2*g.ti/g.dc);
+      const T3 = (3.5/(2*Math.PI)) * Math.log(1 + 0.005/Math.max(0.001, g.De-0.005));
+      let Wd = 0;
+      if(g.U0>1){
+        const Cap = 2*Math.PI*8.854e-12*ins2.ep / Math.log(g.Di/g.dc);
+        Wd = 2*Math.PI*freq*Cap * g.U0*1000 * g.U0*1000 * ins2.td;
+      }
+      const n = cable.con==="three" ? 3 : 1;
+      let Ip=0;
+      const ce = getEnv(cable.y);
+      // Screen loss lambda1 (IEC 60287-1-1 §2.3.1, both-ends bonded)
+      let lambda1 = 0;
+      if(cable.screen){
+        const scrA = 16e-6;
+        const Rs = 1/(58e6*scrA) * (1 + 0.00393*(maxTc-20));
+        const ds_m = Math.max(0.01, g.De-0.004);
+        let sMin = 1e9;
+        for(let jk=0;jk<cables.length;jk++){
+          if(cables[jk]===cable||cables[jk].type!=="power") continue;
+          const dx2=(cable.x-cables[jk].x)/1000, dy2=(cable.y-cables[jk].y)/1000;
+          const dd2 = Math.sqrt(dx2*dx2+dy2*dy2);
+          if(dd2>0.001 && dd2<sMin) sMin = dd2;
+        }
+        if(sMin<10){
+          const Xs = 2 * 2*Math.PI*freq * 1e-7 * Math.log(2*sMin/ds_m);
+          if(Xs>1e-9){
+            const Rac0 = g.r20 * (1 + m.a*(maxTc-20));
+            lambda1 = (Rs/Rac0) / (1 + Math.pow(Rs/Xs, 2));
+            lambda1 = Math.min(lambda1, 1);
+          }
+        }
+      }
+      for(let it=0;it<120;it++){
+        const Rdc = g.r20 * (1 + m.a*(maxTc-20));
+        const xs2 = 8*Math.PI*freq*1e-7/Rdc;
+        const xs4 = xs2*xs2;
+        const ys = xs4/(192 + 0.8*xs4);
+        let snn = 1e9;
+        if(!iso) for(let j=0;j<cables.length;j++){
+          if(cables[j]===cable||cables[j].type!=="power") continue;
+          const ddx=(cable.x-cables[j].x)/1000, ddy=(cable.y-cables[j].y)/1000;
+          const dd = Math.sqrt(ddx*ddx+ddy*ddy);
+          if(dd<snn && dd>0) snn = dd;
+        }
+        const F2 = xs4/(192+0.8*xs4);
+        const dr = snn>0 ? g.dc/snn : 0;
+        const yp = F2*dr*dr*(0.312*dr*dr + 1.18/(F2+0.27));
+        const Rac = Rdc*(1 + ys + yp);
+        const cy = cable.y/1000;
+        let T4s;
+        if(rbf > g.De/2 && rbf < cy){
+          T4s = (1/(2*Math.PI))*(rho_bf*Math.log(rbf/(g.De/2)) + rho_nat*Math.log(2*cy/rbf));
+        } else {
+          T4s = (rho_nat/(2*Math.PI))*Math.log(2*cy/Math.max(0.01, g.De/2));
+        }
+        let T4m = 0;
+        if(!iso) for(let jj=0;jj<cables.length;jj++){
+          if(cables[jj]===cable||cables[jj].type!=="power") continue;
+          const dx = cable.x/1000 - cables[jj].x/1000;
+          const d1y = cy - cables[jj].y/1000;
+          const d2y = cy + cables[jj].y/1000;
+          const dd1 = Math.sqrt(dx*dx + d1y*d1y);
+          const dd2 = Math.sqrt(dx*dx + d2y*d2y);
+          if(dd1>1e-6) T4m += (rho_nat/(2*Math.PI))*Math.log(dd2/dd1);
+        }
+        const T4 = T4s + T4m;
+        const Tt = n===3 ? T1 + n*(1+lambda1)*(T3+T4) : T1 + (1+lambda1)*(T3+T4);
+        const dTd = Wd*(0.5*T1 + n*(1+lambda1)*(T3+T4));
+        const dT = maxTc - ce.T - dTd;
+        if(dT<=0) return {I:0,T4,T4s,T4m,Rac,Tt,T1,T3,Wd,n,rho:rho_nat,rho_bf,envT:ce.T,conv:false};
+        const I = Math.sqrt(dT/(Rac*Tt));
+        if(Math.abs(I-Ip)<0.05 && it>0){
+          cable._W = I*I*Rac*n + Wd*n;
+          return {I,T4,T4s,T4m,Rac,Tt,T1,T3,Wd,n,rho:rho_nat,rho_bf,envT:ce.T,lambda1,conv:true,its:it+1};
+        }
+        Ip = I;
+      }
+      return {I:Ip, conv:false};
+    }
+    let gr=[];
+    for(let p=0;p<3;p++) gr = power.map(c=>single(c,false));
+    const iso = power.map(c=>single(c,true));
+    let Imin = 1e9;
+    for(let ci0=0;ci0<power.length;ci0++){const ri0=gr[ci0]; if(ri0&&ri0.conv&&ri0.I<Imin) Imin=ri0.I;}
+    for(let ci=0;ci<power.length;ci++){
+      const cab = power[ci]; const ri = gr[ci];
+      if(!ri||!ri.conv) continue;
+      const ce = getEnv(cab.y);
+      const dTd = ri.Wd*(0.5*ri.T1 + ri.n*(ri.T3+ri.T4));
+      const dTi = (cab.maxT||90) - ce.T - dTd;
+      const Iw = (cab.Iw!=null && cab.Iw>0) ? cab.Iw : Imin;
+      const ratio = Iw/ri.I;
+      ri.Tc = ce.T + ratio*ratio*dTi + dTd;
+      ri.TcWork = ri.Tc;
+      ri.Icircuit = Imin;
+      cab._Wwork = ratio*ratio*ri.I*ri.I*ri.Rac*ri.n + ri.Wd*ri.n;
+    }
+    return {gr, iso, pw:power};
+  }
+
+  // === GEOMETRY HELPERS for canvas ===
+  function sn(v){return Math.round(v/SNAP)*SNAP;}
+  function effL(){let x=9999; S.cables.forEach(c=>{const r=getDe(c)/2; if(c.x-r<x) x=c.x-r;}); return Math.min(S.trL, Math.round(x)-20);}
+  function effR(){let x=0; S.cables.forEach(c=>{const r=getDe(c)/2; if(c.x+r>x) x=c.x+r;}); return Math.max(S.trR, Math.round(x)+20);}
+  function effD(){let y=0; S.cables.forEach(c=>{const r=getDe(c)/2; if(c.y+r>y) y=c.y+r;}); return Math.max(S.trD, Math.round(y)+30);}
+  function effW(){return effR()-effL();}
+  const ML=90, MT=50;
+  function m2x(mm){return ML + S.panX + (mm-effL())*S.zoom;}
+  function m2y(mm){return MT + S.panY + mm*S.zoom;}
+  function p2mx(px){return effL() + (px-ML-S.panX)/S.zoom;}
+  function p2my(py){return (py-MT-S.panY)/S.zoom;}
+  function clampC(c){const r=getDe(c)/2; return Object.assign({},c,{x:Math.max(effL()+r+5, Math.min(effR()-r-5, c.x)), y:Math.max(r+5, Math.min(effD()-r-5, c.y))});}
+
+  // === HATCH ===
+  function drawHatch(ctx,type,x,y,w,h){
+    if(type==="none"||!type||w<=0||h<=0) return;
+    ctx.save(); ctx.beginPath(); ctx.rect(x,y,w,h); ctx.clip(); ctx.lineWidth=0.8;
+    if(type==="cross"){
+      ctx.strokeStyle="rgba(0,0,0,0.13)";
+      for(let i=x-h;i<x+w+h;i+=10){ctx.beginPath();ctx.moveTo(i,y);ctx.lineTo(i+h,y+h);ctx.stroke();}
+      for(let i2=x-h;i2<x+w+h;i2+=10){ctx.beginPath();ctx.moveTo(i2+h,y);ctx.lineTo(i2,y+h);ctx.stroke();}
+    } else if(type==="diag"){
+      ctx.strokeStyle="rgba(0,0,0,0.13)";
+      for(let j=x-h;j<x+w+h;j+=8){ctx.beginPath();ctx.moveTo(j,y);ctx.lineTo(j+h,y+h);ctx.stroke();}
+    } else if(type==="horiz"){
+      ctx.strokeStyle="rgba(0,0,0,0.1)";
+      for(let k=y+5;k<y+h;k+=5){ctx.beginPath();ctx.moveTo(x,k);ctx.lineTo(x+w,k);ctx.stroke();}
+    } else if(type==="dots"){
+      ctx.fillStyle="rgba(0,0,0,0.12)";
+      for(let dy2=y+4;dy2<y+h;dy2+=8) for(let dx2=x+4;dx2<x+w;dx2+=8){ctx.beginPath();ctx.arc(dx2+(dy2%16<8?0:4),dy2,1.2,0,6.28);ctx.fill();}
+    } else if(type==="circles"){
+      ctx.strokeStyle="rgba(0,0,0,0.1)";
+      for(let cy2=y+7;cy2<y+h;cy2+=14) for(let cx2=x+7;cx2<x+w;cx2+=14){ctx.beginPath();ctx.arc(cx2,cy2,4,0,6.28);ctx.stroke();}
+    }
+    ctx.restore();
+  }
+
+  // === DRAW ===
+  let cvRef=null;
+  function draw(){
+    const cv = cvRef; if(!cv) return;
+    const dpr = window.devicePixelRatio||1;
+    cv.width = LW*dpr; cv.height = LH*dpr;
+    cv.style.width = LW+"px"; cv.style.height = LH+"px";
+    const ctx = cv.getContext("2d"); ctx.scale(dpr,dpr);
+    ctx.fillStyle="#f7f7f5"; ctx.fillRect(0,0,LW,LH);
+    const eL=effL(), eR=effR(), eD=effD(), eW=effW();
+    const surfPx=m2y(0), botPx=m2y(eD), wlPx=m2x(eL), wrPx=m2x(eR);
+    if(surfPx<LH){ctx.fillStyle="#d8d0bc"; ctx.fillRect(0, Math.max(0,surfPx), LW, LH);}
+    if(surfPx>-20 && surfPx<LH+20){ctx.strokeStyle="#555"; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(0,surfPx); ctx.lineTo(LW,surfPx); ctx.stroke();}
+    ctx.fillStyle="#fff"; ctx.fillRect(wlPx,surfPx,wrPx-wlPx,botPx-surfPx);
+    S.layers.forEach((ly,li)=>{
+      const soil = SOILS[ly.soilIdx]||SOILS[2];
+      const y1=m2y(ly.from), y2=m2y(Math.min(ly.to,eD));
+      drawHatch(ctx,soil.hatch,wlPx,y1,wrPx-wlPx,y2-y1);
+      if(li===S.selLayer){ctx.fillStyle="rgba(0,100,200,0.07)"; ctx.fillRect(wlPx,y1,wrPx-wlPx,y2-y1); ctx.strokeStyle="#06c"; ctx.lineWidth=1.5; ctx.strokeRect(wlPx+1,y1+1,wrPx-wlPx-2,y2-y1-2);}
+    });
+    for(let li=1;li<S.layers.length;li++){
+      const by=m2y(S.layers[li].from);
+      ctx.strokeStyle = (S.selLayer===li||S.selLayer===li-1) ? "#06c" : "#777";
+      ctx.lineWidth=0.8; ctx.setLineDash([5,3]);
+      ctx.beginPath(); ctx.moveTo(wlPx,by); ctx.lineTo(wrPx,by); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    ctx.strokeStyle="#333"; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(wlPx,surfPx); ctx.lineTo(wlPx,botPx); ctx.lineTo(wrPx,botPx); ctx.lineTo(wrPx,surfPx); ctx.stroke();
+    const wmY=(surfPx+botPx)/2;
+    ctx.fillStyle = S.mode==="wallL"?"#c00":"#555"; ctx.fillRect(wlPx+1,wmY-4,5,8);
+    ctx.fillStyle = S.mode==="wallR"?"#c00":"#555"; ctx.fillRect(wrPx-6,wmY-4,5,8);
+    ctx.fillStyle = S.mode==="wallB"?"#c00":"#555"; ctx.fillRect((wlPx+wrPx)/2-4,botPx-6,8,5);
+
+    // LEFT scale
+    const lsX=wlPx-20;
+    ctx.strokeStyle="#333"; ctx.lineWidth=0.6;
+    ctx.beginPath(); ctx.moveTo(lsX,surfPx); ctx.lineTo(lsX,botPx); ctx.stroke();
+    ctx.lineWidth=0.8;
+    const dy0=m2y(0); ctx.beginPath(); ctx.moveTo(lsX,dy0); ctx.lineTo(lsX+10,dy0); ctx.stroke();
+    ctx.font="12px "+FT; ctx.fillStyle="#111"; ctx.textAlign="right"; ctx.fillText("0", lsX-4, dy0+5);
+    const dyE=m2y(eD); ctx.beginPath(); ctx.moveTo(lsX,dyE); ctx.lineTo(lsX+10,dyE); ctx.stroke(); ctx.fillText(eD+"", lsX-4, dyE+5);
+    for(let d=50;d<eD;d+=50){
+      const dy=m2y(d); if(dy<surfPx+4||dy>botPx-4) continue;
+      const isMaj=d%200===0, isMid=!isMaj && d%100===0;
+      ctx.strokeStyle="#333"; ctx.lineWidth=isMaj?0.8:0.3;
+      ctx.beginPath(); ctx.moveTo(lsX,dy); ctx.lineTo(lsX+(isMaj?10:isMid?7:4),dy); ctx.stroke();
+      if(isMaj){ctx.font="12px "+FT; ctx.fillStyle="#111"; ctx.textAlign="right"; ctx.fillText(d+"", lsX-4, dy+5);}
+      else if(isMid){ctx.font="9px "+FT; ctx.fillStyle="#999"; ctx.textAlign="right"; ctx.fillText(d+"", lsX-3, dy+4);}
+    }
+    // RIGHT cable depth ticks
+    const rsX=wrPx+20;
+    ctx.strokeStyle="rgba(200,0,0,0.3)"; ctx.lineWidth=0.4;
+    ctx.beginPath(); ctx.moveTo(rsX,surfPx); ctx.lineTo(rsX,botPx); ctx.stroke();
+    const yRows={}; S.cables.forEach(cc=>{yRows[cc.y+""]=cc.y;});
+    Object.keys(yRows).forEach(yk=>{
+      const yy=m2y(yRows[yk]);
+      ctx.strokeStyle="#c00"; ctx.lineWidth=1.2;
+      ctx.beginPath(); ctx.moveTo(rsX-4,yy); ctx.lineTo(rsX+8,yy); ctx.stroke();
+      ctx.font="bold 12px "+FT; ctx.fillStyle="#c00"; ctx.textAlign="left";
+      ctx.fillText(yRows[yk]+"", rsX+10, yy+5);
+    });
+    // TOP scale
+    const tsY=surfPx-20;
+    ctx.strokeStyle="#333"; ctx.lineWidth=0.6;
+    ctx.beginPath(); ctx.moveTo(wlPx,tsY); ctx.lineTo(wrPx,tsY); ctx.stroke();
+    ctx.lineWidth=0.8;
+    const hx0=m2x(eL); ctx.beginPath(); ctx.moveTo(hx0,tsY); ctx.lineTo(hx0,tsY-10); ctx.stroke();
+    ctx.font="12px "+FT; ctx.fillStyle="#111"; ctx.textAlign="center"; ctx.fillText("0", hx0, tsY-13);
+    const hxE=m2x(eR); ctx.beginPath(); ctx.moveTo(hxE,tsY); ctx.lineTo(hxE,tsY-10); ctx.stroke(); ctx.fillText(eW+"", hxE, tsY-13);
+    for(let hx=50;hx<eW;hx+=50){
+      const hpx=m2x(eL+hx); if(hpx<wlPx+8||hpx>wrPx-8) continue;
+      const hMaj=hx%200===0, hMid=!hMaj && hx%100===0;
+      ctx.strokeStyle="#333"; ctx.lineWidth=hMaj?0.8:0.3;
+      ctx.beginPath(); ctx.moveTo(hpx,tsY); ctx.lineTo(hpx,tsY-(hMaj?10:hMid?7:4)); ctx.stroke();
+      if(hMaj){ctx.font="12px "+FT; ctx.fillStyle="#111"; ctx.textAlign="center"; ctx.fillText(hx+"", hpx, tsY-13);}
+      else if(hMid){ctx.font="9px "+FT; ctx.fillStyle="#999"; ctx.textAlign="center"; ctx.fillText(hx+"", hpx, tsY-12);}
+    }
+    // BOTTOM red distance chain
+    const bsY=botPx+20;
+    ctx.strokeStyle="rgba(200,0,0,0.4)"; ctx.lineWidth=0.5;
+    ctx.beginPath(); ctx.moveTo(wlPx,bsY); ctx.lineTo(wrPx,bsY); ctx.stroke();
+    const xPts=[eL]; const uxs=[];
+    S.cables.forEach(cc=>{if(uxs.indexOf(cc.x)<0) uxs.push(cc.x);});
+    uxs.sort((a,b)=>a-b); uxs.forEach(xv=>xPts.push(xv)); xPts.push(eR);
+    ctx.font="bold 12px "+FT;
+    for(let pi=0;pi<xPts.length;pi++){
+      const xx=m2x(xPts[pi]);
+      if(pi>0 && pi<xPts.length-1){ctx.strokeStyle="#c00"; ctx.lineWidth=1.2; ctx.beginPath(); ctx.moveTo(xx,bsY-4); ctx.lineTo(xx,bsY+6); ctx.stroke();}
+      if(pi>0){
+        const x1=m2x(xPts[pi-1]), x2=xx;
+        const dist=Math.round(xPts[pi]-xPts[pi-1]);
+        if(dist>0 && x2-x1>14){ctx.fillStyle="#c00"; ctx.textAlign="center"; ctx.fillText(dist+"", (x1+x2)/2, bsY+18);}
+      }
+    }
+    // Projections
+    S.cables.forEach(cc=>{
+      const px=m2x(cc.x), py=m2y(cc.y);
+      ctx.strokeStyle="rgba(200,0,0,0.3)"; ctx.lineWidth=0.7; ctx.setLineDash([3,3]);
+      ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(px,bsY); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(px,tsY); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(rsX,py); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(lsX,py); ctx.stroke();
+      ctx.setLineDash([]);
+    });
+
+    // HEATMAP
+    if(S.result){
+      const hSrcs=[]; S.cables.forEach(cc=>{const w=cc._Wwork||cc._W; if(w&&w>0) hSrcs.push({x:cc.x,y:cc.y,W:w});});
+      if(hSrcs.length>0){
+        let baseT=0, totH=0;
+        S.layers.forEach(ly=>{const h=ly.to-ly.from; baseT+=(ly.temp||25)*h; totH+=h;});
+        baseT = totH>0 ? baseT/totH : 25;
+        let avgRho=0; S.layers.forEach(ly=>{const h=ly.to-ly.from; avgRho+=ly.rho*h;});
+        avgRho = totH>0 ? avgRho/totH : 1;
+        const hRes=40, vRes=30;
+        let tMin=baseT, tMax=baseT;
+        const tGrid=[];
+        for(let hy=0;hy<vRes;hy++){
+          tGrid[hy]=[];
+          for(let hx2=0;hx2<hRes;hx2++){
+            const gx=eL+(hx2+0.5)/hRes*eW;
+            const gy=(hy+0.5)/vRes*eD;
+            let dTt=0;
+            for(let si=0;si<hSrcs.length;si++){
+              const s=hSrcs[si];
+              const ddx=(gx-s.x)/1000, ddy=(gy-s.y)/1000;
+              const d2=ddx*ddx+ddy*ddy;
+              const dix=ddx, diy=(gy+s.y)/1000;
+              const di2=dix*dix+diy*diy;
+              if(d2>0.0001 && di2>0) dTt += s.W*avgRho/(4*Math.PI)*Math.log(di2/d2);
+            }
+            const T=baseT+dTt; tGrid[hy][hx2]=T;
+            if(T>tMax) tMax=T; if(T<tMin) tMin=T;
+          }
+        }
+        const tRange=Math.max(1, tMax-tMin);
+        ctx.save(); ctx.beginPath(); ctx.rect(wlPx,surfPx,wrPx-wlPx,botPx-surfPx); ctx.clip();
+        for(let hy2=0;hy2<vRes;hy2++) for(let hx3=0;hx3<hRes;hx3++){
+          const T2=tGrid[hy2][hx3];
+          const ratio=Math.max(0,Math.min(1,(T2-tMin)/tRange));
+          let rr2,gg2,bb2;
+          if(ratio<0.25){rr2=0; gg2=Math.round(ratio*4*255); bb2=Math.round(255*(1-ratio*2));}
+          else if(ratio<0.5){rr2=Math.round((ratio-0.25)*4*255); gg2=255; bb2=0;}
+          else if(ratio<0.75){rr2=255; gg2=Math.round(255*(1-(ratio-0.5)*4)); bb2=0;}
+          else{rr2=255; gg2=0; bb2=Math.round((ratio-0.75)*4*100);}
+          ctx.fillStyle="rgba("+rr2+","+gg2+","+bb2+",0.3)";
+          const cx2=wlPx+hx3/hRes*(wrPx-wlPx), cy3=surfPx+hy2/vRes*(botPx-surfPx);
+          ctx.fillRect(cx2, cy3, (wrPx-wlPx)/hRes+1, (botPx-surfPx)/vRes+1);
+        }
+        ctx.restore();
+        // bar
+        const scBarX=rsX+50, scBarY=surfPx+10, scBarH=Math.min(200, botPx-surfPx-20), scBarW=12;
+        for(let si2=0;si2<scBarH;si2++){
+          const r3=1-si2/scBarH;
+          let rr3,gg3,bb3;
+          if(r3<0.25){rr3=0; gg3=Math.round(r3*4*255); bb3=Math.round(255*(1-r3*2));}
+          else if(r3<0.5){rr3=Math.round((r3-0.25)*4*255); gg3=255; bb3=0;}
+          else if(r3<0.75){rr3=255; gg3=Math.round(255*(1-(r3-0.5)*4)); bb3=0;}
+          else{rr3=255; gg3=0; bb3=Math.round((r3-0.75)*4*100);}
+          ctx.fillStyle="rgb("+rr3+","+gg3+","+bb3+")";
+          ctx.fillRect(scBarX, scBarY+si2, scBarW, 1);
+        }
+        ctx.strokeStyle="#333"; ctx.lineWidth=0.5; ctx.strokeRect(scBarX,scBarY,scBarW,scBarH);
+        ctx.font="10px "+FT; ctx.fillStyle="#222"; ctx.textAlign="left";
+        ctx.fillText(tMax.toFixed(1)+"°C", scBarX+scBarW+4, scBarY+5);
+        ctx.fillText(((tMax+tMin)/2).toFixed(1)+"°", scBarX+scBarW+4, scBarY+scBarH/2+3);
+        ctx.fillText(tMin.toFixed(1)+"°C", scBarX+scBarW+4, scBarY+scBarH+3);
+      }
+    }
+
+    // Cables
+    const cPx=[];
+    S.cables.forEach(cc=>{
+      const px=m2x(cc.x), py=m2y(cc.y), de=getDe(cc), rr=Math.max(3, de/2*S.zoom);
+      const col = cc.type==="power" ? "#d97706" : cc.type==="control" ? "#5b5fc7" : "#0ea5c0";
+      const isSel = S.sel.indexOf(cc.id)>=0;
+      cPx.push({px,py,rr,id:cc.id});
+      if(isSel){ctx.beginPath(); ctx.arc(px,py,rr+3,0,6.28); ctx.strokeStyle="#c00"; ctx.lineWidth=1.5; ctx.setLineDash([4,2]); ctx.stroke(); ctx.setLineDash([]);}
+      ctx.beginPath(); ctx.arc(px,py,rr,0,6.28); ctx.fillStyle="#505050"; ctx.fill(); ctx.strokeStyle="#222"; ctx.lineWidth=1; ctx.stroke();
+      if(cc.screen && rr>4){ctx.beginPath(); ctx.arc(px,py,rr*0.88,0,6.28); ctx.strokeStyle="#999"; ctx.lineWidth=0.7; ctx.stroke();}
+      ctx.beginPath(); ctx.arc(px,py,rr*0.78,0,6.28); ctx.fillStyle=col; ctx.fill();
+      if(cc.type!=="optical"){ctx.beginPath(); ctx.arc(px,py,rr*0.35,0,6.28); ctx.fillStyle = cc.mat==="Cu" ? "#c87030" : "#b0b0b0"; ctx.fill();}
+    });
+
+    // LABELS
+    const allL=[];
+    S.cables.forEach((cc,ci)=>{
+      const cp=cPx[ci]; if(cp.rr<2) return;
+      const ln=[cc.label];
+      if(S.result && cc.type==="power"){
+        const pi2=S.result.pw.indexOf(cc);
+        if(pi2>=0 && S.result.gr[pi2] && S.result.gr[pi2].I>0){
+          const ri=S.result.gr[pi2];
+          ln.push(ri.I.toFixed(0)+"A");
+          ln.push(ri.Tc.toFixed(1)+"°C");
+        }
+      }
+      allL.push({ln, px:cp.px, py:cp.py, rr:cp.rr, yMm:cc.y, xMm:cc.x});
+    });
+    if(allL.length>0){
+      allL.sort((a,b)=>a.yMm-b.yMm||a.px-b.px);
+      const rows=[]; let curRow=[allL[0]];
+      for(let ri2=1;ri2<allL.length;ri2++){
+        if(Math.abs(allL[ri2].yMm-curRow[0].yMm)<15) curRow.push(allL[ri2]);
+        else {rows.push(curRow); curRow=[allL[ri2]];}
+      }
+      rows.push(curRow);
+      const rowCenters=[]; rows.forEach(r=>{let sy=0; r.forEach(lb=>{sy+=lb.py;}); rowCenters.push(sy/r.length);});
+      const rowDirs=[];
+      if(rows.length===1) rowDirs.push(1);
+      else for(let rdi=0;rdi<rows.length;rdi++){
+        let isTop=true; for(let rdj=0;rdj<rows.length;rdj++) if(rdj!==rdi && rowCenters[rdj]<rowCenters[rdi]-5) isTop=false;
+        rowDirs.push(isTop?1:-1);
+      }
+      const fsz=10; ctx.font="bold "+fsz+"px "+FT; const lh=fsz+2;
+      allL.forEach(lb=>{let mw=0; lb.ln.forEach(l=>{const w=ctx.measureText(l).width; if(w>mw) mw=w;}); lb.tw=mw+4; lb.th=lb.ln.length*lh+2; lb.lh=lh; lb.fsz=fsz;});
+      const placedBoxes=[];
+      cPx.forEach(c=>{placedBoxes.push({x:c.px-c.rr-1, y:c.py-c.rr-1, w:c.rr*2+2, h:c.rr*2+2});});
+      function boxHit(bx,by,bw,bh){for(let k=0;k<placedBoxes.length;k++){const p=placedBoxes[k]; if(bx<p.x+p.w && bx+bw>p.x && by<p.y+p.h && by+bh>p.y) return true;} return false;}
+      rows.forEach((row,ridx)=>{
+        const dir=rowDirs[ridx];
+        row.sort((a,b)=>a.px-b.px);
+        row.forEach(lb=>{
+          const tw=lb.tw, th=lb.th;
+          for(let tryLen=lb.rr+4; tryLen<lb.rr+200; tryLen+=4){
+            const bx=lb.px-tw/2;
+            const by = dir>0 ? (lb.py-tryLen-th) : (lb.py+tryLen);
+            if(!boxHit(bx,by,tw,th)){
+              lb.bx=bx; lb.by=by;
+              lb.leaderEnd = dir>0 ? (lb.py-tryLen) : (lb.py+tryLen);
+              lb.dir=dir;
+              placedBoxes.push({x:bx, y:by, w:tw, h:th});
+              break;
+            }
+          }
+          if(!lb.bx){lb.bx=lb.px-tw/2; lb.by = dir>0?(lb.py-lb.rr-4-th):(lb.py+lb.rr+4); lb.leaderEnd=lb.by+(dir>0?th:0); lb.dir=dir;}
+        });
+      });
+      allL.forEach(lb=>{
+        if(!lb.bx) return;
+        const leaderStart = lb.py + (lb.dir>0?-lb.rr:lb.rr);
+        ctx.strokeStyle="rgba(160,40,0,0.5)"; ctx.lineWidth=0.7;
+        ctx.beginPath(); ctx.moveTo(lb.px, leaderStart); ctx.lineTo(lb.px, lb.leaderEnd); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(lb.px-2, leaderStart); ctx.lineTo(lb.px+2, leaderStart); ctx.stroke();
+        const ty=lb.by;
+        lb.ln.forEach((line,li)=>{
+          if(li===0){ctx.font="bold "+lb.fsz+"px "+FT; ctx.fillStyle="#333";}
+          else if(li===1){ctx.font="bold "+(lb.fsz+1)+"px "+FT; ctx.fillStyle="#c00";}
+          else{ctx.font=(lb.fsz-1)+"px "+FT; ctx.fillStyle="#b45000";}
+          ctx.textAlign="center"; ctx.fillText(line, lb.px, ty+(li+1)*lb.lh);
+        });
+      });
+    }
+
+    // Drag dims
+    if(S.mode==="drag" && S.sel.length>0){
+      const dc2=S.cables.find(c=>c.id===S.sel[0]);
+      if(dc2){
+        const dpx=m2x(dc2.x), dpy=m2y(dc2.y);
+        ctx.strokeStyle="rgba(200,0,0,0.3)"; ctx.lineWidth=0.5; ctx.setLineDash([2,3]);
+        ctx.beginPath(); ctx.moveTo(dpx,surfPx); ctx.lineTo(dpx,botPx); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(wlPx,dpy); ctx.lineTo(wrPx,dpy); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.font="bold 10px "+FT; ctx.fillStyle="#c00"; ctx.textAlign="center";
+        ctx.fillText(Math.round(dc2.x), (wlPx+dpx)/2, dpy-5);
+        ctx.fillText(Math.round(eW-dc2.x), (dpx+wrPx)/2, dpy-5);
+        let nL=null,nR=null,nU=null,nD=null;
+        S.cables.forEach(c2=>{
+          if(S.sel.indexOf(c2.id)>=0) return;
+          const dx2=c2.x-dc2.x, dy2=c2.y-dc2.y;
+          if(Math.abs(dy2)<80){if(dx2<0&&(!nL||c2.x>nL.x)) nL=c2; if(dx2>0&&(!nR||c2.x<nR.x)) nR=c2;}
+          if(Math.abs(dx2)<80){if(dy2<0&&(!nU||c2.y>nU.y)) nU=c2; if(dy2>0&&(!nD||c2.y<nD.y)) nD=c2;}
+        });
+        if(nL) ctx.fillText(Math.abs(dc2.x-nL.x)+"", (m2x(nL.x)+dpx)/2, dpy-5);
+        if(nR) ctx.fillText(Math.abs(nR.x-dc2.x)+"", (dpx+m2x(nR.x))/2, dpy-5);
+        if(nU){ctx.save(); ctx.translate(dpx+12,(m2y(nU.y)+dpy)/2); ctx.rotate(-Math.PI/2); ctx.textAlign="center"; ctx.fillText(Math.abs(dc2.y-nU.y)+"", 0, 0); ctx.restore();}
+        if(nD){ctx.save(); ctx.translate(dpx+12,(dpy+m2y(nD.y))/2); ctx.rotate(-Math.PI/2); ctx.textAlign="center"; ctx.fillText(Math.abs(nD.y-dc2.y)+"", 0, 0); ctx.restore();}
+      }
+    }
+    if(S.selRect){ctx.strokeStyle="#06c"; ctx.lineWidth=1; ctx.setLineDash([4,2]); ctx.strokeRect(S.selRect.x,S.selRect.y,S.selRect.w,S.selRect.h); ctx.fillStyle="rgba(0,100,200,0.06)"; ctx.fillRect(S.selRect.x,S.selRect.y,S.selRect.w,S.selRect.h); ctx.setLineDash([]);}
+  }
+
+  // === EVENTS ===
+  function cxy(e){const cv=cvRef; if(!cv) return {cx:0,cy:0}; const r=cv.getBoundingClientRect(); return {cx:(e.clientX-r.left)/r.width*LW, cy:(e.clientY-r.top)/r.height*LH};}
+  function onDown(e){
+    e.preventDefault();
+    const p=cxy(e);
+    const mx=p2mx(p.cx), my=p2my(p.cy);
+    const eL=effL(), eR=effR(), eD=effD();
+    const wrPx=m2x(eR), wlPx=m2x(eL), botPx=m2y(eD), surfPx=m2y(0), wmY=(surfPx+botPx)/2;
+    if(Math.abs(p.cx-wlPx)<10 && Math.abs(p.cy-wmY)<12){S.mode="wallL"; S.mRef={sx:p.cx,v:S.trL}; S.selLayer=-1; render(); return;}
+    if(Math.abs(p.cx-wrPx)<10 && Math.abs(p.cy-wmY)<12){S.mode="wallR"; S.mRef={sx:p.cx,v:S.trR}; S.selLayer=-1; render(); return;}
+    if(Math.abs(p.cy-botPx)<10 && Math.abs(p.cx-(wlPx+wrPx)/2)<12){S.mode="wallB"; S.mRef={sy:p.cy,v:S.trD}; S.selLayer=-1; render(); return;}
+    if(mx>=eL && mx<=eR){
+      for(let bli=1;bli<S.layers.length;bli++){
+        const lby=m2y(S.layers[bli].from);
+        if(Math.abs(p.cy-lby)<8){S.mode="layer"; S.mRef={sy:p.cy, li:bli, startFrom:S.layers[bli].from}; render(); return;}
+      }
+    }
+    let hit=null;
+    S.cables.forEach(c=>{
+      const r2=getDe(c)/2+10;
+      if(Math.sqrt((mx-c.x)*(mx-c.x)+(my-c.y)*(my-c.y))<r2) hit=c;
+    });
+    if(hit){
+      let ns=S.sel;
+      if(e.shiftKey){ns = S.sel.indexOf(hit.id)>=0 ? S.sel.filter(x=>x!==hit.id) : S.sel.concat([hit.id]);}
+      else {if(S.sel.indexOf(hit.id)<0) ns=[hit.id];}
+      S.sel=ns; S.selLayer=-1; S.mode="drag";
+      S.mRef={sx:p.cx, sy:p.cy, origins: S.cables.filter(c=>ns.indexOf(c.id)>=0).map(c=>({id:c.id, ox:c.x, oy:c.y}))};
+      render(); return;
+    }
+    if(mx>=eL && mx<=eR && my>=0 && my<=eD){
+      for(let li2=0;li2<S.layers.length;li2++){
+        if(my>=S.layers[li2].from && my<S.layers[li2].to){
+          S.selLayer=li2; S.sel=[]; S.mode="layerDrag";
+          S.mRef={sy:p.cy, li:li2, startFrom:S.layers[li2].from, startTo:S.layers[li2].to};
+          render(); return;
+        }
+      }
+    }
+    if(e.shiftKey){S.sel=[]; S.selLayer=-1; S.mode="select"; S.selRect={x:p.cx,y:p.cy,w:0,h:0}; S.mRef={sx:p.cx,sy:p.cy};}
+    else{S.sel=[]; S.selLayer=-1; S.mode="pan"; S.mRef={sx:p.cx,sy:p.cy,px:S.panX,py:S.panY};}
+    render();
+  }
+  function onMove(e){
+    const p=cxy(e);
+    if(S.mode==="pan" && S.mRef){S.panX=S.mRef.px+(p.cx-S.mRef.sx); S.panY=S.mRef.py+(p.cy-S.mRef.sy); draw(); return;}
+    let cMaxX=0, cMaxY=0, cMinX=9999;
+    S.cables.forEach(c=>{const r=getDe(c)/2; if(c.x+r>cMaxX) cMaxX=c.x+r; if(c.x-r<cMinX) cMinX=c.x-r; if(c.y+r>cMaxY) cMaxY=c.y+r;});
+    if(S.mode==="wallL" && S.mRef){const nv=sn(S.mRef.v+(p.cx-S.mRef.sx)/S.zoom); S.trL=Math.min(nv, Math.round(cMinX)-20); render(); return;}
+    if(S.mode==="wallR" && S.mRef){const nv=sn(S.mRef.v+(p.cx-S.mRef.sx)/S.zoom); S.trR=Math.max(nv, Math.round(cMaxX)+20); render(); return;}
+    if(S.mode==="wallB" && S.mRef){const nv2=Math.max(sn(S.mRef.v+(p.cy-S.mRef.sy)/S.zoom), Math.round(cMaxY)+30); S.trD=nv2; if(S.layers.length) S.layers[S.layers.length-1].to=nv2; render(); return;}
+    if(S.mode==="layer" && S.mRef){
+      const newBound=sn(S.mRef.startFrom+(p.cy-S.mRef.sy)/S.zoom);
+      const idx=S.mRef.li;
+      const above=idx-1, below=idx;
+      const minB = above>=0 ? S.layers[above].from+SNAP : SNAP;
+      const maxB = below<S.layers.length ? S.layers[below].to-SNAP : effD()-SNAP;
+      const clamped = Math.max(minB, Math.min(maxB, newBound));
+      const aboveMid = (S.layers[above].from + S.layers[above].to)/2;
+      const belowMid = (S.layers[below].from + S.layers[below].to)/2;
+      if(clamped<aboveMid){const tS=S.layers[above].soilIdx, tR=S.layers[above].rho, tT=S.layers[above].temp; S.layers[above].soilIdx=S.layers[below].soilIdx; S.layers[above].rho=S.layers[below].rho; S.layers[above].temp=S.layers[below].temp; S.layers[below].soilIdx=tS; S.layers[below].rho=tR; S.layers[below].temp=tT;}
+      if(clamped>belowMid && below<S.layers.length-1){const tS2=S.layers[below].soilIdx, tR2=S.layers[below].rho, tT2=S.layers[below].temp; S.layers[below].soilIdx=S.layers[below+1].soilIdx; S.layers[below].rho=S.layers[below+1].rho; S.layers[below].temp=S.layers[below+1].temp; S.layers[below+1].soilIdx=tS2; S.layers[below+1].rho=tR2; S.layers[below+1].temp=tT2;}
+      S.layers[above].to=clamped; S.layers[below].from=clamped;
+      render(); return;
+    }
+    if(S.mode==="layerDrag" && S.mRef){
+      const dy4=sn((p.cy-S.mRef.sy)/S.zoom);
+      const li3=S.mRef.li;
+      const cur=S.layers[li3];
+      const newFrom=S.mRef.startFrom+dy4, newTo=S.mRef.startTo+dy4;
+      if(li3>0){const abMid=(S.layers[li3-1].from+S.layers[li3-1].to)/2; if(newFrom<abMid){const tmp={soilIdx:S.layers[li3-1].soilIdx,rho:S.layers[li3-1].rho,temp:S.layers[li3-1].temp}; S.layers[li3-1].soilIdx=cur.soilIdx; S.layers[li3-1].rho=cur.rho; S.layers[li3-1].temp=cur.temp; S.layers[li3].soilIdx=tmp.soilIdx; S.layers[li3].rho=tmp.rho; S.layers[li3].temp=tmp.temp; S.mRef.li=li3-1; S.mRef.startFrom=S.layers[li3-1].from; S.mRef.startTo=S.layers[li3-1].to; S.mRef.sy=p.cy;}}
+      if(li3<S.layers.length-1){const blMid=(S.layers[li3+1].from+S.layers[li3+1].to)/2; if(newTo>blMid){const tmp2={soilIdx:S.layers[li3+1].soilIdx,rho:S.layers[li3+1].rho,temp:S.layers[li3+1].temp}; S.layers[li3+1].soilIdx=cur.soilIdx; S.layers[li3+1].rho=cur.rho; S.layers[li3+1].temp=cur.temp; S.layers[li3].soilIdx=tmp2.soilIdx; S.layers[li3].rho=tmp2.rho; S.layers[li3].temp=tmp2.temp; S.mRef.li=li3+1; S.mRef.startFrom=S.layers[li3+1].from; S.mRef.startTo=S.layers[li3+1].to; S.mRef.sy=p.cy;}}
+      render(); return;
+    }
+    if(S.mode==="drag" && S.mRef && S.mRef.origins){
+      const dx3=(p.cx-S.mRef.sx)/S.zoom, dy3=(p.cy-S.mRef.sy)/S.zoom;
+      S.cables = S.cables.map(c=>{
+        const o=S.mRef.origins.find(x=>x.id===c.id);
+        if(!o) return c;
+        return clampC(Object.assign({},c,{x:sn(o.ox+dx3), y:sn(o.oy+dy3)}));
+      });
+      render(); return;
+    }
+    if(S.mode==="select" && S.mRef){S.selRect={x:Math.min(S.mRef.sx,p.cx), y:Math.min(S.mRef.sy,p.cy), w:Math.abs(p.cx-S.mRef.sx), h:Math.abs(p.cy-S.mRef.sy)}; draw(); return;}
+  }
+  function onUp(){
+    if(S.mode==="select" && S.selRect){
+      const ids=[];
+      S.cables.forEach(c=>{
+        const px=m2x(c.x), py=m2y(c.y);
+        if(px>=S.selRect.x && px<=S.selRect.x+S.selRect.w && py>=S.selRect.y && py<=S.selRect.y+S.selRect.h) ids.push(c.id);
+      });
+      S.sel=ids; S.selRect=null;
+    }
+    S.mode="idle"; S.mRef=null; render();
+  }
+  function onWheel(e){
+    e.preventDefault();
+    const p=cxy(e);
+    const f=e.deltaY>0?0.92:1.08;
+    const nz=Math.max(0.15, Math.min(2.5, S.zoom*f));
+    const wx=p2mx(p.cx), wy=p2my(p.cy);
+    S.panX=p.cx-ML-((wx-effL())*nz);
+    S.panY=p.cy-MT-wy*nz;
+    S.zoom=nz;
+    document.getElementById("tcZoom").textContent=(S.zoom*100).toFixed(0)+"%";
+    draw();
+  }
+  function getCursor(){if(S.mode==="pan") return "grabbing"; if(S.mode==="drag") return "move"; if(S.mode==="wallL"||S.mode==="wallR") return "ew-resize"; if(S.mode==="wallB"||S.mode==="layer"||S.mode==="layerDrag") return "ns-resize"; return "default";}
+
+  // === SIDE PANEL RENDER ===
+  function getIecRef(){
+    const db=IEC_REF[S.iecTable]; if(!db||!db[S.iecSize]) return null;
+    const v=db[S.iecSize];
+    let base = S.iecArrange==="trefoil" ? v.tr : (v.fl||v.tr);
+    if(S.iecCircuits>1){const rf=IEC_B19[S.iecCircuits]||0.5; base=Math.round(base*rf);}
+    return base;
+  }
+  function applyIecPreset(){
+    const tbl=IEC_TABLES.find(t=>t.id===S.iecTable); if(!tbl) return;
+    const trDepth=S.iecDepth+200;
+    S.layers = [{from:0, to:trDepth, soilIdx:2, rho:S.iecRhoN, temp:S.iecEnvT}];
+    S.trD=trDepth;
+    const De0=getDe({type:"power", size:S.iecSize, ins:tbl.ins, mat:tbl.mat, con:tbl.con, vc:S.iecVc, screen:true});
+    const ncir=S.iecCircuits; const pad=150; const newCables=[]; let nid2=S.nid;
+    const maxT2 = tbl.ins==="PVC" ? 70 : 90;
+    const grpW = tbl.con==="three" ? De0 : S.iecArrange==="trefoil" ? De0 : (De0*3 + (S.iecArrange==="flat-spaced"?De0:0));
+    const grpStep = Math.round(grpW + (S.iecSpacing||De0*2));
+    const cx=pad+Math.round(grpW/2);
+    for(let ci=0;ci<ncir;ci++){
+      const offX=ci*grpStep;
+      if(tbl.con==="single"){
+        const sp = S.iecArrange==="trefoil" ? 0 : S.iecArrange==="flat-touch" ? 0 : Math.round(De0*0.5);
+        const gap = De0+sp;
+        if(S.iecArrange==="trefoil"){
+          newCables.push({id:nid2++, type:"power", x:cx+offX-Math.round(De0/2), y:S.iecDepth, mat:tbl.mat, ins:tbl.ins, size:S.iecSize, con:"single", vc:S.iecVc, screen:true, maxT:maxT2, Iw:0, label:"R"+(ncir>1?(ci+1):"")});
+          newCables.push({id:nid2++, type:"power", x:cx+offX+Math.round(De0/2), y:S.iecDepth, mat:tbl.mat, ins:tbl.ins, size:S.iecSize, con:"single", vc:S.iecVc, screen:true, maxT:maxT2, Iw:0, label:"S"+(ncir>1?(ci+1):"")});
+          newCables.push({id:nid2++, type:"power", x:cx+offX, y:S.iecDepth-Math.round(De0*0.866), mat:tbl.mat, ins:tbl.ins, size:S.iecSize, con:"single", vc:S.iecVc, screen:true, maxT:maxT2, Iw:0, label:"T"+(ncir>1?(ci+1):"")});
+        } else {
+          newCables.push({id:nid2++, type:"power", x:cx+offX-Math.round(gap), y:S.iecDepth, mat:tbl.mat, ins:tbl.ins, size:S.iecSize, con:"single", vc:S.iecVc, screen:true, maxT:maxT2, Iw:0, label:"R"+(ncir>1?(ci+1):"")});
+          newCables.push({id:nid2++, type:"power", x:cx+offX, y:S.iecDepth, mat:tbl.mat, ins:tbl.ins, size:S.iecSize, con:"single", vc:S.iecVc, screen:true, maxT:maxT2, Iw:0, label:"S"+(ncir>1?(ci+1):"")});
+          newCables.push({id:nid2++, type:"power", x:cx+offX+Math.round(gap), y:S.iecDepth, mat:tbl.mat, ins:tbl.ins, size:S.iecSize, con:"single", vc:S.iecVc, screen:true, maxT:maxT2, Iw:0, label:"T"+(ncir>1?(ci+1):"")});
+        }
+      } else {
+        newCables.push({id:nid2++, type:"power", x:cx+offX, y:S.iecDepth, mat:tbl.mat, ins:tbl.ins, size:S.iecSize, con:"three", vc:S.iecVc, screen:true, maxT:maxT2, Iw:0, label:"C"+(ci+1)});
+      }
+    }
+    S.nid=nid2; S.cables=newCables;
+    let minX=9999, maxX=0; newCables.forEach(c=>{if(c.x>maxX) maxX=c.x; if(c.x<minX) minX=c.x;});
+    S.trL=Math.round(minX)-pad; S.trR=Math.round(maxX)+pad; S.sel=[]; S.result=null;
+    render(); refreshSyncs();
+  }
+
+  function renderRight(){
+    const root=document.getElementById("tcSideR");
+    if(!root) return;
+    const selC = S.sel.length===1 ? S.cables.find(c=>c.id===S.sel[0]) : null;
+    const selR2 = (selC && S.result && selC.type==="power") ? S.result.gr[S.result.pw.indexOf(selC)] : null;
+    const selI2 = (selC && S.result && selC.type==="power") ? S.result.iso[S.result.pw.indexOf(selC)] : null;
+    const selLy = (S.selLayer>=0 && S.selLayer<S.layers.length) ? S.layers[S.selLayer] : null;
+    let html="";
+    if(selC){
+      html += '<div style="font-size:11px;font-weight:700;margin-bottom:3px;">'+selC.label+' <span style="font-size:8px;color:'+(selC.type==="power"?"#d97706":"#5b5fc7")+'">'+selC.type+' ⌀'+getDe(selC).toFixed(0)+'</span></div>';
+      html += '<div class="tc-fld"><label>Label</label><input type="text" data-cf="label" value="'+(selC.label||"").replace(/"/g,"&quot;")+'"/></div>';
+      html += '<div class="tc-grid2"><div class="tc-fld"><label>X</label><input type="number" data-cf="x" step="10" value="'+selC.x+'"/></div><div class="tc-fld"><label>Depth</label><input type="number" data-cf="y" step="10" value="'+selC.y+'"/></div></div>';
+      if(selC.type!=="optical"){
+        html += '<div class="tc-grid2"><div class="tc-fld"><label>Mat</label><select data-cf="mat"><option value="Cu"'+(selC.mat==="Cu"?" selected":"")+'>Cu</option><option value="Al"'+(selC.mat==="Al"?" selected":"")+'>Al</option></select></div><div class="tc-fld"><label>Ins</label><select data-cf="ins"><option value="XLPE"'+(selC.ins==="XLPE"?" selected":"")+'>XLPE</option><option value="PVC"'+(selC.ins==="PVC"?" selected":"")+'>PVC</option><option value="EPR"'+(selC.ins==="EPR"?" selected":"")+'>EPR</option></select></div></div>';
+        html += '<div class="tc-fld"><label>Size</label><select data-cf="size">'+SZ.map(s=>'<option value="'+s.s+'"'+(selC.size===s.s?" selected":"")+'>'+s.s+'</option>').join('')+'</select></div>';
+        html += '<div class="tc-grid2"><div class="tc-fld"><label>V</label><select data-cf="vc">'+VCL.map(v=>'<option value="'+v.l+'"'+(selC.vc===v.l?" selected":"")+'>'+v.l+'</option>').join('')+'</select></div><div class="tc-fld"><label>Type</label><select data-cf="con"><option value="single"'+(selC.con==="single"?" selected":"")+'>1c</option><option value="three"'+(selC.con==="three"?" selected":"")+'>3c</option></select></div></div>';
+        html += '<div class="tc-fld"><label>MaxT</label><input type="number" data-cf="maxT" value="'+(selC.maxT||90)+'"/></div>';
+        html += '<div class="tc-fld"><label>Iwork (A)</label><input type="number" data-cf="Iw" placeholder="rated" value="'+(selC.Iw||"")+'"/></div>';
+        html += '<label class="tc-checkbox"><input type="checkbox" data-cf="screen"'+(selC.screen?" checked":"")+'/>Screen</label>';
+      }
+      if(selR2){
+        html += '<div class="tc-result-box"><b>I='+(selR2.I?selR2.I.toFixed(1):"—")+'A</b> iso='+(selI2?selI2.I.toFixed(1):"—")+'A<br/>df='+(selI2&&selI2.I>0?(selR2.I/selI2.I).toFixed(3):"—")+' ρ='+selR2.rho+' envT='+selR2.envT+'°<br/>Tc(rated)='+(selR2.Tc?selR2.Tc.toFixed(0):"—")+'° <b>Tc(work)='+(selR2.TcWork?selR2.TcWork.toFixed(1):"—")+'°</b><br/>T4='+(selR2.T4?selR2.T4.toFixed(4):"—")+' '+(selR2.conv?"OK":"")+'</div>';
+      }
+    } else if(selLy){
+      html += '<div style="font-size:11px;font-weight:700;margin-bottom:4px;">Layer #'+(S.selLayer+1)+'</div>';
+      html += '<div class="tc-fld"><label>Type</label><select data-lf="soilIdx">'+SOILS.map((s,si)=>'<option value="'+si+'"'+(selLy.soilIdx===si?" selected":"")+'>'+s.n+'</option>').join('')+'</select></div>';
+      html += '<div class="tc-grid2"><div class="tc-fld"><label>From</label><input type="number" data-lf="from" step="10" value="'+selLy.from+'"/></div><div class="tc-fld"><label>To</label><input type="number" data-lf="to" step="10" value="'+selLy.to+'"/></div></div>';
+      html += '<div class="tc-grid2"><div class="tc-fld"><label>ρ K·m/W</label><input type="number" data-lf="rho" step="0.1" value="'+selLy.rho+'"/></div><div class="tc-fld"><label>Temp °C</label><input type="number" data-lf="temp" value="'+(selLy.temp!=null?selLy.temp:25)+'"/></div></div>';
+      if(S.layers.length>1) html += '<button class="tc-del-btn" id="tcDelLayer">Delete layer</button>';
+    } else if(S.sel.length>1){
+      html += '<div><b>'+S.sel.length+' sel</b></div>';
+    } else {
+      html += '<div class="tc-side-help">Click cable or layer<br/>LMB empty: pan<br/>Shift: box select<br/>Scroll: zoom · Del: delete</div>';
+      if(S.result && getIecRef()){
+        html += '<div class="tc-rgrid"><div style="font-weight:700;font-size:10px;margin-bottom:4px;">IEC 60502-2 Table '+S.iecTable+'</div>';
+        html += '<div style="font-size:8px;color:#666;margin-bottom:4px;">'+S.iecSize+'mm² '+(IEC_TABLES.find(t=>t.id===S.iecTable)||{}).n+'<br/>'+S.iecArrange+(S.iecCircuits>1?' · '+S.iecCircuits+' circuits':'')+' · ρ='+S.iecRhoN+' · '+S.iecEnvT+'°C · '+S.iecDepth+'mm</div>';
+        html += '<table><thead><tr style="border-bottom:1px solid #ddd"><th style="text-align:left">Param</th><th>IEC</th><th>Calc</th><th>Δ%</th></tr></thead><tbody>';
+        S.result.pw.forEach((c,i)=>{
+          const r=S.result.gr[i]; if(!r||!r.conv) return;
+          const iecVal=getIecRef();
+          const delta = iecVal ? ((r.I-iecVal)/iecVal*100).toFixed(1) : "—";
+          html += '<tr style="border-bottom:1px solid #eee"><td>'+c.label+'</td><td style="font-weight:700">'+(iecVal||"—")+'</td><td style="color:#c00;font-weight:700">'+r.I.toFixed(0)+'</td><td style="color:'+(Math.abs(parseFloat(delta))<10?"#080":"#c00")+'">'+delta+'</td></tr>';
+        });
+        html += '</tbody></table><div style="font-size:7px;color:#888;margin-top:3px;">IEC conditions: Tc=90°C, ground='+S.iecEnvT+'°C, depth='+S.iecDepth+'mm, ρ='+S.iecRhoN+', screens bonded both ends</div></div>';
+      }
+    }
+    root.innerHTML = html;
+
+    // bind cable field handlers
+    root.querySelectorAll("[data-cf]").forEach(el=>{
+      el.addEventListener("change", ()=>{
+        if(!selC) return;
+        const k=el.getAttribute("data-cf");
+        let v;
+        if(el.type==="checkbox") v=el.checked;
+        else if(el.type==="number") v = sn ? (k==="x"||k==="y" ? sn(+el.value) : (+el.value)) : +el.value;
+        else v = el.value;
+        if(k==="size") v=+el.value;
+        const c = S.cables.find(c=>c.id===selC.id); if(!c) return;
+        c[k]=v;
+        const cl=clampC(c);
+        Object.assign(c, cl);
+        S.result=null; render(); refreshSyncs();
+      });
+    });
+    root.querySelectorAll("[data-lf]").forEach(el=>{
+      el.addEventListener("change", ()=>{
+        if(!selLy) return;
+        const k=el.getAttribute("data-lf");
+        let v = el.type==="number" ? (+el.value) : el.value;
+        if(k==="soilIdx"){v=+el.value; const s=SOILS[v]; if(s) selLy.rho=s.rho;}
+        if(k==="from"||k==="to") v=sn(+el.value);
+        selLy[k]=v;
+        S.result=null; render();
+      });
+    });
+    const dl=document.getElementById("tcDelLayer");
+    if(dl) dl.addEventListener("click", ()=>{
+      if(S.layers.length<=1) return;
+      const i=S.selLayer; const rm=S.layers[i];
+      S.layers.splice(i,1);
+      if(i>0) S.layers[i-1].to=rm.to;
+      else if(S.layers.length) S.layers[0].from=rm.from;
+      S.selLayer=-1; S.result=null; render();
+    });
+  }
+  function refreshSyncs(){
+    const setVal=(id,v)=>{const el=document.getElementById(id); if(el && el.value!==String(v)) el.value=String(v);};
+    setVal("tcTrL", S.trL); setVal("tcTrR", S.trR); setVal("tcTrD", S.trD); setVal("tcFreq", S.freq);
+    document.getElementById("tcZoom").textContent=(S.zoom*100).toFixed(0)+"%";
+    const delBtn=document.getElementById("tcDel");
+    if(delBtn){if(S.sel.length>0){delBtn.hidden=false; delBtn.textContent="Delete ("+S.sel.length+") [Del]";} else delBtn.hidden=true;}
+    const exp=document.getElementById("tcExport"); if(exp) exp.hidden = !S.result;
+    const ref=getIecRef();
+    const refBox=document.getElementById("tcIecRefBox");
+    if(refBox){
+      if(ref){refBox.hidden=false; refBox.innerHTML='IEC ref: <b>'+ref+'A</b> ('+S.iecSize+'mm² '+S.iecArrange+(S.iecCircuits>1?" ×"+S.iecCircuits:"")+')';}
+      else refBox.hidden=true;
+    }
+    // summary chips
+    const sum=document.getElementById("tcSummary");
+    if(sum){
+      if(S.result){
+        sum.hidden=false;
+        sum.innerHTML = S.result.pw.map((c,i)=>{
+          const r=S.result.gr[i]; const iso=S.result.iso[i]; if(!r) return "";
+          const df = iso&&iso.I>0 ? (r.I/iso.I).toFixed(3) : "—";
+          return '<div class="tc-sum-c'+(S.sel.indexOf(c.id)>=0?" sel":"")+'" data-cid="'+c.id+'"><b>'+c.label+'</b> '+r.I.toFixed(0)+'A '+(r.TcWork?r.TcWork.toFixed(0)+'°':'')+' <span style="color:#888">ρ='+r.rho+' df:'+df+'</span></div>';
+        }).join('');
+        sum.querySelectorAll("[data-cid]").forEach(el=>{
+          el.addEventListener("click", ()=>{S.sel=[+el.getAttribute("data-cid")]; S.selLayer=-1; render();});
+        });
+      } else sum.hidden=true;
+    }
+    const cv=cvRef; if(cv) cv.style.cursor=getCursor();
+  }
+  function render(){draw(); renderRight(); refreshSyncs();}
+
+  // === SETUP DOM ===
+  function populateSelects(){
+    const tbl=document.getElementById("tcIecTable");
+    tbl.innerHTML = IEC_TABLES.map(t=>'<option value="'+t.id+'">'+t.n+'</option>').join('');
+    document.getElementById("tcIecSize").innerHTML = SZ.map(s=>'<option value="'+s.s+'">'+s.s+'</option>').join('');
+    document.getElementById("tcIecVc").innerHTML = VCL.map(v=>'<option value="'+v.l+'">'+v.l+'</option>').join('');
+  }
+  function bindEvents(){
+    cvRef = document.getElementById("tcCanvas");
+    cvRef.addEventListener("mousedown", onDown);
+    cvRef.addEventListener("mousemove", onMove);
+    cvRef.addEventListener("mouseup", onUp);
+    cvRef.addEventListener("mouseleave", onUp);
+    cvRef.addEventListener("wheel", onWheel, {passive:false});
+    cvRef.addEventListener("contextmenu", e=>e.preventDefault());
+
+    document.getElementById("tcTrL").addEventListener("change", e=>{
+      let cMinX=9999; S.cables.forEach(c=>{const r=getDe(c)/2; if(c.x-r<cMinX) cMinX=c.x-r;});
+      S.trL=Math.min(sn(+e.target.value), Math.round(cMinX)-20); render();
+    });
+    document.getElementById("tcTrR").addEventListener("change", e=>{
+      let cMaxX=0; S.cables.forEach(c=>{const r=getDe(c)/2; if(c.x+r>cMaxX) cMaxX=c.x+r;});
+      S.trR=Math.max(sn(+e.target.value), Math.round(cMaxX)+20); render();
+    });
+    document.getElementById("tcTrD").addEventListener("change", e=>{
+      let cMaxY=0; S.cables.forEach(c=>{const r=getDe(c)/2; if(c.y+r>cMaxY) cMaxY=c.y+r;});
+      const nv=Math.max(sn(+e.target.value), Math.round(cMaxY)+30);
+      S.trD=nv; if(S.layers.length) S.layers[S.layers.length-1].to=nv; render();
+    });
+    document.getElementById("tcFreq").addEventListener("change", e=>{S.freq=+e.target.value; render();});
+    document.querySelectorAll("[data-add]").forEach(b=>{
+      b.addEventListener("click", ()=>{
+        const t=b.getAttribute("data-add");
+        const id=S.nid++;
+        const newC=clampC({id, type:t, x:sn(100+Math.random()*300), y:sn(500+Math.random()*300), mat:"Cu", ins:t==="power"?"XLPE":"PVC", size:t==="power"?240:10, con:"single", vc:t==="power"?"6/10 kV":"0.6/1 kV", screen:t==="power", maxT:t==="power"?90:70, Iw:0, label:(t==="optical"?"FO":t==="control"?"C":"P")+id});
+        S.cables.push(newC); S.sel=[id]; S.selLayer=-1; S.result=null; render();
+      });
+    });
+    document.getElementById("tcAddLayer").addEventListener("click", ()=>{
+      const last=S.layers[S.layers.length-1];
+      const nf=Math.max(20, last.to-150);
+      S.layers = S.layers.slice(0,-1).concat([Object.assign({},last,{to:nf}), {from:nf, to:last.to, soilIdx:2, rho:1.2, temp:25}]);
+      render();
+    });
+    document.getElementById("tcDel").addEventListener("click", ()=>{
+      S.cables = S.cables.filter(c=>S.sel.indexOf(c.id)<0);
+      S.sel=[]; S.result=null; render();
+    });
+    document.getElementById("tcCalc").addEventListener("click", ()=>{
+      S.result = solve(); render();
+    });
+    document.getElementById("tcExport").addEventListener("click", exportHtmlReport);
+    document.getElementById("tcClose").addEventListener("click", hide);
+    // IEC presets
+    const iecBind = (id, key, parse)=>{document.getElementById(id).addEventListener("change", e=>{S[key]=parse?parse(e.target.value):e.target.value; refreshSyncs();});};
+    iecBind("tcIecTable", "iecTable");
+    iecBind("tcIecSize", "iecSize", v=>+v);
+    iecBind("tcIecVc", "iecVc");
+    iecBind("tcIecArr", "iecArrange");
+    iecBind("tcIecDepth", "iecDepth", v=>+v);
+    iecBind("tcIecRho", "iecRhoN", v=>+v);
+    iecBind("tcIecT", "iecEnvT", v=>+v);
+    document.getElementById("tcIecCirc").addEventListener("change", e=>{
+      S.iecCircuits=+e.target.value;
+      document.getElementById("tcIecSpacingFld").hidden = S.iecCircuits<=1;
+      refreshSyncs();
+    });
+    iecBind("tcIecSpacing", "iecSpacing", v=>+v);
+    document.getElementById("tcIecApply").addEventListener("click", applyIecPreset);
+
+    // Keyboard
+    window.addEventListener("keydown", e=>{
+      if(document.getElementById("trenchCAD").hidden) return;
+      if((e.key==="Delete"||e.key==="Backspace") && S.sel.length>0){
+        const ae=document.activeElement;
+        if(ae && (ae.tagName==="INPUT"||ae.tagName==="SELECT"||ae.tagName==="TEXTAREA")) return;
+        e.preventDefault();
+        S.cables = S.cables.filter(c=>S.sel.indexOf(c.id)<0);
+        S.sel=[]; S.result=null; render();
+      }
+    });
+  }
+  let _initDone=false;
+  function init(){
+    if(_initDone) return;
+    _initDone=true;
+    populateSelects();
+    bindEvents();
+    // sync IEC select values
+    ["tcIecTable","tcIecSize","tcIecVc","tcIecArr","tcIecDepth","tcIecRho","tcIecT","tcIecCirc","tcIecSpacing"].forEach(id=>{
+      const el=document.getElementById(id); if(!el) return;
+      const k = id==="tcIecTable"?"iecTable":id==="tcIecSize"?"iecSize":id==="tcIecVc"?"iecVc":id==="tcIecArr"?"iecArrange":id==="tcIecDepth"?"iecDepth":id==="tcIecRho"?"iecRhoN":id==="tcIecT"?"iecEnvT":id==="tcIecCirc"?"iecCircuits":"iecSpacing";
+      el.value = S[k];
+    });
+    // Multi-section "+" — gated; cross-section tab buttons swap active state
+    document.getElementById("tcAddSection").addEventListener("click", ()=>{
+      if(window.License && License.gate){
+        License.gate("multi_scenario", { onAllowed: addSectionTab });
+      } else { addSectionTab(); }
+    });
+    function addSectionTab(){
+      // Stub for now — real impl needs per-section state arrays. Open upgrade flag for unlicensed.
+      alert("Multi cross-section workspaces — included in paid PRO. (Stub: full per-section state isolation will land in next release.)");
+    }
+    render();
+  }
+  function show(){
+    init();
+    const root=document.getElementById("trenchCAD");
+    root.hidden=false;
+    root.scrollIntoView({behavior:"smooth", block:"start"});
+  }
+  function hide(){document.getElementById("trenchCAD").hidden=true;}
+
+  // === HTML report (modal-free, opens new window) ===
+  function exportHtmlReport(){
+    if(!S.result) return;
+    const pw=S.result.pw, gr=S.result.gr, iso=S.result.iso;
+    const distRows=[];
+    for(let i=0;i<pw.length;i++){
+      const row=[];
+      for(let j=0;j<pw.length;j++){
+        if(i===j){row.push("—");} else {
+          const dx=(pw[i].x-pw[j].x)/1000, dy=(pw[i].y-pw[j].y)/1000;
+          row.push(Math.sqrt(dx*dx+dy*dy).toFixed(3));
+        }
+      }
+      distRows.push(row);
+    }
+    let h = "<html><head><meta charset='utf-8'><title>Cable Ampacity — Trench CAD report</title>";
+    h += "<style>body{font-family:Arial,sans-serif;font-size:11px;margin:20px;color:#222}h1{font-size:16px;border-bottom:2px solid #333;padding-bottom:4px}h2{font-size:13px;color:#444;margin-top:16px;border-bottom:1px solid #ccc;padding-bottom:2px}h3{font-size:11px;color:#555;margin-top:10px}table{border-collapse:collapse;margin:6px 0;font-size:10px}td,th{border:1px solid #ccc;padding:3px 6px;text-align:center}th{background:#f0f0f0;font-weight:bold}.formula{background:#f8f8f5;border:1px solid #ddd;padding:6px 10px;margin:4px 0;font-family:monospace;font-size:10px;white-space:pre-wrap}.var{color:#555;font-size:9px;margin:2px 0}.val{color:#c00;font-weight:bold}@media print{body{margin:10px}}</style></head><body>";
+    h += "<h1>Trench CAD — cable ampacity report (preview)</h1><p>This is the in-app HTML preview. Use <b>Download PRO .docx</b> in the calculator toolbar for the full Word report including this section.</p>";
+    h += "<h2>Summary</h2><table><tr><th>Cable</th><th>I_z, A</th><th>I_iso, A</th><th>df</th><th>Tc(rated), °C</th><th>Iw, A</th><th>Tc(work), °C</th><th>ρ</th><th>θ_env, °C</th></tr>";
+    pw.forEach((c,i)=>{
+      const r=gr[i]; const is=iso[i]; if(!r) return;
+      h += "<tr><td>"+c.label+"</td><td class='val'>"+r.I.toFixed(1)+"</td><td>"+(is?is.I.toFixed(1):"—")+"</td><td>"+(is&&is.I>0?(r.I/is.I).toFixed(3):"—")+"</td><td>"+(c.maxT||90)+"</td><td>"+(c.Iw||r.I.toFixed(0))+"</td><td class='val'>"+(r.TcWork?r.TcWork.toFixed(1):"—")+"</td><td>"+r.rho+"</td><td>"+r.envT+"</td></tr>";
+    });
+    h += "</table>";
+    const w=window.open("","_blank"); if(w){w.document.write(h+"</body></html>"); w.document.close();}
+  }
+
+  // === PUBLIC SNAPSHOT for PRO .docx ===
+  function getSnapshot(){
+    if(!S.result) return null;
+    const canvas=cvRef;
+    let pngDataUrl=null;
+    if(canvas){try{pngDataUrl=canvas.toDataURL("image/png");}catch(e){pngDataUrl=null;}}
+    const distRows=[];
+    const pw=S.result.pw;
+    for(let i=0;i<pw.length;i++){
+      const row=[];
+      for(let j=0;j<pw.length;j++){
+        if(i===j) row.push("—");
+        else {
+          const dx=(pw[i].x-pw[j].x)/1000, dy=(pw[i].y-pw[j].y)/1000;
+          row.push(Math.sqrt(dx*dx+dy*dy).toFixed(3));
+        }
+      }
+      distRows.push(row);
+    }
+    return {
+      cables: S.cables.slice(),
+      layers: S.layers.slice(),
+      result: S.result,
+      pngDataUrl,
+      trench:{trL:S.trL, trR:S.trR, trD:S.trD, freq:S.freq, effW:effW(), effD:effD()},
+      iec:{table:S.iecTable, size:S.iecSize, vc:S.iecVc, arrange:S.iecArrange, depth:S.iecDepth, rho:S.iecRhoN, envT:S.iecEnvT, circuits:S.iecCircuits, spacing:S.iecSpacing, refValue:getIecRef()},
+      distRows,
+      iecTablesMeta: IEC_TABLES,
+      getDe
+    };
+  }
+
+  return {init, show, hide, getSnapshot};
+})();
+
+/* ============================================================
+   PRO .DOCX REPORT — full report including trench data + heatmap
+   ============================================================ */
+async function downloadDocxPro(opts){
+  opts = opts || {};
+  const isExample = !!opts.example;
+  const I = lastInputs;
+  const r = lastResult;
+  if(!I || !r || r.error){ alert("Run calculation first."); return; }
+  if(typeof docx === "undefined"){ alert("Report library not loaded."); return; }
+
+  const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType,
+          Table, TableRow, TableCell, WidthType, BorderStyle, ImageRun, Header, Footer, ShadingType } = docx;
+
+  const para = (txt, opts={}) => new Paragraph({
+    children:[ new TextRun({ text:txt, bold: !!opts.bold, italics: !!opts.italic, size: opts.size || 20 }) ],
+    heading: opts.heading,
+    spacing: { after: opts.after ?? 80 },
+    alignment: opts.align
+  });
+  const subhead = (txt) => para(txt, { bold:true, size:22, after:120 });
+
+  const cellBorder = {style:BorderStyle.SINGLE, size:4, color:"888888"};
+  const cellBorders = {top:cellBorder,bottom:cellBorder,left:cellBorder,right:cellBorder,insideHorizontal:cellBorder,insideVertical:cellBorder};
+
+  const tableRow = (k, v) => new TableRow({
+    children:[
+      new TableCell({ width:{size:55,type:WidthType.PERCENTAGE}, children:[new Paragraph({children:[new TextRun({text:k, size:18})]})] }),
+      new TableCell({ width:{size:45,type:WidthType.PERCENTAGE}, children:[new Paragraph({children:[new TextRun({text:String(v), size:18, bold:true})]})] })
+    ]
+  });
+  const T = (rows) => new Table({width:{size:100,type:WidthType.PERCENTAGE}, rows, borders:cellBorders});
+  const headerRow = (cells) => new TableRow({tableHeader:true, children:cells.map(c=> new TableCell({children:[new Paragraph({children:[new TextRun({text:c, size:16, bold:true})]})]}))});
+  const dataRow = (cells) => new TableRow({children:cells.map(c=> new TableCell({children:[new Paragraph({children:[new TextRun({text:String(c), size:16})]})]}))});
+  const wideTable = (header, rows) => new Table({width:{size:100,type:WidthType.PERCENTAGE}, rows:[headerRow(header), ...rows.map(dataRow)], borders:cellBorders});
+
+  // === Sections 1–6: same as FREE ===
+  const inputsRows = [
+    tableRow("Conductor",      MAT[I.material].name + " " + I.S + " mm² (" + I.design + ")"),
+    tableRow("Cores",          I.cores.toString()),
+    tableRow("Insulation",     INS[I.insulation].name + ", U₀/U = " + I.U0 + "/" + (I.U0===0.6?1:Math.round(I.U0/0.6)) + " kV"),
+    tableRow("Construction",   I.construct.replace(/_/g," ")),
+    tableRow("Sheath / screen",I.sheath.replace(/_/g," ")),
+    tableRow("Armour",         I.armour.toUpperCase()),
+    tableRow("Outer jacket",   I.jacket),
+    tableRow("Installation",   I.instMethod.replace(/_/g," ") + (I.instMethod==="buried" ? ", L = "+I.depth_m+" m" : "")),
+    tableRow("Formation",      I.formation.replace(/_/g," ")),
+    tableRow("Circuits",       I.nCircuits + " (spacing "+I.circuitSpacing_mm+" mm)"),
+    tableRow("Soil ρ_T",       I.soilRho + " K·m/W"),
+    tableRow("Reference ambient temp",  I.ambTemp + " °C"),
+    tableRow("System frequency",        I.freq + " Hz"),
+    tableRow("Bonding",                 I.bonding),
+    tableRow("Conductor max temp",      r.theta_c + " °C")
+  ];
+  const geomRows = [
+    tableRow("Conductor diameter d_c",  r.geo.d_c.toFixed(2) + " mm"),
+    tableRow("Insulation thickness t₁", r.geo.t_1.toFixed(2) + " mm"),
+    tableRow("Diameter over insulation",r.geo.D_over_ins.toFixed(2) + " mm"),
+    tableRow("Sheath thickness t_s",    r.geo.t_s.toFixed(2) + " mm"),
+    tableRow("Diameter over sheath",    r.geo.D_over_sh.toFixed(2) + " mm"),
+    tableRow("Armour wire ⌀",           r.geo.t_a ? r.geo.t_a.toFixed(2) + " mm" : "—"),
+    tableRow("Diameter over armour",    r.geo.D_over_armour.toFixed(2) + " mm"),
+    tableRow("Outer jacket t₃",         r.geo.t_3.toFixed(2) + " mm"),
+    tableRow("External diameter D_e",   r.geo.D_e.toFixed(2) + " mm")
+  ];
+  const lossRows = [
+    tableRow("R₂₀ (DC)",               (r.R20_per_km).toExponential(3) + " Ω/km"),
+    tableRow("R' DC at θ_c",           (r.R_dc_per_m_theta*1000).toExponential(3) + " Ω/km"),
+    tableRow("Skin factor y_s",        r.ys.toFixed(4)),
+    tableRow("Proximity factor y_p",   r.yp.toFixed(4)),
+    tableRow("R AC at θ_c",            (r.R_ac*1000).toExponential(3) + " Ω/km"),
+    tableRow("Capacitance C",          (r.C*1e9).toFixed(3) + " nF/m"),
+    tableRow("Dielectric loss W_d",    r.Wd.toExponential(3) + " W/m/φ"),
+    tableRow("λ₁ sheath loss factor",  r.lam1.toFixed(4)),
+    tableRow("λ₂ armour loss factor",  r.lam2.toFixed(4)),
+    tableRow("T₁ insulation",          r.T1.toFixed(4) + " K·m/W"),
+    tableRow("T₂ bedding",             r.T2.toFixed(4) + " K·m/W"),
+    tableRow("T₃ outer jacket",        r.T3.toFixed(4) + " K·m/W"),
+    tableRow("T₄ external",            r.T4.toFixed(4) + " K·m/W")
+  ];
+  const resultsRows = [
+    tableRow("Continuous ampacity I_z",    Math.round(r.I_z) + " A"),
+    tableRow("Conductor losses W_c at I_z",r.Wc_z.toFixed(2) + " W/m/φ"),
+    tableRow("Sheath losses W_s at I_z",   r.Ws_z.toFixed(3) + " W/m/φ"),
+    tableRow("Armour losses W_a at I_z",   r.Wa_z.toFixed(3) + " W/m/φ"),
+    tableRow("Total losses W_t at I_z",    r.Wt_z.toFixed(2) + " W/m/φ")
+  ];
+
+  const exampleBanner = isExample ? [
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      shading: { type: ShadingType.SOLID, color: "FFE0E0", fill: "FFE0E0" },
+      children:[new TextRun({ text:"⚠  EXAMPLE — DEMO MODE — NOT FOR ENGINEERING USE  ⚠", bold:true, color:"C00000", size:36 })],
+      spacing:{after:120}
+    }),
+    para("This report was generated from the showcase example shipped with the calculator. Cable layout, layer stack and IEC presets were not user-edited. Do not use the values below for any real project. Purchase a PRO licence to unlock editing and to download a clean (non-watermarked) report.", {italic:true, align:AlignmentType.CENTER, after:240, size:18})
+  ] : [];
+
+  const children = [
+    ...exampleBanner,
+    new Paragraph({ heading:HeadingLevel.TITLE, children:[new TextRun({text:"Cable Ampacity — PRO Report" + (isExample?" (EXAMPLE)":""), bold:true, size:32, color: isExample?"C00000":"000000"})], alignment:AlignmentType.CENTER }),
+    para("Per IEC 60287-1-1, -1-2, -2-1, -2-2 and -3-1; IEC 60228 conductor data; IEC 60949 short-circuit withstand; IEC 60502-2 Annex B reference cross-validation.", { italic:true, align:AlignmentType.CENTER, after:300 }),
+    para("Date: " + new Date().toISOString().slice(0,10), { after:100 }),
+    para("Calculator: ieccalc.com/004 — Cable Ampacity (PRO tier — full report with trench layout, distance matrix, per-cable derivation, IEC reference cross-validation).", { italic:true, after:200 }),
+
+    subhead("1. Cable construction & site parameters"), T(inputsRows), para(" "),
+    subhead("2. Estimated cable geometry (IEC 60228 / IEC 60502 typical)"), T(geomRows), para(" "),
+    subhead("3. Electrical and thermal parameters"), T(lossRows), para(" "),
+    subhead("4. Steady-state ampacity I_z"), T(resultsRows), para(" ", {after:60}),
+    para("I_z = √( (Δθ − W_d·[½T₁ + n·(T₂+T₃+T₄)]) / (R·T₁ + n·R·(1+λ₁)·T₂ + n·R·(1+λ₁+λ₂)·(T₃+T₄)) )", { italic:true, after:80 }),
+    para("(IEC 60287-1-1 Eq. 1; n = "+r.n+" load-carrying conductors)", { italic:true, after:200 })
+  ];
+  if(I.iLoad > 0){
+    children.push(subhead("5. Conductor temperature at user load"));
+    children.push(T([
+      tableRow("User load I_load",            I.iLoad + " A"),
+      tableRow("Conductor losses W_c(I_load)",r.Wc_load.toFixed(2) + " W/m/φ"),
+      tableRow("Total losses W_t(I_load)",    r.Wt_load.toFixed(2) + " W/m/φ"),
+      tableRow("Conductor temperature θ_c",   r.theta_at_load.toFixed(1) + " °C"),
+      tableRow("Limit θ_c,max",               r.theta_c + " °C"),
+      tableRow("Ratio θ_c,max / θ_c",         (r.theta_c/r.theta_at_load).toFixed(3)),
+      tableRow("Verdict",                     r.theta_at_load <= r.theta_c ? "PASS" : "FAIL")
+    ]));
+    children.push(para(" "));
+  }
+  if(r.sc){
+    children.push(subhead("6. Thermal short-circuit withstand (IEC 60949)"));
+    children.push(T([
+      tableRow("k constant ("+I.material+"/"+I.insulation+")",  r.k_sc.toString()),
+      tableRow("S × k = adiabatic I·√t",                         (r.k_sc * I.S / 1000).toFixed(2) + " kA·√s"),
+      tableRow("User I\"_k",                                     I.iScKa + " kA"),
+      tableRow("User t_SC",                                      I.tScSec + " s"),
+      tableRow("Permissible I_SC for given t_SC",                (r.sc.Iperm_A/1000).toFixed(2) + " kA"),
+      tableRow("Permissible time at user I\"_k",                 r.sc.tperm_s.toFixed(3) + " s"),
+      tableRow("Verdict",                                        ((r.sc.Iperm_A/1000)>=I.iScKa) ? "PASS" : "FAIL")
+    ]));
+    children.push(para("I_SC,perm = k · S / √t (IEC 60949 §3.1, adiabatic).", { italic:true, after:200 }));
+  }
+
+  // === Sections 7+: PRO-only — trench CAD data ===
+  const snap = (typeof Trench !== "undefined") ? Trench.getSnapshot() : null;
+  if(snap){
+    children.push(subhead("7. Trench cross-section — geometry"));
+    children.push(T([
+      tableRow("Trench width",   snap.trench.effW + " mm (left "+snap.trench.trL+" → right "+snap.trench.trR+")"),
+      tableRow("Trench depth",   snap.trench.effD + " mm"),
+      tableRow("System frequency", snap.trench.freq + " Hz"),
+      tableRow("Number of cables (any type)", snap.cables.length),
+      tableRow("Number of power cables",      snap.result.pw.length)
+    ]));
+    children.push(para(" "));
+
+    if(snap.pngDataUrl){
+      try{
+        const base64=snap.pngDataUrl.split(",")[1];
+        const bin=atob(base64); const len=bin.length;
+        const bytes=new Uint8Array(len); for(let i=0;i<len;i++) bytes[i]=bin.charCodeAt(i);
+        children.push(new Paragraph({alignment:AlignmentType.CENTER, children:[new ImageRun({data:bytes, transformation:{width:560, height:466}})], spacing:{after:120}}));
+        children.push(para("Figure 7.1 — Trench cross-section with cable layout, soil hatching, depth/distance scales and steady-state heatmap.", {italic:true, align:AlignmentType.CENTER, after:200, size:18}));
+      }catch(e){children.push(para("(canvas snapshot could not be embedded — "+e.message+")", {italic:true, after:200}));}
+    }
+
+    children.push(subhead("8. Soil layers"));
+    const soilHeader=["#","Type ID","From, mm","To, mm","ρ_T, K·m/W","T, °C"];
+    const soilRows = snap.layers.map((ly,i)=>[i+1, ly.soilIdx, ly.from, ly.to, ly.rho, (ly.temp!=null?ly.temp:25)]);
+    children.push(wideTable(soilHeader, soilRows));
+    children.push(para(" "));
+
+    children.push(subhead("9. Cable layout"));
+    const cabHeader=["Label","Type","S, mm²","Mat","Ins","V class","Constr.","Screen","X, mm","Depth, mm","D_e, mm","Tmax, °C","I_w, A"];
+    const cabRows = snap.result.pw.map(c=>[
+      c.label, c.type, c.size, c.mat, c.ins, c.vc, c.con, c.screen?"Yes":"No",
+      c.x, c.y, snap.getDe(c).toFixed(1), c.maxT||90, c.Iw||"—"
+    ]);
+    children.push(wideTable(cabHeader, cabRows));
+    children.push(para(" "));
+
+    children.push(subhead("10. Cable-to-cable distances (m)"));
+    const distHdr=[""].concat(snap.result.pw.map(c=>c.label));
+    const distRows = snap.result.pw.map((c,i)=>[c.label].concat(snap.distRows[i]));
+    children.push(wideTable(distHdr, distRows));
+    children.push(para(" "));
+
+    children.push(subhead("11. Per-cable derivation (Trench CAD)"));
+    snap.result.pw.forEach((c,i)=>{
+      const ri=snap.result.gr[i]; const isi=snap.result.iso[i];
+      if(!ri||!ri.conv) return;
+      const ce = (function(){for(let li=0;li<snap.layers.length;li++) if(c.y>=snap.layers[li].from&&c.y<snap.layers[li].to) return snap.layers[li]; return null;})();
+      const envT = ce ? (ce.temp!=null?ce.temp:25) : 25;
+      const rhoS = ce ? ce.rho : 1;
+      const dTd = ri.Wd*(0.5*ri.T1 + ri.n*(ri.T3+ri.T4));
+      children.push(para("11."+(i+1)+". "+c.label+" — "+c.size+" mm² "+(c.mat==="Cu"?"Cu":"Al")+" "+c.ins+" "+c.vc, {bold:true, size:20, after:80}));
+      children.push(T([
+        tableRow("Burial depth L",           c.y+" mm = "+(c.y/1000).toFixed(3)+" m"),
+        tableRow("Soil temp θ_env (layer)",  envT+" °C"),
+        tableRow("Soil ρ_T (layer)",         rhoS+" K·m/W"),
+        tableRow("R_ac at θ_max",            (ri.Rac*1000).toFixed(4)+" mΩ/m"),
+        tableRow("T₁ insulation",            ri.T1.toFixed(5)+" K·m/W"),
+        tableRow("T₃ jacket",                ri.T3.toFixed(5)+" K·m/W"),
+        tableRow("T₄ self (own buried)",     ri.T4s.toFixed(5)+" K·m/W"),
+        tableRow("T₄ mutual (neighbours)",   ri.T4m.toFixed(5)+" K·m/W"),
+        tableRow("T₄ total",                 ri.T4.toFixed(5)+" K·m/W"),
+        tableRow("T_total",                  ri.Tt.toFixed(5)+" K·m/W"),
+        tableRow("W_d dielectric",           ri.Wd.toExponential(3)+" W/m"),
+        tableRow("ΔT_d",                     dTd.toFixed(3)+" °C"),
+        tableRow("λ₁ screen-loss factor",    (ri.lambda1!=null?ri.lambda1.toFixed(4):"0")),
+        tableRow("I_z (in trench, with neighbours)",  ri.I.toFixed(1)+" A"),
+        tableRow("I_z (isolated, single buried)",     isi&&isi.I>0 ? isi.I.toFixed(1)+" A" : "—"),
+        tableRow("Mutual-heating reduction df",       isi&&isi.I>0 ? (ri.I/isi.I).toFixed(3) : "—"),
+        tableRow("θ_c at I_w = "+((c.Iw>0)?c.Iw.toFixed(0):ri.I.toFixed(0))+" A",  ri.TcWork.toFixed(1)+" °C"),
+        tableRow("Verdict (θ_c ≤ θ_max="+ (c.maxT||90)+" °C)", ri.TcWork <= (c.maxT||90) ? "PASS" : "FAIL")
+      ]));
+      children.push(para(" "));
+    });
+
+    if(snap.iec.refValue){
+      children.push(subhead("12. IEC 60502-2 Annex B cross-validation"));
+      const iecHdr=["Cable","IEC ref, A","Calculated, A","Δ, %","Verdict"];
+      const iecRows = snap.result.pw.map((c,i)=>{
+        const ri=snap.result.gr[i]; if(!ri||!ri.conv) return null;
+        const dPct = ((ri.I-snap.iec.refValue)/snap.iec.refValue*100);
+        return [c.label, snap.iec.refValue, ri.I.toFixed(0), dPct.toFixed(1), Math.abs(dPct)<10?"OK":"REVIEW"];
+      }).filter(Boolean);
+      children.push(wideTable(iecHdr, iecRows));
+      children.push(para("IEC reference conditions: Table "+snap.iec.table+", "+snap.iec.size+" mm², "+snap.iec.arrange+(snap.iec.circuits>1?", "+snap.iec.circuits+" circuits ×B.19":"")+", buried "+snap.iec.depth+" mm, ρ="+snap.iec.rho+" K·m/W, ground "+snap.iec.envT+" °C, screens bonded both ends.", {italic:true, after:200}));
+    }
+  }
+
+  children.push(subhead("Standards & methodology — PRO tier"));
+  children.push(para("This PRO report includes: parametric IEC 60287 cable rating, full trench layout with multi-cable mutual heating, per-cable conductor-temperature back-calc, distance matrix, IEC 60502-2 Annex B cross-validation, and a colour heatmap of the steady-state temperature field."));
+  children.push(para("• Skin and proximity per IEC 60287-1-1 §2.1 (k_s, k_p as per design class)."));
+  children.push(para("• Sheath loss factor λ₁ for both-ends bonded systems via the simplified Eq. 32 reduced form (cross-bonding eddy term λ₁\" of IEC 60287-1-2 not modelled)."));
+  children.push(para("• Thermal resistances T₁, T₃ per IEC 60287-2-1 closed form; T₄ uses the two-zone backfill model per IEC 60287-2-1 §2.2.7.2 with native-soil mutual heating (image method)."));
+  children.push(para("• Conductor-temperature at user load uses I²R quadratic scaling: θ_c(I_w) = θ_env + (I_w/I_z)²·Δθ + ΔT_d."));
+  children.push(para("• Heatmap is computed from the same image-method potential field; intended for visual comparison of competing layouts."));
+  children.push(para("• Cyclic ratings per IEC 60853, full magnetic-armour modelling for arbitrary geometry, in-duct configurations, and Heidler-pulse transient ratings remain open development items."));
+
+  // Header / footer with EXAMPLE marker on every page when isExample
+  const sectionProps = isExample ? {
+    properties:{},
+    headers:{ default: new Header({ children:[new Paragraph({alignment:AlignmentType.CENTER, children:[new TextRun({text:"EXAMPLE — DEMO MODE — NOT FOR ENGINEERING USE", bold:true, color:"C00000", size:18})]})]}) },
+    footers:{ default: new Footer({ children:[new Paragraph({alignment:AlignmentType.CENTER, children:[new TextRun({text:"EXAMPLE report from ieccalc.com showcase — do not use for engineering decisions.", italics:true, color:"C00000", size:16})]})]}) },
+    children
+  } : { properties:{}, children };
+
+  const doc = new Document({ creator:"ieccalc.com", title:"Cable Ampacity PRO Report" + (isExample?" (EXAMPLE)":""), sections:[sectionProps] });
+  const blob = await Packer.toBlob(doc);
+  const fname = (isExample?"EXAMPLE_":"") + "cable_ampacity_PRO_" + I.material + I.S + "_U0_" + I.U0 + "kV_Iz" + Math.round(r.I_z||0) + "A.docx";
+  saveAs(blob, fname);
+}
+
+/* ============================================================
+   TEMP-DEMO: tier comparison toggle (REMOVE BEFORE PRODUCTION)
+   ============================================================ */
+function tdbApplyState(){
+  const isPro = !location.hash.match(/dev=free/);
+  const stateEl = document.getElementById("tdbState");
+  const btnEl = document.getElementById("tdbToggle");
+  const trEl = document.getElementById("trenchCAD");
+  const proSec = document.querySelector("details.tier-section.pro");
+  const freeSec = document.querySelector("details.tier-section.free");
+  const proBtns = ["btnTrenchCAD","btnDocxPro"];
+  if(stateEl){
+    stateEl.textContent = isPro ? "PRO (showcase example, editing locked)" : "FREE (PRO section dimmed)";
+    stateEl.className = isPro ? "tdb-state-pro" : "tdb-state-free";
+  }
+  if(btnEl) btnEl.textContent = isPro ? "Switch to FREE view" : "Switch to PRO view";
+
+  // In demo PRO mode: show example, lock editing, allow Calculate + watermarked Download.
+  // In demo FREE mode: dim the PRO section, disable PRO buttons.
+  if(trEl){
+    if(isPro){
+      trEl.classList.add("demo-locked");
+      trEl.classList.remove("locked");
+      trEl.style.opacity="1"; trEl.style.pointerEvents="auto";
+    } else {
+      trEl.classList.remove("demo-locked");
+      trEl.classList.add("locked");
+      trEl.style.opacity="0.55"; trEl.style.pointerEvents="none";
+    }
+  }
+  if(proSec){
+    if(isPro){proSec.open = true;}
+    else { proSec.style.opacity="0.7"; }
+  }
+  if(freeSec){
+    // FREE block stays closed by default in PRO view, opens automatically when toggling to FREE
+    if(!isPro){freeSec.open = true;}
+  }
+  proBtns.forEach(id=>{const el=document.getElementById(id); if(el){el.disabled = !isPro; el.title = isPro?"":"PRO feature — toggle Demo PRO above to test";}});
+}
+function tdbBindToggle(){
+  const btn = document.getElementById("tdbToggle");
+  if(!btn) return;
+  btn.addEventListener("click", () => {
+    const isPro = !location.hash.match(/dev=free/);
+    if(isPro){
+      // switch to FREE: clear dev hash, force License.refresh
+      location.hash = "dev=free";
+    } else {
+      location.hash = "dev=lifetime";
+    }
+    location.reload();
+  });
+  // default: if no hash, treat as PRO (demo mode)
+  if(!location.hash){location.hash="dev=lifetime"; return;}
+}
+
+/* ============================================================
+   INIT
+   ============================================================ */
+window.addEventListener("DOMContentLoaded", () => {
+  tdbBindToggle();   // TEMP-DEMO
+  tdbApplyState();   // TEMP-DEMO
+
+  populateCrossSections();
+  applyTypicalDefaults();   // also calls recalc()
+
+  // Init Trench CAD module — always. const Trench is module-scoped, NOT on window — call directly.
+  if(typeof Trench !== "undefined") Trench.init();
+
+  document.getElementById("btnRecalc").addEventListener("click", recalc);
+  document.getElementById("btnReset").addEventListener("click", applyTypicalDefaults);
+  document.getElementById("btnDocx").addEventListener("click", downloadDocx);
+  document.getElementById("btnDocxPro").addEventListener("click", () => {
+    // TEMP-DEMO: in dev (#dev=lifetime / #dev=free) the licence is "isDev:true" — let download proceed
+    // but stamp the report with EXAMPLE watermark so it's clearly not for engineering use.
+    const lic = (window.License && License.getSync) ? License.getSync() : null;
+    const isDemoExample = lic && lic.isDev === true;
+    if(isDemoExample){
+      downloadDocxPro({example:true});
+      return;
+    }
+    if(window.License && License.gate){
+      License.gate("full_report", { onAllowed: () => downloadDocxPro({example:false}) });
+    } else { downloadDocxPro({example:false}); }
+  });
+  document.getElementById("btnTrenchCAD").addEventListener("click", () => {
+    if(window.License && License.gate){
+      License.gate("trench_cad", { onAllowed: () => Trench.show() });
+    } else { Trench.show(); }
+  });
+  document.getElementById("btnValidate").addEventListener("click", runValidation);
+  document.getElementById("regionPreset").addEventListener("change", applyRegionPreset);
+  document.getElementById("insulation").addEventListener("change", () => { autoSetThetaMax(); recalc(); });
+
+  // recalc on every input change (only main form, not trench CAD inputs)
+  document.querySelectorAll(".container > .layout input, .container > .layout select, .container > .toolbar input, .container > .toolbar select").forEach(el => {
+    el.addEventListener("change", recalc);
+  });
+});
+</script>
+
+</body>
+</html>

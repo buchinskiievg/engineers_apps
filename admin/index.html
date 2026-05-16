@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Admin — ieccalc.com</title>
+<style>
+  :root {
+    --bg:#c8ccd1; --panel-2:#ffffff; --ink:#000; --ink-soft:#1a1a1a; --muted:#3a3f44;
+    --line:#8a8f94; --line-soft:#b4b9bd;
+    --btn:#3c4043; --btn-hover:#23272a;
+    --ok:#0c5826; --err:#9b1c1c;
+    --sans:"Arial Narrow", Arial, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  *, *::before, *::after { box-sizing:border-box; }
+  body { margin:0; font-family:var(--sans); background:var(--bg); color:var(--ink); }
+  header { background:var(--btn); color:#fff; padding:10px 18px; display:flex; justify-content:space-between; align-items:center; }
+  header h1 { margin:0; font-size:16px; font-weight:700; letter-spacing:0.04em; }
+  header a { color:#fff; font-size:12px; text-decoration:none; opacity:0.85; }
+  header a:hover { opacity:1; }
+  .layout { display:grid; grid-template-columns:200px 1fr; min-height:calc(100vh - 38px); }
+  @media (max-width:780px) { .layout { grid-template-columns:1fr; } }
+  nav.side { background:#1f2326; color:#cdd1d4; padding:10px 0; }
+  nav.side a { display:block; padding:8px 16px; color:#cdd1d4; text-decoration:none; font-size:13px; border-left:3px solid transparent; }
+  nav.side a:hover { background:#272b2e; color:#fff; }
+  nav.side a.active { background:#2c3033; color:#fff; border-left-color:#fff; }
+  main { padding:20px 22px; background:#dee1e4; }
+  .stat-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(170px, 1fr)); gap:10px; margin-bottom:18px; }
+  .stat { background:var(--panel-2); border:1px solid var(--line-soft); border-radius:4px; padding:12px 14px; }
+  .stat .l { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; }
+  .stat .v { font-size:22px; font-weight:700; font-family:Consolas, monospace; margin-top:2px; }
+  h2 { margin:18px 0 10px; font-size:16px; }
+  table { width:100%; border-collapse:collapse; background:var(--panel-2); border:1px solid var(--line); font-size:13px; }
+  th, td { padding:7px 10px; border-bottom:1px solid var(--line-soft); text-align:left; }
+  th { background:#eef0f2; font-size:12px; }
+  tr:hover td { background:#f4f6f8; }
+  .row-actions button { font:inherit; font-size:11.5px; padding:3px 8px; background:transparent; border:1px solid var(--line); border-radius:3px; cursor:pointer; margin-right:4px; }
+  .row-actions button.danger { color:var(--err); border-color:var(--err); }
+  .toolbar { display:flex; gap:8px; margin-bottom:10px; align-items:center; flex-wrap:wrap; }
+  .toolbar input, .toolbar select { font:inherit; padding:5px 8px; border:1px solid var(--line); border-radius:3px; }
+  button.primary { font:inherit; padding:6px 14px; background:var(--btn); color:#fff; border:0; border-radius:3px; cursor:pointer; font-weight:700; }
+  button.primary:hover { background:var(--btn-hover); }
+  pre.json { background:#1f2326; color:#cdd1d4; padding:10px 12px; border-radius:3px; font-size:12px; overflow:auto; max-height:60vh; }
+  .msg { font-size:12.5px; padding:6px 10px; border-radius:3px; margin:8px 0; }
+  .msg.err { background:#fcebea; color:var(--err); border:1px solid #f1bdb9; }
+  .msg.ok  { background:#e6f4ea; color:var(--ok); border:1px solid #bde0c5; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>ieccalc.com · admin</h1>
+    <div>
+      <span id="user-info" style="font-size:12px;opacity:0.8;margin-right:14px"></span>
+      <a href="/">← back to site</a>
+    </div>
+  </header>
+  <div class="layout">
+    <nav class="side">
+      <a data-view="dashboard" class="active">Dashboard</a>
+      <a data-view="calculators">Calculators</a>
+      <a data-view="pricing-rules">Pricing rules</a>
+      <a data-view="orders">Orders</a>
+      <a data-view="licenses">Licences</a>
+      <a data-view="users">Users</a>
+      <a data-view="leads">Leads</a>
+      <a data-view="campaigns">Email campaigns</a>
+      <a data-view="articles">Content</a>
+      <a data-view="events">Events log</a>
+    </nav>
+    <main id="main">
+      <div id="msg-box"></div>
+      <section id="view"></section>
+    </main>
+  </div>
+
+  <script src="/_lib/api.js"></script>
+  <script>
+    const $ = sel => document.querySelector(sel);
+    const view = $("#view");
+    const msg = (text, cls = "ok") => { $("#msg-box").innerHTML = text ? `<div class="msg ${cls}">${text}</div>` : ""; };
+
+    function esc(s) { return String(s||"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
+    function fmtDate(t) { return t ? new Date(t).toISOString().slice(0,16).replace("T"," ") : "—"; }
+
+    async function api(path, opts = {}) {
+      const r = await fetch(IecApi.base + path, {
+        method: opts.method || "GET",
+        headers: { "Content-Type":"application/json", ...(opts.headers||{}) },
+        body: opts.body ? JSON.stringify(opts.body) : undefined,
+        credentials: "include",
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw Object.assign(new Error(data.error || r.statusText), { status: r.status, body: data });
+      return data;
+    }
+
+    // Views
+    const views = {
+      async dashboard() {
+        const s = await api("/admin/analytics/summary");
+        const stats = [
+          ["Users",            s.users],
+          ["Active licences",  s.active_licenses],
+          ["Paid orders",      s.paid_orders],
+          ["Revenue (USD)",    "$" + Number(s.revenue_usd || 0).toFixed(2)],
+          ["Subscribed leads", s.subscribed_leads],
+          ["Events (24h)",     s.events_24h],
+        ];
+        view.innerHTML = `
+          <h2>Dashboard</h2>
+          <div class="stat-grid">${stats.map(([l,v]) => `<div class="stat"><div class="l">${l}</div><div class="v">${v ?? "—"}</div></div>`).join("")}</div>
+          <h2>Top calculators (7 days)</h2>
+          <table><thead><tr><th>Calculator</th><th>Hits</th></tr></thead><tbody>
+            ${(s.top_calculators_7d||[]).map(r => `<tr><td>#${esc(r.calc_slug)}</td><td>${r.hits}</td></tr>`).join("") || "<tr><td colspan=2>No data yet.</td></tr>"}
+          </tbody></table>`;
+      },
+
+      async calculators() { return crudView("calculators", "Calculators",
+        ["id","slug","name","category","tier","display_order"], { editable:true }); },
+      async ["pricing-rules"]() { return crudView("pricing-rules", "Pricing rules",
+        ["id","name","match_type","period","price_usd","badge","active","display_order"], { editable:true }); },
+      async articles() { return crudView("articles", "Articles",
+        ["id","slug","title","status","published_at"], { editable:true }); },
+      async licenses() { return crudView("licenses", "Licences",
+        ["id","user_id","calc_id","period","starts_at","expires_at","revoked","source"], { editable:true }); },
+      async orders() { return crudView("orders", "Orders",
+        ["id","user_id","ls_order_id","status","amount_usd","currency","paid_at"], { editable:false }); },
+      async users() { return crudView("users", "Users",
+        ["id","email","name","marketing_optin","created_at","last_login_at"], { editable:false }); },
+      async leads() { return crudView("leads", "Leads",
+        ["id","email","source","calc_slug","subscribed","created_at"], { editable:true }); },
+      async campaigns() { return crudView("campaigns", "Email campaigns",
+        ["id","name","subject","status","recipients_count","sent_at"], { editable:true, extraActions: (row) => row.status === "draft"
+          ? `<button data-act="send" data-id="${row.id}">Send</button>` : "" }); },
+
+      async events() {
+        const url = new URL(IecApi.base + "/admin/events");
+        const params = new URLSearchParams(location.hash.split("?")[1] || "");
+        ["type","calc","limit"].forEach(k => params.get(k) && url.searchParams.set(k, params.get(k)));
+        const { events } = await fetch(url, { credentials:"include" }).then(r => r.json());
+        view.innerHTML = `
+          <h2>Events log <span style="font-size:12px;color:var(--muted);font-weight:400">(latest 200)</span></h2>
+          <div class="toolbar">
+            <input id="evt-type" placeholder="event_type filter">
+            <input id="evt-calc" placeholder="calc_slug filter">
+            <button class="primary" id="evt-apply">Apply</button>
+          </div>
+          <table><thead><tr><th>ID</th><th>When</th><th>Type</th><th>User</th><th>Calc</th><th>Feature</th><th>Payload</th></tr></thead><tbody>
+            ${(events||[]).map(e => `<tr>
+              <td>${e.id}</td><td>${fmtDate(e.created_at)}</td><td>${esc(e.event_type)}</td>
+              <td>${esc(e.email || ("u#"+(e.user_id||"")))}</td>
+              <td>${esc(e.calc_slug||"")}</td><td>${esc(e.feature||"")}</td>
+              <td><code style="font-size:11px">${esc((e.payload_json||"").slice(0,80))}</code></td>
+            </tr>`).join("")}
+          </tbody></table>`;
+        $("#evt-apply").addEventListener("click", () => {
+          const params = new URLSearchParams();
+          if ($("#evt-type").value) params.set("type", $("#evt-type").value);
+          if ($("#evt-calc").value) params.set("calc", $("#evt-calc").value);
+          location.hash = "events?" + params.toString();
+        });
+      },
+    };
+
+    async function crudView(resource, title, cols, opts = {}) {
+      const { items } = await api("/admin/" + resource);
+      view.innerHTML = `
+        <h2>${title} <span style="font-size:12px;color:var(--muted);font-weight:400">(${items.length})</span></h2>
+        ${opts.editable ? `<div class="toolbar"><button class="primary" id="btn-new">+ New</button></div>` : ""}
+        <table><thead><tr>${cols.map(c => `<th>${c}</th>`).join("")}${opts.editable ? "<th></th>" : ""}</tr></thead><tbody>
+          ${items.map(row => `<tr data-id="${row.id}">
+            ${cols.map(c => `<td>${esc(formatCell(c, row[c]))}</td>`).join("")}
+            ${opts.editable ? `<td class="row-actions">
+              ${opts.extraActions ? opts.extraActions(row) : ""}
+              <button data-act="edit" data-id="${row.id}">Edit</button>
+              <button class="danger" data-act="del" data-id="${row.id}">Delete</button>
+            </td>` : ""}
+          </tr>`).join("")}
+        </tbody></table>
+      `;
+      view.querySelectorAll("[data-act]").forEach(b => b.addEventListener("click", async () => {
+        const id = b.dataset.id, act = b.dataset.act;
+        if (act === "del" && confirm("Delete record #" + id + "?")) {
+          await api(`/admin/${resource}/${id}`, { method: "DELETE" });
+          msg("Deleted #" + id);
+          views[resource.replace("-","_")] ? views[resource.replace("-","_")]() : crudView(resource, title, cols, opts);
+        }
+        if (act === "edit") {
+          const r = await api(`/admin/${resource}/${id}`);
+          const newJson = prompt("Edit JSON for #" + id + ":", JSON.stringify(r.item, null, 2));
+          if (newJson) {
+            try {
+              const body = JSON.parse(newJson);
+              await api(`/admin/${resource}/${id}`, { method: "PUT", body });
+              msg("Saved #" + id);
+              crudView(resource, title, cols, opts);
+            } catch (e) { msg("Save failed: " + e.message, "err"); }
+          }
+        }
+        if (act === "send") {
+          if (!confirm("Send campaign #" + id + " to all matching subscribers?")) return;
+          msg("Sending…");
+          const r = await api(`/admin/campaigns/${id}/send`, { method: "POST" });
+          msg(`Sent: ${r.sent}, failed: ${r.failed}`);
+          crudView(resource, title, cols, opts);
+        }
+      }));
+      $("#btn-new")?.addEventListener("click", async () => {
+        const tmpl = templateFor(resource);
+        const body = prompt("New " + resource + " (JSON):", JSON.stringify(tmpl, null, 2));
+        if (!body) return;
+        try {
+          await api("/admin/" + resource, { method: "POST", body: JSON.parse(body) });
+          msg("Created.");
+          crudView(resource, title, cols, opts);
+        } catch (e) { msg("Create failed: " + e.message, "err"); }
+      });
+    }
+
+    function templateFor(resource) {
+      if (resource === "calculators")  return { slug:"005", name:"New calculator", short_desc:"", standards:"", category:"pro", tier:"coming_soon", base_url:"/005/", display_order:50 };
+      if (resource === "pricing-rules") return { name:"New rule", match_type:"per_item", period:"month", price_usd:5.99, active:1, display_order:50 };
+      if (resource === "articles")     return { slug:"first-article", title:"First article", excerpt:"", body_md:"# Heading", status:"draft", tags_json:"[]" };
+      if (resource === "leads")        return { email:"user@example.com", source:"admin", subscribed:1 };
+      if (resource === "campaigns")    return { name:"Campaign", subject:"Subject line", body_html:"<p>Hello</p>", segment_query:"" };
+      return {};
+    }
+
+    function formatCell(col, val) {
+      if (val == null) return "—";
+      if (["created_at","updated_at","paid_at","starts_at","expires_at","last_login_at","sent_at","published_at","refunded_at"].includes(col)) return fmtDate(val);
+      if (typeof val === "string" && val.length > 60) return val.slice(0,60) + "…";
+      return val;
+    }
+
+    // Navigation
+    document.querySelectorAll("nav.side a").forEach(a => a.addEventListener("click", e => {
+      e.preventDefault();
+      document.querySelectorAll("nav.side a").forEach(x => x.classList.remove("active"));
+      a.classList.add("active");
+      location.hash = a.dataset.view;
+      load(a.dataset.view);
+    }));
+
+    async function load(name) {
+      msg("");
+      try {
+        const fn = views[name] || views.dashboard;
+        await fn();
+      } catch (e) {
+        if (e.status === 401) {
+          view.innerHTML = `<div class="msg err">Not authenticated.
+            <br><br>Open <a href="/account/?intent=signin">/account/</a> and sign in with an admin email,
+            or configure Cloudflare Access on this path.</div>`;
+        } else {
+          msg("Load failed: " + e.message, "err");
+        }
+      }
+    }
+
+    // Show user info
+    IecApi.me().then(s => {
+      if (s.authenticated) $("#user-info").textContent = s.user.email;
+    }).catch(()=>{});
+
+    const initial = (location.hash || "#dashboard").slice(1).split("?")[0];
+    const tab = document.querySelector(`nav.side a[data-view="${initial}"]`) || document.querySelector("nav.side a");
+    tab.click();
+  </script>
+</body>
+</html>
