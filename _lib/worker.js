@@ -40,14 +40,27 @@
 // Secrets: JWT_SECRET, LS_WEBHOOK_SIGNING_SECRET, LS_API_KEY, RESEND_API_KEY, ADMIN_API_KEY
 // Vars:    SITE_URL, LS_STORE_SUBDOMAIN, FROM_EMAIL
 
-const CORS_ORIGIN = "*"; // tighten to https://ieccalc.com after deploy
+// Allowed origins for credentialed requests. With credentials:include
+// browsers REJECT responses that use Access-Control-Allow-Origin: * — the
+// server MUST echo a specific Origin from the allow-list.
+const CORS_ALLOWED_ORIGINS = new Set([
+  "https://ieccalc.com",
+  "https://www.ieccalc.com",
+  "http://localhost:8780",
+  "http://localhost:8781",
+  "http://127.0.0.1:8780",
+  "http://127.0.0.1:8781",
+]);
 
 function corsHeaders(req) {
+  const origin = req && req.headers && req.headers.get("Origin");
+  const allow = origin && CORS_ALLOWED_ORIGINS.has(origin) ? origin : "https://ieccalc.com";
   return {
-    "Access-Control-Allow-Origin":  CORS_ORIGIN,
+    "Access-Control-Allow-Origin":  allow,
     "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Signature, X-Admin-Key",
     "Access-Control-Allow-Credentials": "true",
+    "Vary": "Origin",
   };
 }
 
