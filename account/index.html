@@ -69,14 +69,43 @@
     </div>
 
     <div id="signed-out" class="card" style="display:none">
-      <h2 style="margin-top:0">Sign in with a one-time link</h2>
-      <p style="font-size:13px;color:var(--muted)">Enter your email — we'll send a one-time sign-in link. No password.</p>
+      <h2 style="margin-top:0">Sign in</h2>
+
+      <div class="oauth-row">
+        <a class="oauth-btn google" href="https://api.ieccalc.com/auth/google?r=%2Faccount%2F">
+          <svg viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.79 2.71v2.26h2.9c1.7-1.56 2.69-3.87 2.69-6.61z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.81 5.96-2.18l-2.9-2.26c-.81.54-1.84.86-3.06.86-2.35 0-4.35-1.59-5.06-3.72H.97v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.94 10.7A5.4 5.4 0 0 1 3.66 9c0-.59.1-1.16.28-1.7V4.97H.97A9 9 0 0 0 0 9c0 1.45.35 2.83.97 4.03l2.97-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.51.45 3.44 1.35l2.58-2.58A9 9 0 0 0 9 0 9 9 0 0 0 .97 4.97L3.94 7.3C4.65 5.17 6.65 3.58 9 3.58z"/></svg>
+          Sign in with Google
+        </a>
+        <a class="oauth-btn linkedin" href="https://api.ieccalc.com/auth/linkedin?r=%2Faccount%2F">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="#fff" d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+          Sign in with LinkedIn
+        </a>
+      </div>
+
+      <div class="or-divider"><span>or by email</span></div>
+
+      <p style="font-size:13px;color:var(--muted);margin:0 0 8px">Enter your email — we'll send a one-time sign-in link.</p>
       <div class="row">
         <input type="email" id="email" placeholder="you@example.com" />
         <button class="primary" id="btn-request">Send sign-in link</button>
       </div>
       <div class="msg" id="auth-msg"></div>
     </div>
+
+    <style>
+      .oauth-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+      .oauth-btn { display: inline-flex; align-items: center; gap: 10px; padding: 10px 16px; border: 1px solid var(--line); border-radius: 3px; text-decoration: none; font-weight: 700; font-size: 13.5px; background: var(--panel-2); color: var(--ink); transition: background .1s, border-color .1s; min-height: 42px; }
+      .oauth-btn:hover { border-color: var(--btn); background: #f4f6f8; }
+      .oauth-btn svg { width: 18px; height: 18px; flex-shrink: 0; }
+      .oauth-btn.linkedin { background: #0a66c2; color: #fff; border-color: #0a66c2; }
+      .oauth-btn.linkedin:hover { background: #084f99; }
+      .or-divider { display: flex; align-items: center; gap: 10px; margin: 14px 0; color: var(--muted); font-size: 12px; }
+      .or-divider::before, .or-divider::after { content:''; flex:1; height: 1px; background: var(--line-soft); }
+      @media (max-width: 480px) {
+        .oauth-row { flex-direction: column; }
+        .oauth-btn { width: 100%; justify-content: center; }
+      }
+    </style>
 
     <div id="signed-in" style="display:none">
       <h2>My licences</h2>

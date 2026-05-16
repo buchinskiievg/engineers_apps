@@ -99,6 +99,11 @@ async function dispatch(req, env, ctx, url, path) {
   if (path === "/auth/callback" && method === "GET") return authCallback(req, env, url);
   if (path === "/auth/signout" && method === "POST") return authSignout(req, env);
   if (path === "/me" && method === "GET") return me(req, env);
+  // OAuth — Google + LinkedIn (OpenID Connect)
+  if (path === "/auth/google" && method === "GET") return oauthStart(req, env, url, "google");
+  if (path === "/auth/google/callback" && method === "GET") return oauthCallback(req, env, url, "google");
+  if (path === "/auth/linkedin" && method === "GET") return oauthStart(req, env, url, "linkedin");
+  if (path === "/auth/linkedin/callback" && method === "GET") return oauthCallback(req, env, url, "linkedin");
 
   // ── Cart / leads / events ──────────────────────────────────────────────
   if (path === "/cart/quote" && method === "POST") return cartQuote(req, env);
@@ -251,6 +256,135 @@ async function me(req, env) {
     "ORDER BY l.expires_at IS NULL DESC, l.expires_at DESC"
   ).bind(user.id, now()).all();
   return json({ authenticated: true, user, licenses });
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// OAuth (OpenID Connect — Google + LinkedIn)
+// ════════════════════════════════════════════════════════════════════════
+const OAUTH = {
+  google: {
+    authz:    "https://accounts.google.com/o/oauth2/v2/auth",
+    token:    "https://oauth2.googleapis.com/token",
+    userinfo: "https://openidconnect.googleapis.com/v1/userinfo",
+    scope:    "openid email profile",
+    idEnv:    "GOOGLE_CLIENT_ID",
+    secEnv:   "GOOGLE_CLIENT_SECRET",
+  },
+  linkedin: {
+    authz:    "https://www.linkedin.com/oauth/v2/authorization",
+    token:    "https://www.linkedin.com/oauth/v2/accessToken",
+    userinfo: "https://api.linkedin.com/v2/userinfo",
+    scope:    "openid email profile",
+    idEnv:    "LINKEDIN_CLIENT_ID",
+    secEnv:   "LINKEDIN_CLIENT_SECRET",
+  },
+};
+
+async function oauthStart(req, env, url, provider) {
+  const cfg = OAUTH[provider];
+  if (!cfg) return err("unknown provider", 404);
+  const clientId = env[cfg.idEnv];
+  if (!clientId) return err(`${provider} OAuth not configured (missing ${cfg.idEnv})`, 503);
+
+  const state = randomToken(16);
+  const redirect = url.searchParams.get("r") || "/account/";
+  // Store state in short-lived auth_tokens row so callback can validate it
+  await env.DB.prepare(
+    "INSERT INTO auth_tokens (token, email, purpose, expires_at, created_at) VALUES (?, ?, ?, ?, ?)"
+  ).bind(state, redirect, `oauth_state_${provider}`, now() + 10 * 60 * 1000, now()).run();
+
+  const redirectUri = `${siteApi(env)}/auth/${provider}/callback`;
+  const params = new URLSearchParams({
+    client_id:     clientId,
+    redirect_uri:  redirectUri,
+    response_type: "code",
+    scope:         cfg.scope,
+    state,
+  });
+  return Response.redirect(`${cfg.authz}?${params.toString()}`, 302);
+}
+
+async function oauthCallback(req, env, url, provider) {
+  const cfg = OAUTH[provider];
+  if (!cfg) return err("unknown provider", 404);
+  const code = url.searchParams.get("code");
+  const state = url.searchParams.get("state");
+  if (!code || !state) return err("missing code or state");
+
+  // Validate state
+  const stateRow = await env.DB.prepare(
+    "SELECT email AS redirect_to, consumed_at, expires_at FROM auth_tokens WHERE token = ? AND purpose = ?"
+  ).bind(state, `oauth_state_${provider}`).first();
+  if (!stateRow) return err("invalid state", 401);
+  if (stateRow.consumed_at) return err("state already used", 401);
+  if (stateRow.expires_at < now()) return err("state expired", 401);
+  await env.DB.prepare("UPDATE auth_tokens SET consumed_at = ? WHERE token = ?").bind(now(), state).run();
+
+  const redirectUri = `${siteApi(env)}/auth/${provider}/callback`;
+  // Exchange code for access_token
+  const tokenResp = await fetch(cfg.token, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: redirectUri,
+      client_id:     env[cfg.idEnv],
+      client_secret: env[cfg.secEnv],
+    }).toString(),
+  });
+  if (!tokenResp.ok) {
+    const detail = await tokenResp.text();
+    console.error(`${provider} token exchange failed:`, detail);
+    return err(`${provider} token exchange failed: ${detail.slice(0, 200)}`, 502);
+  }
+  const tokenJson = await tokenResp.json();
+  const accessToken = tokenJson.access_token;
+  if (!accessToken) return err("no access_token in response", 502);
+
+  // Fetch userinfo
+  const uiResp = await fetch(cfg.userinfo, {
+    headers: { "Authorization": `Bearer ${accessToken}` },
+  });
+  if (!uiResp.ok) {
+    const detail = await uiResp.text();
+    console.error(`${provider} userinfo failed:`, detail);
+    return err(`${provider} userinfo failed`, 502);
+  }
+  const profile = await uiResp.json();
+  const email = (profile.email || "").toLowerCase();
+  if (!email) return err(`${provider} did not return an email — make sure email scope is granted`, 400);
+  const name = profile.name || profile.given_name || null;
+
+  // Upsert user
+  await env.DB.prepare(
+    "INSERT INTO users (email, name, created_at, last_login_at) VALUES (?, ?, ?, ?) " +
+    "ON CONFLICT(email) DO UPDATE SET name = COALESCE(users.name, excluded.name), last_login_at = excluded.last_login_at"
+  ).bind(email, name, now(), now()).run();
+
+  // Issue session
+  const sessionToken = randomToken(32);
+  const sessionExpires = now() + 30 * 86400 * 1000;
+  await env.DB.prepare(
+    "INSERT INTO auth_tokens (token, email, purpose, expires_at, created_at) VALUES (?, ?, 'session', ?, ?)"
+  ).bind(sessionToken, email, sessionExpires, now()).run();
+
+  const cookie = `iec_sess=${sessionToken}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${30 * 86400}`;
+  const redirectTo = stateRow.redirect_to || "/account/";
+  return new Response(null, {
+    status: 302,
+    headers: {
+      "Location": `${env.SITE_URL || "https://ieccalc.com"}${redirectTo}`,
+      "Set-Cookie": cookie,
+      ...corsHeaders(req),
+    },
+  });
+}
+
+function siteApi(env) {
+  // api.ieccalc.com — derived from SITE_URL host, or hard-coded if not set
+  const site = env.SITE_URL || "https://ieccalc.com";
+  return site.replace("://", "://api.").replace("api.www.", "api.");
 }
 
 // ════════════════════════════════════════════════════════════════════════
