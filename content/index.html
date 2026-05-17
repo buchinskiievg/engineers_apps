@@ -1,56 +1,153 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Engineering content — ieccalc.com</title>
-<meta name="description" content="Engineering articles, worked examples and case studies for substation, cable and grounding design — IEC / IEEE / UAE-GCC context." />
-<style>
-  :root {
-    --bg:#c8ccd1; --panel-2:#ffffff; --ink:#000; --ink-soft:#1a1a1a; --muted:#3a3f44;
-    --line:#8a8f94; --line-soft:#b4b9bd; --btn:#3c4043;
-    --accent:#1a3a6a;
-    --sans:"Arial Narrow", Arial, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  }
-  *, *::before, *::after { box-sizing:border-box; }
-  body { margin:0; font-family:var(--sans); background:var(--bg); color:var(--ink); line-height:1.55; }
-  .container { max-width:880px; margin:0 auto; padding:28px 18px 64px; }
-  .home { font-size:12px; font-weight:700; color:var(--btn); text-decoration:none; }
-  h1 { margin:6px 0 4px; font-size:26px; }
-  .sub { color:var(--muted); font-size:13.5px; margin-bottom:20px; }
-  .article { background:var(--panel-2); border:1px solid var(--line); border-left:4px solid var(--accent); border-radius:4px; padding:18px 22px; text-decoration:none; color:var(--ink); display:block; }
-  .article + .article { margin-top:12px; }
-  .meta { font-size:11.5px; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; }
-  .title { font-size:18px; font-weight:700; margin:4px 0 6px; }
-  .excerpt { font-size:13.5px; color:var(--muted); }
-  .empty { background:var(--panel-2); border:1px dashed var(--line); border-radius:4px; padding:30px; text-align:center; color:var(--muted); font-size:13.5px; }
-</style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Content &mdash; IECCalc.com</title>
+<meta name="description" content="Articles, videos, presentations and posts on power engineering — short-circuit, cables, grounding, standards." />
+<link rel="stylesheet" href="/_lib/design.css?v=metal10" />
 <link rel="stylesheet" href="/_lib/mobile.css" />
+<style>
+  html, body { height: 100%; } body { background: var(--paper); }
+  /* Filter chips */
+  .cn-filters { display: flex; gap: 6px; padding: 18px 48px; background: var(--carbon); align-items: center; overflow-x: auto; }
+  .cn-filter { font: 800 11px/1 var(--sans); letter-spacing: 0.12em; text-transform: uppercase; padding: 8px 14px; border: 1px solid rgba(255,255,255,0.18); background: transparent; color: rgba(255,255,255,0.7); cursor: pointer; }
+  .cn-filter:hover { color: #fff; border-color: rgba(255,255,255,0.4); }
+  .cn-filter.is-on { color: #fff; background: var(--red); border-color: var(--red); }
+  /* Feed grid */
+  .cn-feed { max-width: 1280px; margin: 0 auto; padding: 32px 48px 60px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; }
+  @media (max-width:980px) { .cn-feed { grid-template-columns: 1fr 1fr; padding: 22px 18px; } }
+  @media (max-width:600px) { .cn-feed { grid-template-columns: 1fr; } }
+  .cn-card { background: var(--surface); border: 1px solid var(--border); text-decoration: none; color: inherit; display: flex; flex-direction: column; transition: border-color .12s; }
+  .cn-card:hover { border-color: var(--ink); }
+  .cn-cover { aspect-ratio: 16 / 9; background: var(--ink) center/cover; color: #fff; display: flex; align-items: center; justify-content: center; font: 900 22px/1 var(--display); }
+  .cn-cover-empty { background: linear-gradient(135deg, var(--ink-2), var(--carbon)); }
+  .cn-cover img { width: 100%; height: 100%; object-fit: cover; }
+  .cn-meta { display: flex; gap: 8px; align-items: center; padding: 12px 16px 6px; font: 800 10.5px/1 var(--sans); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); }
+  .cn-type { padding: 3px 7px; background: var(--ink); color: #fff; font-size: 10px; letter-spacing: 0.14em; }
+  .cn-type.article { background: var(--ink); }
+  .cn-type.video { background: var(--red); }
+  .cn-type.presentation { background: #1a3a6a; }
+  .cn-type.post { background: var(--green); }
+  .cn-title { font: 800 18px/1.2 var(--display); padding: 4px 16px 8px; margin: 0; letter-spacing: -0.01em; }
+  .cn-preview { font: 500 13px/1.5 var(--sans); color: var(--ink-2); padding: 0 16px 14px; flex: 1; }
+  .cn-foot { padding: 10px 16px 14px; border-top: 1px dashed var(--line); font: 600 11px/1 var(--sans); color: var(--ink-3); display: flex; justify-content: space-between; }
+  /* Subnav header */
+  .cn-head { background: var(--paper); border-bottom: 2px solid var(--ink); padding: 26px 48px 20px; max-width: 1440px; margin: 0 auto; }
+  .cn-head h1 { font: 900 36px/1 var(--display); letter-spacing: -0.03em; margin: 0; text-transform: uppercase; }
+  .cn-head p { font: 500 14px/1.5 var(--sans); color: var(--ink-2); max-width: 720px; margin: 8px 0 0; }
+  .empty { padding: 50px 24px; text-align: center; color: var(--ink-3); background: var(--surface); border: 1px dashed var(--border); grid-column: 1/-1; }
+</style>
 </head>
 <body>
-  <div class="container">
-    <a class="home" href="/">← ieccalc.com</a>
-    <h1>Engineering content</h1>
-    <div class="sub">Articles, worked examples and case studies — substation, cable, grounding, protection.</div>
-    <div id="list"><div class="empty">Loading…</div></div>
+<div class="ab v-a">
+
+<!-- Compact nav -->
+<header class="va-nav va-nav-xl">
+  <a href="/" class="logo-nav logo-nav-xl" aria-label="IECCalc.com">
+    <span class="logo-nav-mark" style="width:48px;height:48px">
+      <svg width="48" height="48" viewBox="0 0 64 64" aria-hidden="true">
+        <rect x="1" y="1" width="62" height="62" rx="3" fill="none" stroke="var(--ink)" stroke-width="2"/>
+        <line x1="32" y1="32" x2="32" y2="10" stroke="var(--ink)" stroke-width="3.5"/>
+        <line x1="32" y1="32" x2="51.05" y2="43" stroke="var(--red)" stroke-width="3.5"/>
+        <line x1="32" y1="32" x2="12.95" y2="43" stroke="var(--ink)" stroke-width="3.5"/>
+        <circle cx="32" cy="10" r="3" fill="var(--ink)"/>
+        <circle cx="51.05" cy="43" r="3" fill="var(--red)"/>
+        <circle cx="12.95" cy="43" r="3" fill="var(--ink)"/>
+        <circle cx="32" cy="32" r="4" fill="var(--ink)"/>
+      </svg>
+    </span>
+    <span class="logo-nav-stack">
+      <span class="logo-nav-word logo-nav-word-xl" style="font-size:26px"><b style="color:var(--ink)">IEC</b><b style="color:var(--red)">CALC</b><span class="logo-nav-tld" style="color:var(--ink-3)">.COM</span></span>
+      <span class="logo-nav-tag">&mdash; POWER ENGINEERING TOOLBOX &mdash;</span>
+    </span>
+  </a>
+  <nav>
+    <a href="/#tabs">TOOLBOX</a>
+    <a href="/content/" class="is-on">CONTENT</a>
+    <a href="/forum/">FORUM</a>
+    <a href="/#pricing">PRICING</a>
+  </nav>
+  <div class="va-nav-r">
+    <a href="/account/?intent=signin" class="va-sign">SIGN IN</a>
+    <a href="/account/" class="btn btn-primary btn-sm">SUBSCRIBE</a>
   </div>
+</header>
 
-  <script src="/_lib/api.js"></script>
-  <script>
-    function esc(s) { return String(s||"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
-    function fmtDate(t) { return t ? new Date(t).toISOString().slice(0,10) : ""; }
+<div class="cn-head">
+  <h1>Content</h1>
+  <p>Engineering articles, videos and presentations. Comment, vote, save for later.</p>
+</div>
 
-    IecApi.articles().then(({ articles }) => {
-      document.getElementById("list").innerHTML = articles.length
-        ? articles.map(a => `<a class="article" href="/content/${esc(a.slug)}/">
-            <div class="meta">${fmtDate(a.published_at)}</div>
-            <div class="title">${esc(a.title)}</div>
-            <div class="excerpt">${esc(a.excerpt || "")}</div>
-          </a>`).join("")
-        : `<div class="empty">No articles published yet. First piece — substation grounding under high-resistivity rocky soil in the UAE — is in editing.</div>`;
-    }).catch(e => {
-      document.getElementById("list").innerHTML = `<div class="empty">Content list offline (${esc(e.message)}). Once the API is deployed, articles will appear here.</div>`;
-    });
-  </script>
+<div class="cn-filters" id="cn-filters">
+  <button class="cn-filter is-on" data-type="all">ALL</button>
+  <button class="cn-filter" data-type="article">Articles</button>
+  <button class="cn-filter" data-type="video">Videos</button>
+  <button class="cn-filter" data-type="presentation">Presentations</button>
+  <button class="cn-filter" data-type="post">Posts</button>
+</div>
+
+<main class="cn-feed" id="cn-feed">
+  <div class="empty">Loading&hellip;</div>
+</main>
+
+</div>
+<script src="/_lib/api.js"></script>
+<script>
+(function() {
+  'use strict';
+  function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));}
+  function fmtDate(t){return t ? new Date(t).toISOString().slice(0,10) : '';}
+
+  function card(item) {
+    const t = item.type;
+    let href;
+    if (t === 'article')      href = '/content/articles/' + esc(item.key);
+    else if (t === 'video')   href = '/content/v/' + esc(item.key);
+    else if (t === 'presentation') href = '/content/p/' + esc(item.key);
+    else                      href = '/content/posts/' + esc(item.key);
+    const cover = item.cover
+      ? `<div class="cn-cover"><img src="${esc(item.cover)}" alt=""></div>`
+      : `<div class="cn-cover cn-cover-empty">${t.charAt(0).toUpperCase()}</div>`;
+    const title = item.title ? esc(item.title) : '';
+    const preview = (item.preview || '').slice(0, 180);
+    return `<a class="cn-card" href="${href}">
+      ${cover}
+      <div class="cn-meta">
+        <span class="cn-type ${t}">${t}</span>
+        <span>${fmtDate(item.published_at)}</span>
+      </div>
+      ${title ? `<h3 class="cn-title">${title}</h3>` : ''}
+      <div class="cn-preview">${esc(preview)}${preview.length === 180 ? '&hellip;' : ''}</div>
+      <div class="cn-foot"><span>0 comments</span><span>READ &rarr;</span></div>
+    </a>`;
+  }
+
+  let allFeed = [];
+  function render(filter) {
+    const list = filter === 'all' ? allFeed : allFeed.filter(x => x.type === filter);
+    const root = document.getElementById('cn-feed');
+    if (!list.length) {
+      const msg = filter === 'all'
+        ? 'No content published yet. First articles, videos and case studies coming soon.'
+        : `No <b>${filter}s</b> yet.`;
+      root.innerHTML = `<div class="empty">${msg}</div>`;
+      return;
+    }
+    root.innerHTML = list.map(card).join('');
+  }
+
+  document.getElementById('cn-filters').addEventListener('click', e => {
+    const b = e.target.closest('.cn-filter');
+    if (!b) return;
+    document.querySelectorAll('.cn-filter').forEach(x => x.classList.remove('is-on'));
+    b.classList.add('is-on');
+    render(b.dataset.type);
+  });
+
+  IecApi.contentFeed(60).then(d => { allFeed = d.feed || []; render('all'); })
+    .catch(e => { document.getElementById('cn-feed').innerHTML = '<div class="empty">Content offline (' + esc(e.message) + ').</div>'; });
+})();
+</script>
 </body>
 </html>

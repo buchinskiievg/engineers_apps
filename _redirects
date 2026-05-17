@@ -1,0 +1,6 @@
+# Cloudflare Pages dynamic-route rewrites
+/content/articles/:slug      /content/article.html      200
+/content/v/:slug             /content/video.html        200
+/content/p/:slug             /content/presentation.html 200
+/forum/c/:slug               /forum/category.html       200
+/forum/t/:id                 /forum/thread.html         200

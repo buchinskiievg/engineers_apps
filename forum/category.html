@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Category &mdash; IECCalc Forum</title>
+<link rel="stylesheet" href="/_lib/design.css?v=metal10" />
+<link rel="stylesheet" href="/_lib/mobile.css" />
+<style>
+  html, body { height: 100%; } body { background: var(--paper); }
+  .ct-head { background: var(--paper); border-bottom: 2px solid var(--ink); padding: 26px 48px 20px; max-width: 1440px; margin: 0 auto; }
+  .ct-crumb { font: 800 10.5px/1 var(--sans); letter-spacing: 0.14em; color: var(--ink-3); text-transform: uppercase; }
+  .ct-crumb a { color: var(--ink-3); text-decoration: none; }
+  .ct-crumb a:hover { color: var(--red); }
+  .ct-head h1 { font: 900 32px/1 var(--display); letter-spacing: -0.03em; margin: 8px 0; text-transform: uppercase; }
+  .ct-head .row { display: flex; gap: 14px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+  .ct-head p { font: 500 13px/1.5 var(--sans); color: var(--ink-2); max-width: 660px; margin: 0; }
+  .ct-list { max-width: 1280px; margin: 0 auto; padding: 18px 48px 60px; }
+  @media (max-width:760px) { .ct-list, .ct-head { padding-left: 16px; padding-right: 16px; } }
+  .th { display: grid; grid-template-columns: 1fr auto auto auto; gap: 18px; align-items: center; padding: 12px 18px; background: var(--surface); border: 1px solid var(--border); margin-bottom: 4px; text-decoration: none; color: var(--ink); transition: border-color .12s; }
+  .th:hover { border-color: var(--ink); }
+  .th.pinned { background: #f4e4c1; border-left: 4px solid var(--red); }
+  .th .ttl { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .th .ttl b { font: 800 15px/1.2 var(--display); }
+  .th .ttl small { font: 500 11.5px/1 var(--sans); color: var(--ink-3); }
+  .th .stat { text-align: center; min-width: 60px; }
+  .th .stat-k { font: 800 16px/1 var(--display); }
+  .th .stat-u { font: 700 9px/1 var(--sans); letter-spacing: 0.14em; color: var(--ink-3); margin-top: 3px; display: block; }
+  .empty { padding: 60px 24px; text-align: center; color: var(--ink-3); background: var(--surface); border: 1px dashed var(--border); }
+
+  /* New thread form */
+  .nt-form { background: var(--paper-2); border: 2px solid var(--ink); padding: 22px 24px; margin-bottom: 18px; }
+  .nt-form h3 { font: 900 18px/1 var(--display); margin: 0 0 10px; }
+  .nt-form input, .nt-form textarea { width: 100%; font: 500 14px/1.4 var(--sans); padding: 9px 12px; border: 1px solid var(--ink); background: var(--paper); margin-bottom: 8px; }
+  .nt-form textarea { min-height: 130px; resize: vertical; font-family: var(--sans); }
+  .nt-form .row { display: flex; gap: 10px; }
+</style>
+</head>
+<body>
+<div class="ab v-a">
+
+<header class="va-nav va-nav-xl">
+  <a href="/" class="logo-nav logo-nav-xl">
+    <span class="logo-nav-mark" style="width:40px;height:40px">
+      <svg width="40" height="40" viewBox="0 0 64 64"><rect x="1" y="1" width="62" height="62" rx="3" fill="none" stroke="var(--ink)" stroke-width="2"/><line x1="32" y1="32" x2="32" y2="10" stroke="var(--ink)" stroke-width="3.5"/><line x1="32" y1="32" x2="51.05" y2="43" stroke="var(--red)" stroke-width="3.5"/><line x1="32" y1="32" x2="12.95" y2="43" stroke="var(--ink)" stroke-width="3.5"/><circle cx="32" cy="10" r="3" fill="var(--ink)"/><circle cx="51.05" cy="43" r="3" fill="var(--red)"/><circle cx="12.95" cy="43" r="3" fill="var(--ink)"/><circle cx="32" cy="32" r="4" fill="var(--ink)"/></svg>
+    </span>
+    <span class="logo-nav-stack">
+      <span class="logo-nav-word logo-nav-word-xl" style="font-size:22px"><b style="color:var(--ink)">IEC</b><b style="color:var(--red)">CALC</b><span class="logo-nav-tld" style="color:var(--ink-3)">.COM</span></span>
+    </span>
+  </a>
+  <nav>
+    <a href="/#tabs">TOOLBOX</a><a href="/content/">CONTENT</a><a href="/forum/" class="is-on">FORUM</a><a href="/#pricing">PRICING</a>
+  </nav>
+  <div class="va-nav-r"><a href="/account/?intent=signin" class="va-sign">SIGN IN</a><a href="/account/" class="btn btn-primary btn-sm">SUBSCRIBE</a></div>
+</header>
+
+<div class="ct-head">
+  <div class="ct-crumb"><a href="/forum/">&larr; All categories</a></div>
+  <div class="row">
+    <div>
+      <h1 id="cat-name">Loading&hellip;</h1>
+      <p id="cat-desc"></p>
+    </div>
+    <button class="btn btn-primary" id="btn-new-thread">+ NEW THREAD</button>
+  </div>
+</div>
+
+<main class="ct-list">
+  <div class="nt-form hidden" id="nt-form">
+    <h3>New thread</h3>
+    <input type="text" id="nt-title" placeholder="Title (1 sentence)" maxlength="180"/>
+    <textarea id="nt-body" placeholder="Body — markdown supported."></textarea>
+    <div class="row">
+      <button class="btn btn-primary" id="nt-submit">POST</button>
+      <button class="btn" id="nt-cancel">CANCEL</button>
+    </div>
+    <div class="va-modal-msg" id="nt-msg"></div>
+  </div>
+  <div id="threads"><div class="empty">Loading&hellip;</div></div>
+</main>
+
+</div>
+<script src="/_lib/api.js"></script>
+<script>
+(function() {
+  'use strict';
+  function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));}
+  function fmtDate(t){return t ? new Date(t).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '';}
+  function timeAgo(t){if(!t) return '';const s=(Date.now()-t)/1000;if(s<60)return 'just now';if(s<3600)return Math.floor(s/60)+'m ago';if(s<86400)return Math.floor(s/3600)+'h ago';return Math.floor(s/86400)+'d ago';}
+
+  // Extract slug from URL — _redirects rewrites /forum/c/<slug> to /forum/category.html
+  // but Pages forwards original URL; window.location.pathname returns /forum/c/<slug>
+  const m = location.pathname.match(/\/forum\/c\/([\w-]+)/);
+  const slug = m ? m[1] : null;
+  if (!slug) { document.body.innerHTML = '<p style="padding:40px;text-align:center">Category not specified.</p>'; return; }
+
+  // Load category info + threads
+  Promise.all([IecApi.forumCategories(), IecApi.forumThreads(slug)])
+    .then(([cd, td]) => {
+      const cat = (cd.categories || []).find(c => c.slug === slug);
+      if (!cat) throw new Error('Category not found');
+      document.title = cat.name + ' — IECCalc Forum';
+      document.getElementById('cat-name').textContent = cat.name.toUpperCase();
+      document.getElementById('cat-desc').textContent = cat.description || '';
+      window.__cat = cat;
+      const threads = td.threads || [];
+      const root = document.getElementById('threads');
+      if (!threads.length) {
+        root.innerHTML = '<div class="empty">No threads in this category yet. Start the first one!</div>';
+        return;
+      }
+      root.innerHTML = threads.map(t => `<a href="/forum/t/${t.id}" class="th${t.pinned ? ' pinned' : ''}">
+        <div class="ttl">
+          <b>${esc(t.title)}</b>
+          <small>by ${esc(t.author_name || t.author_email || 'anon')} &middot; ${fmtDate(t.created_at)}</small>
+        </div>
+        <div class="stat"><span class="stat-k">${t.reply_count || 0}</span><span class="stat-u">REPLIES</span></div>
+        <div class="stat"><span class="stat-k">${t.views || 0}</span><span class="stat-u">VIEWS</span></div>
+        <div class="stat"><span class="stat-k" style="font-size:11px;font-weight:600">${timeAgo(t.last_reply_at || t.created_at)}</span><span class="stat-u">LAST</span></div>
+      </a>`).join('');
+    })
+    .catch(e => {
+      document.getElementById('threads').innerHTML = '<div class="empty">Forum offline (' + esc(e.message) + ').</div>';
+    });
+
+  // New thread form
+  const form = document.getElementById('nt-form');
+  document.getElementById('btn-new-thread').addEventListener('click', () => {
+    form.classList.remove('hidden');
+    document.getElementById('nt-title').focus();
+  });
+  document.getElementById('nt-cancel').addEventListener('click', () => form.classList.add('hidden'));
+  document.getElementById('nt-submit').addEventListener('click', async () => {
+    const title = document.getElementById('nt-title').value.trim();
+    const body = document.getElementById('nt-body').value.trim();
+    const msgEl = document.getElementById('nt-msg');
+    if (!title || !body) { msgEl.textContent = 'Title and body required'; msgEl.className='va-modal-msg err'; return; }
+    msgEl.textContent = 'Posting…'; msgEl.className='va-modal-msg';
+    try {
+      const r = await IecApi.createThread(slug, title, body);
+      location.href = '/forum/t/' + r.id;
+    } catch (e) {
+      msgEl.textContent = e.message || 'Post failed';
+      msgEl.className = 'va-modal-msg err';
+      if (e.status === 401) msgEl.textContent = 'Sign in to post.';
+    }
+  });
+})();
+</script>
+</body>
+</html>

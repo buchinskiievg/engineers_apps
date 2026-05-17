@@ -1,241 +1,532 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>ieccalc.com — IEC engineering calculators by Eng. Evgenii Buchinskii</title>
-<meta name="description" content="Online IEC calculators for electrical / power engineers. UAE / GCC defaults, Word report on every run. Free and Professional tools + engineering content." />
-<style>
-  :root {
-    --bg:#c8ccd1; --bg-soft:#d8dbdf; --panel:#eef0f2; --panel-2:#ffffff;
-    --ink:#000000; --ink-soft:#1a1a1a; --muted:#3a3f44;
-    --line:#8a8f94; --line-soft:#b4b9bd;
-    --btn:#3c4043; --btn-hover:#23272a; --btn-ink:#ffffff;
-    --chip-bg:#3c4043; --chip-ink:#ffffff;
-    --accent-free:#0c5826; --accent-pro:#7a3a00; --accent-content:#1a3a6a;
-    --sans:"Arial Narrow", Arial, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  }
-  *, *::before, *::after { box-sizing: border-box; }
-  body { margin:0; font-family:var(--sans); color:var(--ink); background:var(--bg); line-height:1.5; -webkit-font-smoothing:antialiased; }
-  .container { max-width:1080px; margin:0 auto; padding:28px 18px 64px; }
-
-  .header-top { display:flex; justify-content:space-between; align-items:flex-start; gap:20px; flex-wrap:wrap; }
-  .chips { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
-  .chip { font-size:11px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; padding:3px 9px; border-radius:2px; background:var(--chip-bg); color:var(--chip-ink); }
-  h1 { margin:0 0 6px; font-size:28px; font-weight:700; letter-spacing:-0.01em; }
-  .sub { color:var(--muted); font-size:14px; max-width:720px; }
-  .header-right { text-align:right; font-size:12px; color:var(--ink-soft); line-height:1.4; }
-  .author-name { font-weight:700; color:var(--ink); }
-  .author-email a { color:var(--ink-soft); text-decoration:none; }
-  .author-email a:hover { text-decoration:underline; }
-  .account-link { display:inline-block; margin-top:6px; padding:5px 10px; background:var(--btn); color:#fff; text-decoration:none; border-radius:3px; font-size:11.5px; font-weight:700; letter-spacing:0.04em; text-transform:uppercase; }
-  .account-link:hover { background:var(--btn-hover); }
-  .account-link.secondary { background:transparent; color:var(--ink); border:1px solid var(--line); }
-  .account-link.secondary:hover { background:var(--panel); }
-
-  /* Tabs */
-  .tabs { display:flex; gap:0; margin:22px 0 0; border-bottom:1px solid var(--line); flex-wrap:wrap; }
-  .tab { background:transparent; border:0; padding:11px 18px 12px; font:inherit; font-weight:700; font-size:14px; letter-spacing:0.02em; cursor:pointer; color:var(--muted); border-bottom:3px solid transparent; margin-bottom:-1px; }
-  .tab:hover { color:var(--ink); }
-  .tab.active { color:var(--ink); border-bottom-color:var(--btn); }
-  .tab .count { font-size:11px; font-weight:700; color:var(--muted); margin-left:6px; }
-  .tab.active .count { color:var(--btn); }
-
-  .panel { padding:18px 0 0; }
-  .panel.hidden { display:none; }
-  .panel-intro { color:var(--muted); font-size:13px; margin-bottom:14px; max-width:760px; }
-
-  .apps { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
-  @media (max-width: 760px) { .apps { grid-template-columns:1fr; } }
-  .app { display:block; background:var(--panel-2); border:1px solid var(--line); border-left:4px solid var(--btn); border-radius:4px; padding:16px 18px; text-decoration:none; color:var(--ink); transition:border-color .1s, transform .08s; }
-  .app:hover { border-color:var(--btn); transform:translateY(-1px); }
-  .app.free  { border-left-color: var(--accent-free); }
-  .app.pro   { border-left-color: var(--accent-pro); }
-  .app.coming-soon { opacity:0.65; cursor:default; }
-  .app-no { font-family:"Consolas", monospace; font-size:12px; color:var(--muted); letter-spacing:0.08em; display:flex; justify-content:space-between; align-items:center; }
-  .app-tag { font-size:10.5px; font-weight:700; padding:2px 6px; border-radius:2px; letter-spacing:0.05em; text-transform:uppercase; }
-  .app-tag.free    { background:#dff0e2; color:var(--accent-free); }
-  .app-tag.pro     { background:#f4e4c1; color:var(--accent-pro); }
-  .app-tag.beta    { background:#dbe7f5; color:var(--accent-content); }
-  .app-tag.coming  { background:#e3e3e3; color:var(--muted); }
-  .app-title { font-size:17px; font-weight:700; margin:4px 0 6px; }
-  .app-sub { font-size:13px; color:var(--muted); line-height:1.45; }
-  .app-refs { font-size:11px; color:var(--muted); margin-top:10px; padding-top:8px; border-top:1px dashed var(--line-soft); }
-
-  .article-card { display:block; background:var(--panel-2); border:1px solid var(--line); border-left:4px solid var(--accent-content); border-radius:4px; padding:16px 18px; text-decoration:none; color:var(--ink); }
-  .article-card + .article-card { margin-top:10px; }
-  .article-meta { font-size:11.5px; color:var(--muted); margin-bottom:4px; }
-  .article-title { font-size:17px; font-weight:700; margin:0 0 6px; }
-  .article-excerpt { font-size:13px; color:var(--muted); }
-
-  .empty { padding:30px 16px; background:var(--panel-2); border:1px dashed var(--line); border-radius:4px; color:var(--muted); font-size:13px; text-align:center; }
-
-  footer { margin-top:32px; padding-top:14px; border-top:1px solid var(--line); color:var(--ink-soft); font-size:12px; }
-  footer .disclaimer { background:#f4e4c1; border:1px solid #c99c3c; color:#3a2e00; padding:10px 14px; border-radius:3px; line-height:1.5; }
-  .footer-nav { display:flex; gap:14px; margin-top:10px; flex-wrap:wrap; }
-  .footer-nav a { color:var(--ink-soft); text-decoration:none; }
-  .footer-nav a:hover { text-decoration:underline; }
-</style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>IECCalc.com — Engineering calculations, referenced to clause</title>
+<meta name="description" content="Online calculators for low- and medium-voltage power systems. Every formula traced to an IEC, IEEE or NFPA clause, every result auditable in the report." />
+<link rel="stylesheet" href="/_lib/design.css?v=metal10" />
 <link rel="stylesheet" href="/_lib/mobile.css" />
+<style>
+  html, body { height: 100%; }
+  body { background: var(--paper); }
+</style>
 </head>
 <body>
-  <div class="container">
-    <div class="header-top">
-      <div>
-        <div class="chips">
-          <span class="chip">IEC calculators</span>
-          <span class="chip">UAE / GCC defaults</span>
-          <span class="chip">Word report</span>
-          <span class="chip">Runs in your browser</span>
-        </div>
-        <h1>ieccalc.com — engineering tools by Eng. Evgenii Buchinskii</h1>
-        <div class="sub">
-          Online calculators for electrical / power engineers, aligned with IEC and IEEE standards.
-          Free tools cover the everyday parametric checks; Professional tools add sketch editors,
-          numerical solvers, lightning impulse, optimisation and full Word reports.
-        </div>
-      </div>
-      <div class="header-right">
-        <div class="author-name">Eng. Evgenii Buchinskii</div>
-        <div class="author-email"><a href="mailto:buchinskii.evg@gmail.com">buchinskii.evg@gmail.com</a></div>
-        <a class="account-link" href="/account/">My account</a>
-        <a class="account-link secondary" href="/account/?intent=signin">Sign in</a>
-      </div>
-    </div>
+<div class="ab v-a">
 
-    <div class="tabs" role="tablist">
-      <button class="tab active" data-tab="free"    role="tab" aria-selected="true">Free tools <span class="count" id="cnt-free"></span></button>
-      <button class="tab"        data-tab="pro"     role="tab" aria-selected="false">Professional tools <span class="count" id="cnt-pro"></span></button>
-      <button class="tab"        data-tab="content" role="tab" aria-selected="false">Content <span class="count" id="cnt-content"></span></button>
-    </div>
-
-    <section class="panel" id="panel-free" role="tabpanel">
-      <div class="panel-intro">
-        Free tools — full IEC math, parametric input, compact Word report, no registration required.
-      </div>
-      <div class="apps" id="apps-free"><div class="empty">Loading…</div></div>
-    </section>
-
-    <section class="panel hidden" id="panel-pro" role="tabpanel">
-      <div class="panel-intro">
-        Professional tools — sketch editors, numerical solvers, optimiser, full report with maps and appendices.
-        Buy a per-calculator licence or the full bundle from your <a href="/account/">account page</a>.
-      </div>
-      <div class="apps" id="apps-pro"><div class="empty">Loading…</div></div>
-    </section>
-
-    <section class="panel hidden" id="panel-content" role="tabpanel">
-      <div class="panel-intro">
-        Engineering articles, worked examples and case studies — written for substation, cable
-        and grounding designers in UAE / GCC and the wider IEC space.
-      </div>
-      <div id="articles"><div class="empty">Loading…</div></div>
-    </section>
-
-    <footer>
-      <div class="disclaimer">
-        <strong>Disclaimer.</strong> These calculators are provided “as is”. The author bears no
-        responsibility for decisions made on their output. Verify every input, formula and result
-        against the applicable standard. Final designs must be signed off by a qualified engineer.
-      </div>
-      <div class="footer-nav">
-        <a href="/account/">Account</a>
-        <a href="/content/">Content</a>
-        <a href="https://www.linkedin.com/in/evgenii-buchinskii-20351a2a6" target="_blank" rel="noopener">LinkedIn</a>
-        <a href="https://chat.whatsapp.com/JW3utOLN0J46EMWArIJsY8" target="_blank" rel="noopener">WhatsApp group</a>
-      </div>
-    </footer>
+<!-- Nav with large brand block -->
+<header class="va-nav va-nav-xl">
+  <a href="/" class="logo-nav logo-nav-xl" aria-label="IECCalc.com">
+    <span class="logo-nav-mark" style="width:72px;height:72px">
+      <svg width="72" height="72" viewBox="0 0 64 64" aria-hidden="true">
+        <rect x="1" y="1" width="62" height="62" rx="3" fill="none" stroke="var(--ink)" stroke-width="2"/>
+        <line x1="32" y1="32" x2="32" y2="10" stroke="var(--ink)" stroke-width="3.5" stroke-linecap="square"/>
+        <line x1="32" y1="32" x2="51.05" y2="43" stroke="var(--red)" stroke-width="3.5" stroke-linecap="square"/>
+        <line x1="32" y1="32" x2="12.95" y2="43" stroke="var(--ink)" stroke-width="3.5" stroke-linecap="square"/>
+        <circle cx="32" cy="10" r="3" fill="var(--ink)"/>
+        <circle cx="51.05" cy="43" r="3" fill="var(--red)"/>
+        <circle cx="12.95" cy="43" r="3" fill="var(--ink)"/>
+        <circle cx="32" cy="32" r="4" fill="var(--ink)"/>
+      </svg>
+    </span>
+    <span class="logo-nav-stack">
+      <span class="logo-nav-word logo-nav-word-xl"><b style="color:var(--ink)">IEC</b><b style="color:var(--red)">CALC</b><span class="logo-nav-tld" style="color:var(--ink-3)">.COM</span></span>
+      <span class="logo-nav-tag">&mdash; POWER ENGINEERING TOOLBOX &mdash;</span>
+    </span>
+  </a>
+  <nav>
+    <a href="#tabs" class="is-on">TOOLBOX</a>
+    <a href="/content/">CONTENT</a>
+    <a href="#pricing">PRICING</a>
+    <a href="/account/?intent=enterprise">ENTERPRISE</a>
+  </nav>
+  <div class="va-nav-r">
+    <button class="va-search" type="button" onclick="document.getElementById('tool-finder-input').focus()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ink-2)" stroke-width="2" stroke-linecap="square" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M16 16 L22 22"/></svg>
+      <span>SEARCH TOOLS</span>
+      <kbd>&#8984;K</kbd>
+    </button>
+    <a href="/account/?intent=signin" class="va-sign">SIGN IN</a>
+    <a href="/account/" class="btn btn-primary btn-sm">SUBSCRIBE</a>
   </div>
+</header>
 
-  <script src="/_lib/api.js"></script>
-  <script>
-    // Tab switching
-    const tabs = document.querySelectorAll(".tab");
-    tabs.forEach(t => t.addEventListener("click", () => {
-      tabs.forEach(x => { x.classList.remove("active"); x.setAttribute("aria-selected", "false"); });
-      t.classList.add("active"); t.setAttribute("aria-selected", "true");
-      document.querySelectorAll(".panel").forEach(p => p.classList.add("hidden"));
-      document.getElementById("panel-" + t.dataset.tab).classList.remove("hidden");
-      history.replaceState(null, "", "#" + t.dataset.tab);
-      window.IecApi && IecApi.logEvent("tab_switch", { feature: t.dataset.tab }).catch(() => {});
-    }));
-    const initTab = (location.hash || "").replace("#", "");
-    if (initTab && document.querySelector(`.tab[data-tab="${initTab}"]`)) {
-      document.querySelector(`.tab[data-tab="${initTab}"]`).click();
+<!-- Quick launcher: frequently-used tools (replaces static stats band) -->
+<section class="va-hero-stats va-hero-stats-attached va-quicklaunch" id="quick-launch"></section>
+
+<!-- Tab strip -->
+<section class="va-tabstrip" id="tabs">
+  <div class="va-tabstrip-head">
+    <span class="eyebrow-red">/ THE TOOLBOX</span>
+    <span class="va-tabstrip-rule"></span>
+    <span class="eyebrow">PICK A SECTION &darr;</span>
+  </div>
+  <div class="va-tabs" role="tablist">
+    <button role="tab" aria-selected="true" data-tab="free" class="va-tab is-on">
+      <span class="va-tab-n tnum">01</span>
+      <span class="va-tab-m">
+        <span class="va-tab-l">FREE TOOLS</span>
+        <span class="va-tab-s">OPEN ACCESS &middot; NO ACCOUNT</span>
+      </span>
+      <span class="va-tab-c tnum" id="cnt-free">&mdash;<small>ENTRIES</small></span>
+      <span class="va-tab-arrow"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="square" aria-hidden="true"><path d="M4 12 H20 M14 6 L20 12 L14 18"/></svg></span>
+    </button>
+    <button role="tab" aria-selected="false" data-tab="pro" class="va-tab">
+      <span class="va-tab-n tnum">02</span>
+      <span class="va-tab-m">
+        <span class="va-tab-l">PRO TOOLS <span class="tag tag-red">PRO</span></span>
+        <span class="va-tab-s">STUDIES &middot; REPORTS &middot; CAD</span>
+      </span>
+      <span class="va-tab-c tnum" id="cnt-pro">&mdash;<small>ENTRIES</small></span>
+      <span class="va-tab-arrow"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="square" aria-hidden="true"><path d="M4 12 H20 M14 6 L20 12 L14 18"/></svg></span>
+    </button>
+    <button role="tab" aria-selected="false" data-tab="content" class="va-tab">
+      <span class="va-tab-n tnum">03</span>
+      <span class="va-tab-m">
+        <span class="va-tab-l">USEFUL CONTENT</span>
+        <span class="va-tab-s">STANDARDS &middot; ARTICLES &middot; FORUM</span>
+      </span>
+      <span class="va-tab-c tnum" id="cnt-content">&mdash;<small>ENTRIES</small></span>
+      <span class="va-tab-arrow"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="square" aria-hidden="true"><path d="M4 12 H20 M14 6 L20 12 L14 18"/></svg></span>
+    </button>
+  </div>
+</section>
+
+<!-- App layout: left sidebar (projects tree) + main content -->
+<div class="va-app">
+<aside class="va-sidebar" id="va-sidebar">
+  <div class="va-sb-head">
+    <span class="eyebrow-red">/ PROJECTS</span>
+    <button class="va-sb-add" id="sb-add-project" title="New project">+</button>
+  </div>
+  <div class="va-sb-body" id="sb-body">
+    <div class="va-sb-empty">
+      <p>Sign in to manage your projects, installations and connections.</p>
+      <a href="/account/?intent=signin" class="btn btn-primary btn-sm">SIGN IN</a>
+    </div>
+  </div>
+  <div class="va-sb-foot">
+    <span class="eyebrow">ENG. EVGENII BUCHINSKII</span>
+  </div>
+</aside>
+
+<div class="va-app-main">
+
+<!-- Body: Free -->
+<section class="va-body" id="panel-free">
+  <div class="va-cubes" id="cubes-free"><div class="cubes-loading">Loading&hellip;</div></div>
+
+  <aside class="va-finder">
+    <div class="va-finder-l">
+      <span class="eyebrow-red">/ NEED SOMETHING SPECIFIC?</span>
+      <h3 class="va-finder-h">SEARCH ACROSS THE TOOLBOX.</h3>
+      <p>Type a calculation, a clause number, or describe the problem. The toolbox will route you to the right tool.</p>
+    </div>
+    <div class="va-finder-r">
+      <div class="va-finder-search">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ink)" stroke-width="2.2" stroke-linecap="square" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M16 16 L22 22"/></svg>
+        <input id="tool-finder-input" placeholder='Try "voltage drop 35 m 240 mm&sup2;"' />
+        <button class="btn btn-primary btn-sm" id="tool-finder-go">GO</button>
+      </div>
+      <div class="va-finder-chips">
+        <span class="eyebrow">RECENT:</span>
+        <button class="va-finder-chip">SCC at LV bus</button>
+        <button class="va-finder-chip">cable IEC 60287</button>
+        <button class="va-finder-chip">IEEE 80 grid</button>
+        <button class="va-finder-chip">voltage drop</button>
+      </div>
+    </div>
+  </aside>
+</section>
+
+<!-- Body: Pro -->
+<section class="va-body hidden" id="panel-pro">
+  <div class="va-cubes" id="cubes-pro"><div class="cubes-loading">Loading&hellip;</div></div>
+
+  <aside class="va-price" id="pricing">
+    <div class="va-price-l">
+      <span class="eyebrow-red" style="color:var(--red-soft)">/ PRO SUBSCRIPTION</span>
+      <h3 class="va-price-h">EVERYTHING ABOVE,<br><span style="color:var(--red)">PLUS AUDIT-GRADE REPORTS.</span></h3>
+      <p>Per-calculator or full-bundle licences &middot; monthly, yearly or lifetime.</p>
+      <ul>
+        <li><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2.6" aria-hidden="true"><path d="M4 12 L10 18 L20 6"/></svg> <span>FULL .DOCX REPORT WITH CLAUSE-BY-CLAUSE DERIVATION</span></li>
+        <li><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2.6" aria-hidden="true"><path d="M4 12 L10 18 L20 6"/></svg> <span>SKETCH / CAD EDITORS (TRENCH, GROUNDING GRID)</span></li>
+        <li><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2.6" aria-hidden="true"><path d="M4 12 L10 18 L20 6"/></svg> <span>OPTIMISER &middot; MULTI-SCENARIO &middot; SAVE / LOAD</span></li>
+        <li><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2.6" aria-hidden="true"><path d="M4 12 L10 18 L20 6"/></svg> <span>EMBEDDED HEATMAPS &middot; POTENTIAL MAPS &middot; IEC ANNEX B</span></li>
+        <li><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2.6" aria-hidden="true"><path d="M4 12 L10 18 L20 6"/></svg> <span>REGIONAL DEFAULTS &middot; UAE / GCC / UK / EU</span></li>
+        <li><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2.6" aria-hidden="true"><path d="M4 12 L10 18 L20 6"/></svg> <span>PAY ONLY FOR WHAT YOU NEED</span></li>
+      </ul>
+    </div>
+    <div class="va-price-r">
+      <span class="va-price-p tnum">$5.99<small>/mo</small></span>
+      <span class="va-price-u">SINGLE TOOL &middot; MONTHLY</span>
+      <a class="btn btn-primary btn-xl" href="/account/">PICK YOUR LICENCE &rarr;</a>
+      <a class="btn btn-xl va-price-cmp" href="/account/">SEE ALL TIERS</a>
+    </div>
+  </aside>
+</section>
+
+<!-- Body: Content -->
+<section class="va-body hidden" id="panel-content">
+  <div class="va-content-grid" id="articles-list">
+    <div class="cubes-loading">Loading&hellip;</div>
+  </div>
+</section>
+
+</div><!-- /.va-app-main -->
+</div><!-- /.va-app -->
+
+<!-- Footer -->
+<footer class="va-foot">
+  <div class="va-foot-band">
+    <div class="logo-hero" style="--scale:0.95">
+      <div class="logo-hero-row">
+        <span class="logo-hero-mark">
+          <svg width="61" height="61" viewBox="0 0 64 64" aria-hidden="true">
+            <rect x="1" y="1" width="62" height="62" rx="3" fill="none" stroke="var(--paper)" stroke-width="2"/>
+            <line x1="32" y1="32" x2="32" y2="10" stroke="var(--paper)" stroke-width="3.5"/>
+            <line x1="32" y1="32" x2="51.05" y2="43" stroke="var(--red)" stroke-width="3.5"/>
+            <line x1="32" y1="32" x2="12.95" y2="43" stroke="var(--paper)" stroke-width="3.5"/>
+            <circle cx="32" cy="10" r="3" fill="var(--paper)"/>
+            <circle cx="51.05" cy="43" r="3" fill="var(--red)"/>
+            <circle cx="12.95" cy="43" r="3" fill="var(--paper)"/>
+            <circle cx="32" cy="32" r="4" fill="var(--paper)"/>
+          </svg>
+        </span>
+        <span class="logo-hero-word"><b style="color:var(--paper)">IEC</b><b style="color:var(--red)">CALC</b><span class="logo-hero-tld" style="color:var(--paper);opacity:.4">.COM</span></span>
+      </div>
+      <span class="logo-hero-tag" style="color:var(--red)">&mdash; POWER ENGINEERING TOOLBOX &mdash;</span>
+    </div>
+    <div class="va-foot-cols">
+      <div><h5>TOOLBOX</h5><ul><li><a href="#tabs">ALL CALCULATORS</a></li><li><a href="#panel-free">FREE TOOLS</a></li><li><a href="#panel-pro">PRO TOOLS</a></li><li><a href="/account/">PRICING</a></li></ul></div>
+      <div><h5>STANDARDS</h5><ul><li><a href="/content/">IEC LIBRARY</a></li><li><a href="/content/">IEEE LIBRARY</a></li><li><a href="/content/">NFPA &amp; NEC</a></li></ul></div>
+      <div><h5>LIBRARY</h5><ul><li><a href="/content/">GUIDES</a></li><li><a href="/content/">VIDEO</a></li><li><a href="/content/">FORUM</a></li></ul></div>
+      <div><h5>COMPANY</h5><ul><li><a href="mailto:buchinskii.evg@gmail.com">CONTACT</a></li><li><a href="https://www.linkedin.com/in/evgenii-buchinskii-20351a2a6" target="_blank" rel="noopener">LINKEDIN</a></li></ul></div>
+    </div>
+  </div>
+  <div class="va-foot-bot">
+    <span>&copy; 2026 IECCALC &mdash; ENG. EVGENII BUCHINSKII</span>
+    <span>CALIBRATED TO IEC 60364 &middot; 60909 &middot; 60287 &middot; IEEE 80 &middot; IEEE 1584</span>
+    <span><a href="/account/">TERMS</a> &middot; <a href="/account/">PRIVACY</a></span>
+  </div>
+</footer>
+
+</div>
+
+<!-- ─── Sign-in modal ────────────────────────────────────────────── -->
+<div class="va-modal hidden" id="signin-modal" role="dialog" aria-modal="true" aria-labelledby="signin-title">
+  <div class="va-modal-backdrop" data-close></div>
+  <div class="va-modal-card">
+    <button class="va-modal-x" aria-label="Close" data-close>&times;</button>
+    <span class="eyebrow-red">/ ACCESS</span>
+    <h3 id="signin-title">SIGN IN TO IECCALC.COM</h3>
+    <p class="va-modal-sub">Pick a method &mdash; no password needed.</p>
+
+    <div class="va-modal-oauth">
+      <a class="va-oauth-btn google" href="https://api.ieccalc.com/auth/google?r=%2F">
+        <svg viewBox="0 0 18 18" width="18" height="18" aria-hidden="true"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.79 2.71v2.26h2.9c1.7-1.56 2.69-3.87 2.69-6.61z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.81 5.96-2.18l-2.9-2.26c-.81.54-1.84.86-3.06.86-2.35 0-4.35-1.59-5.06-3.72H.97v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.94 10.7A5.4 5.4 0 0 1 3.66 9c0-.59.1-1.16.28-1.7V4.97H.97A9 9 0 0 0 0 9c0 1.45.35 2.83.97 4.03l2.97-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.51.45 3.44 1.35l2.58-2.58A9 9 0 0 0 9 0 9 9 0 0 0 .97 4.97L3.94 7.3C4.65 5.17 6.65 3.58 9 3.58z"/></svg>
+        <span>CONTINUE WITH GOOGLE</span>
+      </a>
+      <a class="va-oauth-btn linkedin" href="https://api.ieccalc.com/auth/linkedin?r=%2F">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="#fff" d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+        <span>CONTINUE WITH LINKEDIN</span>
+      </a>
+    </div>
+
+    <div class="va-modal-or"><span>OR BY EMAIL</span></div>
+
+    <form class="va-modal-form" id="modal-email-form">
+      <input type="email" required name="email" id="modal-email" placeholder="you@example.com" />
+      <button type="submit" class="btn btn-primary">SEND SIGN-IN LINK</button>
+    </form>
+    <div class="va-modal-msg" id="modal-msg"></div>
+
+    <p class="va-modal-tos">By signing in you accept the <a href="/account/">terms</a> and <a href="/account/">privacy policy</a>.</p>
+  </div>
+</div>
+
+<script src="/_lib/api.js"></script>
+<script>
+(function () {
+  'use strict';
+  function esc(s) { return String(s||'').replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
+
+  const ICON_BY_SLUG = { '001':'drop', '002':'bolt', '003':'earth', '004':'cable' };
+  const STAT_BY_SLUG = { '001':{v:'ΔU',u:'%'}, '002':{v:'I″k',u:'kA'}, '003':{v:'R_g',u:'Ω'}, '004':{v:'I_z',u:'A'} };
+  const GROUP_BY_SLUG = { '001':'CABLES', '002':'FAULTS & PROTECTION', '003':'EARTHING', '004':'CABLES' };
+
+  const ICONS = {
+    bolt:  '<path d="M13 2 L4 14 H11 L9 22 L20 9 H13 L15 2 Z" fill="currentColor" stroke="none"/>',
+    cable: '<path d="M3 9 q 4.5 -6 9 0 t 9 0"/><path d="M3 16 q 4.5 -6 9 0 t 9 0"/>',
+    drop:  '<path d="M12 2 L6 12 a 6 6 0 1 0 12 0 Z"/>',
+    earth: '<path d="M12 2 V14"/><path d="M5 14 H19"/><path d="M7 17 H17"/><path d="M9 20 H15"/>',
+    cube:  '<path d="M4 7 L12 3 L20 7 V17 L12 21 L4 17 Z"/><path d="M4 7 L12 11 L20 7 M12 11 V21"/>',
+    arrowne: '<path d="M6 18 L18 6 M8 6 H18 V16"/>',
+  };
+  function iconSvg(kind, size, color, stroke) {
+    const body = ICONS[kind] || '<circle cx="12" cy="12" r="6"/>';
+    return '<svg width="'+size+'" height="'+size+'" viewBox="0 0 24 24" fill="none" stroke="'+color+'" stroke-width="'+(stroke||2.2)+'" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true">'+body+'</svg>';
+  }
+
+  function calcCube(c, idx) {
+    const slug = c.slug || '';
+    const tier = c.category || 'free';
+    const isPro = tier === 'pro';
+    const iconKind = ICON_BY_SLUG[slug] || 'cube';
+    const stat = STAT_BY_SLUG[slug] || { v: '—', u: '' };
+    const group = GROUP_BY_SLUG[slug] || (c.standards ? c.standards.split(',')[0].trim().slice(0,18).toUpperCase() : 'TOOLBOX');
+    const std = (c.standards || '').split(',')[0] || 'IEC';
+    const href = c.tier === 'coming_soon' ? 'javascript:void(0)' : (c.base_url || ('/' + slug + '/'));
+    return ''
+      + '<a href="'+esc(href)+'" class="va-cube tier-'+esc(tier)+'">'
+      + '  <div class="va-cube-bg" aria-hidden="true"></div>'
+      + '  <div class="va-cube-top">'
+      + '    <span class="va-cube-n tnum">№ '+String(idx).padStart(2,'0')+'</span>'
+      + '    <div class="va-cube-tags">' + (isPro ? '<span class="tag tag-red">PRO</span>' : '') + '</div>'
+      + '  </div>'
+      + '  <div class="va-cube-icn">' + iconSvg(iconKind, 56, isPro ? 'var(--red)' : 'var(--ink)', 2.2) + '</div>'
+      + '  <div class="va-cube-body">'
+      + '    <h4 class="va-cube-h">'+esc(c.name).toUpperCase()+'</h4>'
+      + '    <p>'+esc(c.short_desc || '')+'</p>'
+      + '    <div class="va-cube-stat">'
+      + '      <span class="va-cube-stat-l">OUTPUT</span>'
+      + '      <span class="va-cube-stat-v tnum">'+esc(stat.v)+'<small>'+esc(stat.u)+'</small></span>'
+      + '    </div>'
+      + '  </div>'
+      + '  <div class="va-cube-foot">'
+      + '    <span class="va-cube-g">'+esc(group).toUpperCase()+'</span>'
+      + '    <span class="va-cube-std">'+esc(std)+'</span>'
+      + '  </div>'
+      + '  <div class="va-cube-hover" aria-hidden="true"><span>OPEN</span>'+iconSvg('arrowne', 20, 'currentColor', 2.6)+'</div>'
+      + '</a>';
+  }
+
+  function articleCard(a) {
+    const date = a.published_at ? new Date(a.published_at).toISOString().slice(0,10) : '';
+    return ''
+      + '<a href="/content/'+esc(a.slug)+'/" class="va-content-card">'
+      + '  <span class="eyebrow-red">/ ARTICLE</span>'
+      + '  <h4>'+esc(a.title).toUpperCase()+'</h4>'
+      + '  <p>'+esc(a.excerpt || '')+'</p>'
+      + '  <span class="va-content-meta">'+esc(date)+'</span>'
+      + '</a>';
+  }
+
+  function setTab(name) {
+    document.querySelectorAll('.va-tab').forEach(t => {
+      const on = t.dataset.tab === name;
+      t.classList.toggle('is-on', on);
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    document.querySelectorAll('.va-body').forEach(p => p.classList.add('hidden'));
+    document.getElementById('panel-' + name).classList.remove('hidden');
+    if (window.IecApi) IecApi.logEvent('tab_switch', { feature: name }).catch(()=>{});
+  }
+  document.querySelectorAll('.va-tab').forEach(t => t.addEventListener('click', () => setTab(t.dataset.tab)));
+
+  document.getElementById('tool-finder-go').addEventListener('click', () => {
+    const q = (document.getElementById('tool-finder-input').value || '').toLowerCase();
+    if (!q) return;
+    if (q.includes('drop') || q.includes('voltage')) location.href = '/001/';
+    else if (q.includes('short') || q.includes('scc') || q.includes('60909')) location.href = '/002/';
+    else if (q.includes('earth') || q.includes('ground') || q.includes('ieee 80')) location.href = '/003/';
+    else if (q.includes('cable') || q.includes('ampacity') || q.includes('60287')) location.href = '/004/';
+    else alert('No tool matched "' + q + '". Use the toolbox below for all tools.');
+  });
+  document.querySelectorAll('.va-finder-chip').forEach(b => b.addEventListener('click', () => {
+    document.getElementById('tool-finder-input').value = b.textContent;
+    document.getElementById('tool-finder-go').click();
+  }));
+
+  const SEED = [
+    {slug:'001',name:'Voltage Drop',short_desc:'Multi-feeder, multi-segment voltage drop per IEC 60364-5-52 Annex D and IEC 60502-2.',standards:'IEC 60364-5-52, IEC 60502-2',category:'pro',tier:'active',base_url:'/001/'},
+    {slug:'002',name:'Short-Circuit',short_desc:'Positive / negative / zero sequence I″k3, I″k2, I″k1, peak ip and κ at every busbar.',standards:'IEC 60909-0',category:'pro',tier:'active',base_url:'/002/'},
+    {slug:'003',name:'Substation Grounding Grid',short_desc:'Multi-grid sizing per IEEE Std 80-2013 with sketch editor and full Word report.',standards:'IEEE 80',category:'pro',tier:'active',base_url:'/003/'},
+    {slug:'004',name:'Cable Ampacity',short_desc:'Continuous current rating per IEC 60287 with multi-cable trench CAD.',standards:'IEC 60287',category:'pro',tier:'active',base_url:'/004/'},
+  ];
+
+  // ── Sidebar: projects tree ─────────────────────────────────────────
+  // Node types: project · installation · feeder · scenario
+  // For Phase 1 we render a local tree (no backend persistence yet);
+  // wiring to /admin/projects API is a follow-up task.
+  const TREE_ICON = {
+    project:      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5 H10 L12 7 H21 V20 H3 Z"/></svg>',
+    installation: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="12"/><path d="M3 10 H21 M9 6 V18 M15 6 V18"/></svg>',
+    feeder:       '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M13 2 L4 14 H11 L9 22 L20 9 H13 L15 2 Z"/></svg>',
+    scenario:     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3 H14 L19 8 V21 H5 Z"/><path d="M14 3 V8 H19"/></svg>',
+  };
+  const CHEV_SVG = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 5 L16 12 L9 19"/></svg>';
+
+  // Demo tree (replaced by API data when projects endpoint lands)
+  const DEMO_TREE = [
+    { id:'p1', type:'project', label:'DEMO SUBSTATION 110/20 kV', open:true, children: [
+      { id:'i1', type:'installation', label:'Switchgear A · 20 kV', open:true, children: [
+        { id:'f1', type:'feeder', label:'Outgoing feeder F1' },
+        { id:'f2', type:'feeder', label:'Outgoing feeder F2' },
+      ]},
+      { id:'i2', type:'installation', label:'Transformer T1 · 110/20', children: [
+        { id:'s1', type:'scenario', label:'Short-circuit study' },
+      ]},
+    ]},
+    { id:'p2', type:'project', label:'CABLE ROUTE — CITY CENTRE' },
+  ];
+
+  function renderTree(nodes) {
+    return '<ul class="va-tree">' + nodes.map(renderNode).join('') + '</ul>';
+  }
+  function renderNode(n) {
+    const hasKids = Array.isArray(n.children) && n.children.length > 0;
+    const open = n.open !== false;
+    const rowClass = 'va-tree-row' + (open ? ' is-open' : '');
+    return ''
+      + '<li class="va-tree-node" data-id="'+esc(n.id)+'" data-type="'+esc(n.type)+'">'
+      + '  <div class="'+rowClass+'" data-id="'+esc(n.id)+'">'
+      + '    <span class="chev">'+(hasKids ? CHEV_SVG : '')+'</span>'
+      + '    <span class="icn">'+(TREE_ICON[n.type]||'')+'</span>'
+      + '    <span class="label" title="'+esc(n.label)+'">'+esc(n.label)+'</span>'
+      + '    <button class="add" data-act="add-child" data-id="'+esc(n.id)+'" title="Add child">+</button>'
+      + '  </div>'
+      + (hasKids ? '<ul class="va-tree-children'+(open?'':' hidden')+'">'+n.children.map(renderNode).join('')+'</ul>' : '')
+      + '</li>';
+  }
+
+  function bindTree(rootEl) {
+    rootEl.querySelectorAll('.va-tree-row').forEach(row => {
+      row.addEventListener('click', e => {
+        if (e.target.closest('[data-act="add-child"]')) {
+          e.stopPropagation();
+          const name = prompt('Name of new child node:');
+          if (!name) return;
+          // For Phase 1 just refresh local demo data; backend wiring later
+          alert('Stub: would create child under ' + row.dataset.id + ' = ' + name + '. (Backend API for projects pending.)');
+          return;
+        }
+        const node = row.closest('.va-tree-node');
+        const kids = node.querySelector(':scope > .va-tree-children');
+        if (kids) {
+          kids.classList.toggle('hidden');
+          row.classList.toggle('is-open');
+        }
+        // toggle selection
+        rootEl.querySelectorAll('.va-tree-row.is-on').forEach(r => r.classList.remove('is-on'));
+        row.classList.add('is-on');
+      });
+    });
+  }
+
+  async function loadSidebar() {
+    const body = document.getElementById('sb-body');
+    let me = null;
+    try { me = await IecApi.me(); } catch (e) {}
+    if (me && me.authenticated) {
+      body.innerHTML = renderTree(DEMO_TREE);
+      bindTree(body);
+    } // else: leave default empty state with sign-in CTA
+  }
+  document.getElementById('sb-add-project').addEventListener('click', () => {
+    const name = prompt('Name of new project:');
+    if (!name) return;
+    alert('Stub: would create project "' + name + '". Backend API pending.');
+  });
+  loadSidebar();
+
+  // ── Sign-in modal ─────────────────────────────────────────────
+  const modal = document.getElementById('signin-modal');
+  function openSignin(e) {
+    if (e) e.preventDefault();
+    modal.classList.remove('hidden');
+    setTimeout(() => document.getElementById('modal-email').focus(), 50);
+  }
+  function closeSignin() { modal.classList.add('hidden'); }
+  modal.querySelectorAll('[data-close]').forEach(el => el.addEventListener('click', closeSignin));
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeSignin(); });
+
+  // Hook all auth-related triggers
+  document.querySelectorAll('a[href*="/account/"]').forEach(a => {
+    // Only intercept sign-in-style links; keep deep links to /account/?intent=enterprise alone
+    const href = a.getAttribute('href') || '';
+    const isSigninLink = href.includes('intent=signin') || a.textContent.trim().toUpperCase() === 'SIGN IN'
+                       || a.textContent.trim().toUpperCase() === 'SUBSCRIBE';
+    if (isSigninLink) a.addEventListener('click', openSignin);
+  });
+
+  // Email form
+  document.getElementById('modal-email-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('modal-email').value.trim();
+    const msg = document.getElementById('modal-msg');
+    msg.textContent = 'Sending…'; msg.className = 'va-modal-msg';
+    try {
+      await IecApi.requestLogin(email, '/');
+      msg.textContent = 'Check ' + email + ' for your sign-in link.';
+      msg.className = 'va-modal-msg ok';
+    } catch (err) {
+      msg.textContent = err.message || 'Failed to send.';
+      msg.className = 'va-modal-msg err';
     }
+  });
 
-    function calcCard(c) {
-      const tagClass = c.tier === "coming_soon" ? "coming" : (c.tier === "beta" ? "beta" : c.category);
-      const tagText  = c.tier === "coming_soon" ? "coming soon" : (c.tier === "beta" ? "beta" : c.category);
-      const cssClass = `app ${c.category}${c.tier === "coming_soon" ? " coming-soon" : ""}`;
-      const href     = c.tier === "coming_soon" ? "javascript:void(0)" : c.base_url;
-      return `<a class="${cssClass}" href="${href}">
-        <div class="app-no"><span>Calculator #${c.slug}</span><span class="app-tag ${tagClass}">${tagText}</span></div>
-        <div class="app-title">${escapeHtml(c.name)}</div>
-        <div class="app-sub">${escapeHtml(c.short_desc || "")}</div>
-        ${c.standards ? `<div class="app-refs">${escapeHtml(c.standards)}</div>` : ""}
-      </a>`;
-    }
-
-    function articleCard(a) {
-      const date = a.published_at ? new Date(a.published_at).toISOString().slice(0,10) : "";
-      return `<a class="article-card" href="/content/${a.slug}/">
-        <div class="article-meta">${date}</div>
-        <h3 class="article-title">${escapeHtml(a.title)}</h3>
-        <div class="article-excerpt">${escapeHtml(a.excerpt || "")}</div>
-      </a>`;
-    }
-
-    function escapeHtml(s) {
-      return String(s || "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
-    }
-
-    async function load() {
-      try {
-        const { calculators } = await IecApi.calculators();
-        const free = calculators.filter(c => c.category === "free");
-        const pro  = calculators.filter(c => c.category === "pro");
-        document.getElementById("cnt-free").textContent = free.length || "";
-        document.getElementById("cnt-pro").textContent  = pro.length  || "";
-        document.getElementById("apps-free").innerHTML = free.length
-          ? free.map(calcCard).join("")
-          : `<div class="empty">No free tools yet — coming soon.</div>`;
-        document.getElementById("apps-pro").innerHTML  = pro.length
-          ? pro.map(calcCard).join("")
-          : `<div class="empty">No professional tools published yet.</div>`;
-      } catch (e) {
-        // Fallback: show static seed data so the page is useful even if API is offline
-        const seed = [
-          { slug:"001", name:"Voltage Drop — LV & MV up to 33 kV", category:"pro", tier:"active", base_url:"/001/",
-            short_desc:"Multi-feeder, multi-segment voltage drop per IEC 60364-5-52 Annex D (LV) and IEC 60502-2 / IEC 60287 (MV).",
-            standards:"IEC 60364-5-52 · IEC 60502-2 · IEC 60287 · IEC 60228 · IEC 61089" },
-          { slug:"002", name:"Short-Circuit — IEC 60909", category:"pro", tier:"active", base_url:"/002/",
-            short_desc:"Positive/negative/zero sequence Iʺk3, Iʺk2, Iʺk1, peak ip and κ at every busbar.",
-            standards:"IEC 60909-0 · IEC 60909-1 · IEC 60909-4" },
-          { slug:"003", name:"Substation Grounding Grid — IEEE 80", category:"pro", tier:"active", base_url:"/003/",
-            short_desc:"Multi-grid sizing per IEEE Std 80-2013 with sketch editor and full Word report.",
-            standards:"IEEE 80 · IEEE 81 · IEC 61936-1" },
-          { slug:"004", name:"Cable Ampacity — IEC 60287", category:"pro", tier:"active", base_url:"/004/",
-            short_desc:"Continuous current rating per IEC 60287 with derating; multi-cable trench CAD.",
-            standards:"IEC 60287 · IEC 60228 · IEC 60949" },
-        ];
-        const pro = seed.filter(c => c.category === "pro");
-        document.getElementById("cnt-pro").textContent = pro.length;
-        document.getElementById("apps-pro").innerHTML  = pro.map(calcCard).join("");
-        document.getElementById("apps-free").innerHTML = `<div class="empty">Free tools — coming soon. API offline (${escapeHtml(e.message)}).</div>`;
+  // Quick-launch strip: top tools (recent for user, popular for guests)
+  async function renderQuickLaunch(calculators) {
+    const root = document.getElementById('quick-launch');
+    let pinned = [];
+    let isUser = false;
+    try {
+      const me = await IecApi.me();
+      isUser = !!(me && me.authenticated);
+      if (isUser) {
+        // Get user's recent calc events
+        const recentSlugs = JSON.parse(localStorage.getItem('iec_recent_calcs') || '[]');
+        pinned = recentSlugs.map(s => calculators.find(c => c.slug === s)).filter(Boolean);
       }
-
-      try {
-        const { articles } = await IecApi.articles();
-        document.getElementById("cnt-content").textContent = articles.length || "";
-        document.getElementById("articles").innerHTML = articles.length
-          ? articles.map(articleCard).join("")
-          : `<div class="empty">No articles published yet — first piece coming this month.</div>`;
-      } catch (e) {
-        document.getElementById("articles").innerHTML = `<div class="empty">Content loading offline (${escapeHtml(e.message)}).</div>`;
-      }
+    } catch (e) {}
+    if (pinned.length < 5) {
+      // Fill from top calculators (just by display order for now)
+      const fill = calculators.filter(c => c.tier === 'active' && !pinned.find(p => p.slug === c.slug)).slice(0, 6 - pinned.length);
+      pinned = pinned.concat(fill);
     }
-    load();
-  </script>
+    const eyebrow = isUser ? 'RECENT TOOLS &middot; CLICK TO RESUME' : 'POPULAR TOOLS &middot; CLICK TO OPEN';
+    const items = pinned.slice(0, 6).map((c, i) => `<a class="va-ql" href="${esc(c.base_url || ('/' + c.slug + '/'))}">
+      <span class="icn">${iconSvg(ICON_BY_SLUG[c.slug] || 'cube', 16, 'currentColor', 2.2)}</span>
+      <span class="lbl">${esc(c.name).toUpperCase()}</span>
+      <span class="sub">#${esc(c.slug)}</span>
+    </a>`).join('');
+    const add = isUser
+      ? '<a class="va-ql is-add" href="#tabs"><span class="lbl">+ PIN</span></a>'
+      : '<a class="va-ql is-add" href="#tabs"><span class="lbl">+ MORE</span></a>';
+    root.innerHTML = `<div class="va-ql-eyebrow">${eyebrow}</div><div class="va-ql-row">${items}${pinned.length < 6 ? add : ''}</div>`;
+  }
+
+  async function load() {
+    let calculators = SEED;
+    try { ({ calculators } = await IecApi.calculators()); } catch (e) {}
+    renderQuickLaunch(calculators);
+    const free = calculators.filter(c => c.category === 'free');
+    const pro  = calculators.filter(c => c.category === 'pro');
+    document.getElementById('stat-tools').textContent = String(calculators.length).padStart(2,'0');
+    document.getElementById('cnt-free').innerHTML = String(free.length) + '<small>ENTRIES</small>';
+    document.getElementById('cnt-pro').innerHTML  = String(pro.length)  + '<small>ENTRIES</small>';
+    document.getElementById('cubes-free').innerHTML = free.length
+      ? free.map((c,i) => calcCube(c, i+1)).join('')
+      : '<div class="cubes-loading">No free tools yet — first one coming soon. Pro tools available now in tab 02.</div>';
+    document.getElementById('cubes-pro').innerHTML = pro.length
+      ? pro.map((c,i) => calcCube(c, i+1)).join('')
+      : '<div class="cubes-loading">No professional tools published yet.</div>';
+
+    try {
+      const { articles } = await IecApi.articles();
+      document.getElementById('cnt-content').innerHTML = String(articles.length) + '<small>ENTRIES</small>';
+      document.getElementById('articles-list').innerHTML = articles.length
+        ? articles.map(articleCard).join('')
+        : '<div class="cubes-loading">No articles published yet. First piece is in editing.</div>';
+    } catch (e) {
+      document.getElementById('cnt-content').innerHTML = '0<small>ENTRIES</small>';
+      document.getElementById('articles-list').innerHTML = '<div class="cubes-loading">Content offline.</div>';
+    }
+  }
+  load();
+})();
+</script>
 </body>
 </html>

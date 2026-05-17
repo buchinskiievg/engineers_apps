@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Thread &mdash; IECCalc Forum</title>
+<link rel="stylesheet" href="/_lib/design.css?v=metal10" />
+<link rel="stylesheet" href="/_lib/mobile.css" />
+<style>
+  html, body { height: 100%; } body { background: var(--paper); }
+  .th-head { background: var(--paper); border-bottom: 2px solid var(--ink); padding: 22px 48px 18px; max-width: 1280px; margin: 0 auto; }
+  .th-crumb { font: 700 11px/1 var(--sans); letter-spacing: 0.14em; color: var(--ink-3); text-transform: uppercase; }
+  .th-crumb a { color: var(--ink-3); text-decoration: none; }
+  .th-crumb a:hover { color: var(--red); }
+  .th-head h1 { font: 900 26px/1.15 var(--display); letter-spacing: -0.02em; margin: 8px 0 6px; }
+  .th-head .meta { font: 600 12px/1 var(--sans); color: var(--ink-3); }
+
+  .th-body { max-width: 1280px; margin: 0 auto; padding: 20px 48px 60px; }
+  @media (max-width:760px) { .th-body, .th-head { padding-left: 14px; padding-right: 14px; } }
+
+  .post { background: var(--surface); border: 1px solid var(--border); padding: 18px 22px; margin-bottom: 10px; }
+  .post.op { border-left: 4px solid var(--red); }
+  .post .top { display: flex; justify-content: space-between; font: 700 11.5px/1 var(--sans); letter-spacing: 0.06em; color: var(--ink-3); text-transform: uppercase; margin-bottom: 10px; }
+  .post .body { font: 500 14px/1.55 var(--sans); white-space: pre-wrap; word-break: break-word; }
+  .post .acts { margin-top: 10px; display: flex; gap: 14px; font: 700 11px/1 var(--sans); letter-spacing: 0.1em; color: var(--ink-3); }
+  .post .acts button { background: transparent; border: 0; cursor: pointer; font: inherit; color: inherit; padding: 0; }
+  .post .acts button:hover { color: var(--red); }
+  .post .acts .votes { font-weight: 800; }
+
+  .reply-form { background: var(--paper-2); border: 2px solid var(--ink); padding: 18px 22px; margin-top: 14px; }
+  .reply-form h3 { font: 800 14px/1 var(--sans); margin: 0 0 8px; letter-spacing: 0.06em; text-transform: uppercase; }
+  .reply-form textarea { width: 100%; min-height: 100px; font: 500 14px/1.5 var(--sans); padding: 10px 12px; border: 1px solid var(--ink); background: var(--paper); resize: vertical; }
+  .reply-form .row { display: flex; gap: 10px; align-items: center; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="ab v-a">
+
+<header class="va-nav va-nav-xl">
+  <a href="/" class="logo-nav logo-nav-xl">
+    <span class="logo-nav-mark" style="width:40px;height:40px">
+      <svg width="40" height="40" viewBox="0 0 64 64"><rect x="1" y="1" width="62" height="62" rx="3" fill="none" stroke="var(--ink)" stroke-width="2"/><line x1="32" y1="32" x2="32" y2="10" stroke="var(--ink)" stroke-width="3.5"/><line x1="32" y1="32" x2="51.05" y2="43" stroke="var(--red)" stroke-width="3.5"/><line x1="32" y1="32" x2="12.95" y2="43" stroke="var(--ink)" stroke-width="3.5"/><circle cx="32" cy="10" r="3" fill="var(--ink)"/><circle cx="51.05" cy="43" r="3" fill="var(--red)"/><circle cx="12.95" cy="43" r="3" fill="var(--ink)"/><circle cx="32" cy="32" r="4" fill="var(--ink)"/></svg>
+    </span>
+    <span class="logo-nav-stack"><span class="logo-nav-word logo-nav-word-xl" style="font-size:22px"><b style="color:var(--ink)">IEC</b><b style="color:var(--red)">CALC</b><span class="logo-nav-tld" style="color:var(--ink-3)">.COM</span></span></span>
+  </a>
+  <nav>
+    <a href="/#tabs">TOOLBOX</a><a href="/content/">CONTENT</a><a href="/forum/" class="is-on">FORUM</a><a href="/#pricing">PRICING</a>
+  </nav>
+  <div class="va-nav-r"><a href="/account/?intent=signin" class="va-sign">SIGN IN</a></div>
+</header>
+
+<div class="th-head">
+  <div class="th-crumb"><a href="/forum/">Forum</a> &middot; <a href="#" id="cat-link">&hellip;</a></div>
+  <h1 id="title">Loading&hellip;</h1>
+  <div class="meta" id="meta"></div>
+</div>
+
+<main class="th-body" id="body">
+  <div style="padding:60px;text-align:center;color:var(--ink-3)">Loading thread&hellip;</div>
+</main>
+
+</div>
+<script src="/_lib/api.js"></script>
+<script>
+(function() {
+  'use strict';
+  function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));}
+  function fmtDate(t){return t ? new Date(t).toLocaleString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '';}
+  function authorName(p){ return esc(p.author_name || p.author_email || 'anon'); }
+
+  const m = location.pathname.match(/\/forum\/t\/(\d+)/);
+  const tid = m ? Number(m[1]) : null;
+  if (!tid) { document.body.innerHTML = '<p style="padding:40px;text-align:center">No thread id.</p>'; return; }
+
+  function renderPost(p, isOp) {
+    return `<article class="post${isOp?' op':''}" data-id="${p.id}">
+      <div class="top">
+        <span>${authorName(p)}${isOp ? ' &middot; OP' : ''}</span>
+        <span>${fmtDate(p.created_at)}</span>
+      </div>
+      <div class="body">${esc(p.body_md)}</div>
+      <div class="acts">
+        <button data-act="vote" data-dir="1" data-id="${p.id}">&#9650; <span class="votes">${p.votes_up || 0}</span></button>
+        <button data-act="vote" data-dir="-1" data-id="${p.id}">&#9660; <span class="votes">${p.votes_down || 0}</span></button>
+        ${isOp ? '' : `<button data-act="reply" data-id="${p.id}">Reply</button>`}
+      </div>
+    </article>`;
+  }
+
+  Promise.all([IecApi.forumThread(tid), IecApi.forumReplies(tid)])
+    .then(([td, rd]) => {
+      const t = td.thread;
+      document.title = t.title + ' — IECCalc Forum';
+      document.getElementById('title').textContent = t.title;
+      document.getElementById('cat-link').textContent = t.category_name;
+      document.getElementById('cat-link').href = '/forum/c/' + t.category_slug;
+      document.getElementById('meta').textContent = 'started by ' + authorName(t) + ' · ' + fmtDate(t.created_at) + ' · ' + (t.views || 0) + ' views';
+      const op = renderPost({id:t.id, author_name:t.author_name, author_email:t.author_email, body_md:t.body_md, created_at:t.created_at, votes_up:0, votes_down:0}, true);
+      const replies = (rd.replies || []).filter(r => !r.deleted).map(r => renderPost(r, false)).join('');
+      const formHtml = t.locked
+        ? '<div class="post" style="text-align:center;color:var(--ink-3)">Thread is locked.</div>'
+        : `<form class="reply-form" id="reply-form">
+            <h3>Reply</h3>
+            <textarea id="reply-body" placeholder="Type your reply — markdown supported."></textarea>
+            <div class="row">
+              <button type="submit" class="btn btn-primary">POST REPLY</button>
+              <span class="va-modal-msg" id="reply-msg"></span>
+            </div>
+          </form>`;
+      document.getElementById('body').innerHTML = op + replies + formHtml;
+      bind();
+    })
+    .catch(e => {
+      document.getElementById('body').innerHTML = '<div style="padding:60px;text-align:center;color:var(--ink-3)">Failed to load: ' + esc(e.message) + '</div>';
+    });
+
+  function bind() {
+    document.querySelectorAll('button[data-act="vote"]').forEach(b => b.addEventListener('click', async () => {
+      const id = Number(b.dataset.id);
+      const dir = Number(b.dataset.dir);
+      if (id === Number((location.pathname.match(/\/forum\/t\/(\d+)/)||[])[1])) {
+        // Can't vote on OP container — treat as no-op
+        return;
+      }
+      try {
+        const r = await IecApi.voteReply(id, dir);
+        const post = document.querySelector('.post[data-id="' + id + '"]');
+        if (post) {
+          post.querySelectorAll('.votes')[0].textContent = r.votes_up;
+          post.querySelectorAll('.votes')[1].textContent = r.votes_down;
+        }
+      } catch (e) { if (e.status === 401) alert('Sign in to vote.'); }
+    }));
+    document.querySelectorAll('button[data-act="reply"]').forEach(b => b.addEventListener('click', () => {
+      const id = b.dataset.id;
+      const ta = document.getElementById('reply-body');
+      ta.value = '> @reply-' + id + '\n\n';
+      ta.focus();
+    }));
+    const form = document.getElementById('reply-form');
+    if (form) form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const body = document.getElementById('reply-body').value.trim();
+      const msg = document.getElementById('reply-msg');
+      if (!body) { msg.textContent = 'Empty'; msg.className='va-modal-msg err'; return; }
+      msg.textContent = 'Posting…'; msg.className='va-modal-msg';
+      try {
+        await IecApi.createReply(tid, body);
+        location.reload();
+      } catch (e) {
+        msg.textContent = e.message || 'Failed';
+        msg.className = 'va-modal-msg err';
+        if (e.status === 401) msg.textContent = 'Sign in to reply.';
+      }
+    });
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Article &mdash; IECCalc.com</title>
+<link rel="stylesheet" href="/_lib/design.css?v=metal10" />
+<link rel="stylesheet" href="/_lib/mobile.css" />
+<style>
+  html, body { height: 100%; } body { background: var(--paper); }
+  .ar-head { background: var(--paper); border-bottom: 2px solid var(--ink); padding: 32px 48px 26px; max-width: 1080px; margin: 0 auto; }
+  .ar-head .crumb { font: 700 11px/1 var(--sans); letter-spacing: 0.14em; color: var(--ink-3); text-transform: uppercase; }
+  .ar-head .crumb a { color: var(--ink-3); text-decoration: none; }
+  .ar-head h1 { font: 900 36px/1.1 var(--display); letter-spacing: -0.025em; margin: 8px 0 8px; }
+  .ar-head .lede { font: 500 16px/1.6 var(--sans); color: var(--ink-2); margin: 0; max-width: 740px; }
+  .ar-meta { display: flex; gap: 12px; align-items: center; margin-top: 16px; font: 600 12px/1 var(--sans); color: var(--ink-3); }
+  .ar-cover { max-width: 1080px; margin: 0 auto; padding: 18px 48px 0; }
+  .ar-cover img { width: 100%; max-height: 420px; object-fit: cover; border: 2px solid var(--ink); display: block; }
+  .ar-body { max-width: 880px; margin: 0 auto; padding: 30px 48px 50px; font: 500 16.5px/1.7 var(--sans); color: var(--ink); }
+  .ar-body h2 { font: 900 26px/1.2 var(--display); margin: 32px 0 12px; letter-spacing: -0.02em; }
+  .ar-body h3 { font: 800 19px/1.3 var(--display); margin: 22px 0 8px; }
+  .ar-body p { margin: 0 0 14px; }
+  .ar-body a { color: var(--red); }
+  .ar-body code { background: var(--surface); padding: 1px 6px; font: 600 14px/1 "Consolas",monospace; border: 1px solid var(--border); }
+  .ar-body pre { background: var(--carbon); color: var(--paper); padding: 14px 16px; overflow-x: auto; font: 500 13px/1.5 "Consolas",monospace; }
+  .ar-body blockquote { border-left: 3px solid var(--red); margin: 16px 0; padding: 4px 14px; color: var(--ink-2); font-style: italic; }
+  .ar-body img { max-width: 100%; height: auto; border: 1px solid var(--border); }
+  .ar-body ul, .ar-body ol { padding-left: 26px; margin: 0 0 16px; }
+  .ar-body li { margin-bottom: 6px; }
+  @media (max-width:760px) { .ar-head, .ar-cover, .ar-body { padding-left: 16px; padding-right: 16px; } }
+
+  /* Comments */
+  .cm-block { max-width: 880px; margin: 30px auto 60px; padding: 26px 48px; border-top: 2px solid var(--ink); }
+  .cm-block h2 { font: 900 22px/1 var(--display); letter-spacing: -0.02em; margin: 0 0 16px; }
+  .cm { background: var(--surface); border: 1px solid var(--border); padding: 12px 16px; margin-bottom: 8px; }
+  .cm .top { font: 700 11.5px/1 var(--sans); letter-spacing: 0.06em; color: var(--ink-3); margin-bottom: 6px; }
+  .cm .body { font: 500 13.5px/1.5 var(--sans); white-space: pre-wrap; }
+  .cm .acts { margin-top: 8px; font: 700 11px/1 var(--sans); color: var(--ink-3); display: flex; gap: 14px; }
+  .cm .acts button { background: transparent; border: 0; cursor: pointer; font: inherit; color: inherit; }
+  .cm-form { background: var(--paper-2); border: 2px solid var(--ink); padding: 14px 16px; margin: 14px 0; }
+  .cm-form textarea { width: 100%; min-height: 80px; font: 500 14px/1.4 var(--sans); padding: 8px 12px; border: 1px solid var(--ink); resize: vertical; }
+  .cm-form .row { display: flex; gap: 10px; align-items: center; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="ab v-a">
+
+<header class="va-nav va-nav-xl">
+  <a href="/" class="logo-nav logo-nav-xl">
+    <span class="logo-nav-mark" style="width:40px;height:40px">
+      <svg width="40" height="40" viewBox="0 0 64 64"><rect x="1" y="1" width="62" height="62" rx="3" fill="none" stroke="var(--ink)" stroke-width="2"/><line x1="32" y1="32" x2="32" y2="10" stroke="var(--ink)" stroke-width="3.5"/><line x1="32" y1="32" x2="51.05" y2="43" stroke="var(--red)" stroke-width="3.5"/><line x1="32" y1="32" x2="12.95" y2="43" stroke="var(--ink)" stroke-width="3.5"/><circle cx="32" cy="10" r="3" fill="var(--ink)"/><circle cx="51.05" cy="43" r="3" fill="var(--red)"/><circle cx="12.95" cy="43" r="3" fill="var(--ink)"/><circle cx="32" cy="32" r="4" fill="var(--ink)"/></svg>
+    </span>
+    <span class="logo-nav-stack"><span class="logo-nav-word logo-nav-word-xl" style="font-size:22px"><b style="color:var(--ink)">IEC</b><b style="color:var(--red)">CALC</b><span class="logo-nav-tld" style="color:var(--ink-3)">.COM</span></span></span>
+  </a>
+  <nav><a href="/#tabs">TOOLBOX</a><a href="/content/" class="is-on">CONTENT</a><a href="/forum/">FORUM</a><a href="/#pricing">PRICING</a></nav>
+  <div class="va-nav-r"><a href="/account/?intent=signin" class="va-sign">SIGN IN</a></div>
+</header>
+
+<article>
+  <div class="ar-head">
+    <div class="crumb"><a href="/content/">&larr; All content</a></div>
+    <h1 id="title">Loading&hellip;</h1>
+    <p class="lede" id="excerpt"></p>
+    <div class="ar-meta" id="meta"></div>
+  </div>
+  <div class="ar-cover" id="cover"></div>
+  <div class="ar-body" id="body"></div>
+</article>
+
+<section class="cm-block" id="comments-block" hidden>
+  <h2>Comments <span id="cm-count" style="color:var(--ink-3);font-size:14px;font-weight:600">0</span></h2>
+  <div id="cm-list"></div>
+  <form class="cm-form" id="cm-form">
+    <textarea id="cm-body" placeholder="Add a comment — markdown supported. Sign in required."></textarea>
+    <div class="row">
+      <button type="submit" class="btn btn-primary">POST</button>
+      <span class="va-modal-msg" id="cm-msg"></span>
+    </div>
+  </form>
+</section>
+
+</div>
+<script src="/_lib/api.js"></script>
+<script>
+(function() {
+  'use strict';
+  function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));}
+  function fmtDate(t){return t ? new Date(t).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '';}
+
+  // Tiny markdown renderer — handles paragraphs, headers, bold/italic/code, links, lists
+  function md(src) {
+    if (!src) return '';
+    let html = esc(src);
+    // headers
+    html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+    html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+    // bold + italic
+    html = html.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+    html = html.replace(/(?<!\*)\*([^*]+)\*/g, '<i>$1</i>');
+    // inline code
+    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+    // links [text](url)
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    // unordered list
+    html = html.replace(/^(?:- |\* )(.+)(\n(?:- |\* ).+)*/gm, (m) => {
+      const items = m.split(/\n/).map(l => l.replace(/^[-*] /, '')).map(l => '<li>'+l+'</li>').join('');
+      return '<ul>'+items+'</ul>';
+    });
+    // paragraphs
+    html = html.split(/\n\n+/).map(p => p.trim().startsWith('<') ? p : '<p>'+p.replace(/\n/g,'<br>')+'</p>').join('\n');
+    return html;
+  }
+
+  const slug = location.pathname.replace(/^\/content\/articles\//, '').replace(/\/$/, '');
+  if (!slug) { document.body.innerHTML = '<p style="padding:40px;text-align:center">No article slug.</p>'; return; }
+
+  IecApi.article(slug).then(d => {
+    const a = d.article;
+    document.title = a.title + ' — IECCalc.com';
+    document.getElementById('title').textContent = a.title;
+    document.getElementById('excerpt').textContent = a.excerpt || '';
+    document.getElementById('meta').textContent = fmtDate(a.published_at);
+    if (a.cover_image) {
+      document.getElementById('cover').innerHTML = '<img src="' + esc(a.cover_image) + '" alt="">';
+    }
+    document.getElementById('body').innerHTML = md(a.body_md || '');
+    loadComments(a.id);
+  }).catch(e => {
+    document.getElementById('body').innerHTML = '<p style="text-align:center;color:var(--ink-3)">Article not found.</p>';
+  });
+
+  function loadComments(id) {
+    document.getElementById('comments-block').hidden = false;
+    IecApi.comments('article', id).then(d => {
+      const list = d.comments || [];
+      document.getElementById('cm-count').textContent = list.length;
+      document.getElementById('cm-list').innerHTML = list.length
+        ? list.map(c => `<div class="cm">
+            <div class="top">${esc(c.author_name || c.author_email || 'anon')} &middot; ${fmtDate(c.created_at)}</div>
+            <div class="body">${esc(c.body_md)}</div>
+            <div class="acts">
+              <button data-act="vote" data-dir="1" data-id="${c.id}">&#9650; ${c.votes_up || 0}</button>
+              <button data-act="vote" data-dir="-1" data-id="${c.id}">&#9660; ${c.votes_down || 0}</button>
+            </div>
+          </div>`).join('')
+        : '<p style="color:var(--ink-3);font-size:13px">No comments yet — be the first.</p>';
+    });
+    document.getElementById('cm-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const body = document.getElementById('cm-body').value.trim();
+      const msg = document.getElementById('cm-msg');
+      if (!body) return;
+      msg.textContent='Posting…'; msg.className='va-modal-msg';
+      try { await IecApi.addComment('article', id, body); location.reload(); }
+      catch (e) { msg.textContent = e.status === 401 ? 'Sign in to comment.' : e.message; msg.className='va-modal-msg err'; }
+    });
+  }
+})();
+</script>
+</body>
+</html>

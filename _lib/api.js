@@ -51,6 +51,28 @@
 
     saveLead:      (email, source, calc_slug) => request("/leads", { method: "POST", body: { email, source, calc_slug } }),
     logEvent:      (event_type, extras = {}) => request("/events", { method: "POST", body: { event_type, ...extras } }),
+
+    // Content
+    contentFeed:   (limit)         => request("/content/feed?limit=" + (limit || 30)),
+    posts:         ()              => request("/content/posts"),
+    videos:        ()              => request("/content/videos"),
+    presentations: ()              => request("/content/presentations"),
+    presentation:  (slug)          => request("/content/presentations/" + slug),
+    video:         (slug)          => request("/content/videos/" + slug),
+
+    // Comments
+    comments:      (type, id)      => request("/comments?type=" + encodeURIComponent(type) + "&id=" + id),
+    addComment:    (type, id, body_md, parent_id) => request("/comments", { method: "POST", body: { target_type: type, target_id: id, body_md, parent_id } }),
+    voteComment:   (id, dir)       => request("/comments/" + id + "/vote", { method: "POST", body: { direction: dir } }),
+
+    // Forum
+    forumCategories: ()                       => request("/forum/categories"),
+    forumThreads:    (catSlug)                => request("/forum/c/" + catSlug + "/threads"),
+    forumThread:     (id)                     => request("/forum/t/" + id),
+    forumReplies:    (id)                     => request("/forum/t/" + id + "/replies"),
+    createThread:    (catSlug, title, body_md) => request("/forum/c/" + catSlug + "/threads", { method: "POST", body: { title, body_md } }),
+    createReply:     (threadId, body_md, parent_id) => request("/forum/t/" + threadId + "/replies", { method: "POST", body: { body_md, parent_id } }),
+    voteReply:       (id, dir)                => request("/forum/replies/" + id + "/vote", { method: "POST", body: { direction: dir } }),
   };
 
   window.IecApi = Api;

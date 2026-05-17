@@ -48,8 +48,10 @@ const CORS_ALLOWED_ORIGINS = new Set([
   "https://www.ieccalc.com",
   "http://localhost:8780",
   "http://localhost:8781",
+  "http://localhost:8782",
   "http://127.0.0.1:8780",
   "http://127.0.0.1:8781",
+  "http://127.0.0.1:8782",
 ]);
 
 function corsHeaders(req) {
@@ -123,6 +125,34 @@ async function dispatch(req, env, ctx, url, path) {
   if (path === "/cart/checkout" && method === "POST") return cartCheckout(req, env);
   if (path === "/leads" && method === "POST") return saveLead(req, env);
   if (path === "/events" && method === "POST") return logEvent(req, env);
+
+  // ── Content public reads ───────────────────────────────────────────────
+  if (path === "/content/posts" && method === "GET") return listPublished(env, "posts");
+  if (path === "/content/videos" && method === "GET") return listPublished(env, "videos");
+  if (path === "/content/presentations" && method === "GET") return listPublished(env, "presentations");
+  if (path === "/content/feed" && method === "GET") return contentFeed(env, url);
+  let m;
+  if ((m = path.match(/^\/content\/posts\/(\d+)$/)) && method === "GET") return getContentItem(env, "posts", Number(m[1]));
+  if ((m = path.match(/^\/content\/videos\/([\w-]+)$/)) && method === "GET") return getContentItem(env, "videos", m[1], "slug");
+  if ((m = path.match(/^\/content\/presentations\/([\w-]+)$/)) && method === "GET") return getPresentation(env, m[1]);
+
+  // ── Comments (polymorphic) ─────────────────────────────────────────────
+  if (path === "/comments" && method === "GET") return listComments(env, url);
+  if (path === "/comments" && method === "POST") return createComment(req, env);
+  if ((m = path.match(/^\/comments\/(\d+)\/vote$/)) && method === "POST") return voteComment(req, env, Number(m[1]));
+
+  // ── Forum public ────────────────────────────────────────────────────────
+  if (path === "/forum/categories" && method === "GET") return forumCategories(env);
+  if ((m = path.match(/^\/forum\/c\/([\w-]+)\/threads$/)) && method === "GET") return forumThreads(env, m[1], url);
+  if ((m = path.match(/^\/forum\/t\/(\d+)$/)) && method === "GET") return forumThread(env, Number(m[1]));
+  if ((m = path.match(/^\/forum\/t\/(\d+)\/replies$/)) && method === "GET") return forumReplies(env, Number(m[1]));
+  if ((m = path.match(/^\/forum\/c\/([\w-]+)\/threads$/)) && method === "POST") return forumCreateThread(req, env, m[1]);
+  if ((m = path.match(/^\/forum\/t\/(\d+)\/replies$/)) && method === "POST") return forumCreateReply(req, env, Number(m[1]));
+  if ((m = path.match(/^\/forum\/replies\/(\d+)\/vote$/)) && method === "POST") return forumVoteReply(req, env, Number(m[1]));
+
+  // ── Media (R2 signed upload) ───────────────────────────────────────────
+  if (path === "/media/upload" && method === "POST") return mediaUploadInit(req, env);
+  if (path.startsWith("/media/file/") && method === "GET") return mediaServe(env, path.slice("/media/file/".length));
 
   // ── Lemon Squeezy webhook ──────────────────────────────────────────────
   if (path === "/license/webhook" && method === "POST") return handleWebhook(req, env);
@@ -932,4 +962,223 @@ async function hmacVerifyHex(body, sigHex, secret) {
   const sigBuf = await crypto.subtle.sign("HMAC", key, enc.encode(body));
   const computed = [...new Uint8Array(sigBuf)].map(b => b.toString(16).padStart(2, "0")).join("");
   return timingSafeEqual(computed, sigHex);
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// CONTENT — posts, videos, presentations (public reads)
+// ════════════════════════════════════════════════════════════════════════
+async function listPublished(env, table) {
+  const cols = {
+    posts: "id, author_id, body_md, image_url, tags_json, published_at",
+    videos: "id, slug, title, description, source, youtube_id, video_url, embed_html, cover_url, duration_sec, tags_json, published_at",
+    presentations: "id, slug, title, description, cover_url, tags_json, published_at",
+  }[table];
+  const { results } = await env.DB.prepare(
+    `SELECT ${cols} FROM ${table} WHERE status='published' ORDER BY published_at DESC LIMIT 100`
+  ).all();
+  return json({ items: results, type: table });
+}
+
+async function getContentItem(env, table, id, idCol = "id") {
+  const row = await env.DB.prepare(`SELECT * FROM ${table} WHERE ${idCol} = ? AND status='published'`).bind(id).first();
+  if (!row) return err("not found", 404);
+  return json({ item: row });
+}
+
+async function getPresentation(env, slug) {
+  const p = await env.DB.prepare("SELECT * FROM presentations WHERE slug = ? AND status='published'").bind(slug).first();
+  if (!p) return err("not found", 404);
+  const { results: slides } = await env.DB.prepare(
+    "SELECT id, idx, image_url, caption FROM presentation_slides WHERE presentation_id = ? ORDER BY idx"
+  ).bind(p.id).all();
+  return json({ item: p, slides });
+}
+
+async function contentFeed(env, url) {
+  const limit = Math.min(Number(url.searchParams.get("limit") || 30), 100);
+  const sql = `
+    SELECT 'article' AS type, id, slug AS key, title, excerpt AS preview, cover_image AS cover, published_at FROM articles WHERE status='published'
+    UNION ALL
+    SELECT 'post' AS type, id, CAST(id AS TEXT) AS key, NULL AS title, body_md AS preview, image_url AS cover, published_at FROM posts WHERE status='published'
+    UNION ALL
+    SELECT 'video' AS type, id, slug AS key, title, description AS preview, cover_url AS cover, published_at FROM videos WHERE status='published'
+    UNION ALL
+    SELECT 'presentation' AS type, id, slug AS key, title, description AS preview, cover_url AS cover, published_at FROM presentations WHERE status='published'
+    ORDER BY published_at DESC
+    LIMIT ?
+  `;
+  const { results } = await env.DB.prepare(sql).bind(limit).all();
+  return json({ feed: results });
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// COMMENTS (polymorphic)
+// ════════════════════════════════════════════════════════════════════════
+async function listComments(env, url) {
+  const target_type = url.searchParams.get("type");
+  const target_id = Number(url.searchParams.get("id") || 0);
+  if (!target_type || !target_id) return err("missing type or id");
+  const { results } = await env.DB.prepare(
+    "SELECT c.id, c.author_id, u.email AS author_email, u.name AS author_name, c.parent_id, c.body_md, c.votes_up, c.votes_down, c.created_at " +
+    "FROM comments c LEFT JOIN users u ON u.id = c.author_id " +
+    "WHERE c.target_type = ? AND c.target_id = ? AND c.deleted = 0 " +
+    "ORDER BY c.created_at"
+  ).bind(target_type, target_id).all();
+  return json({ comments: results });
+}
+
+async function createComment(req, env) {
+  const user = await getSessionUser(req, env);
+  if (!user) return err("auth required", 401);
+  const { target_type, target_id, parent_id, body_md } = await req.json();
+  if (!target_type || !target_id || !body_md) return err("missing fields");
+  if (body_md.length > 4000) return err("body too long");
+  const r = await env.DB.prepare(
+    "INSERT INTO comments (target_type, target_id, author_id, parent_id, body_md, created_at, updated_at) " +
+    "VALUES (?, ?, ?, ?, ?, ?, ?)"
+  ).bind(target_type, Number(target_id), user.id, parent_id || null, body_md, now(), now()).run();
+  return json({ ok: true, id: r.meta?.last_row_id });
+}
+
+async function voteComment(req, env, id) {
+  const user = await getSessionUser(req, env);
+  if (!user) return err("auth required", 401);
+  const { direction } = await req.json();
+  const dir = direction > 0 ? 1 : -1;
+  await env.DB.prepare(
+    "INSERT INTO comment_votes (comment_id, user_id, direction, created_at) VALUES (?, ?, ?, ?) " +
+    "ON CONFLICT(comment_id, user_id) DO UPDATE SET direction = excluded.direction"
+  ).bind(id, user.id, dir, now()).run();
+  const tot = await env.DB.prepare(
+    "SELECT SUM(CASE WHEN direction>0 THEN 1 ELSE 0 END) AS up, SUM(CASE WHEN direction<0 THEN 1 ELSE 0 END) AS dn FROM comment_votes WHERE comment_id = ?"
+  ).bind(id).first();
+  await env.DB.prepare("UPDATE comments SET votes_up = ?, votes_down = ? WHERE id = ?")
+    .bind(tot.up || 0, tot.dn || 0, id).run();
+  return json({ ok: true, votes_up: tot.up || 0, votes_down: tot.dn || 0 });
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// FORUM
+// ════════════════════════════════════════════════════════════════════════
+async function forumCategories(env) {
+  const { results } = await env.DB.prepare(
+    "SELECT id, slug, name, description, icon, thread_count, last_activity FROM forum_categories ORDER BY display_order, id"
+  ).all();
+  return json({ categories: results });
+}
+
+async function forumThreads(env, catSlug, url) {
+  const cat = await env.DB.prepare("SELECT id FROM forum_categories WHERE slug = ?").bind(catSlug).first();
+  if (!cat) return err("category not found", 404);
+  const limit = Math.min(Number(url.searchParams.get("limit") || 50), 200);
+  const { results } = await env.DB.prepare(
+    "SELECT t.id, t.slug, t.title, t.pinned, t.locked, t.views, t.reply_count, t.last_reply_at, t.created_at, " +
+    "       u.email AS author_email, u.name AS author_name " +
+    "FROM forum_threads t LEFT JOIN users u ON u.id = t.author_id " +
+    "WHERE t.category_id = ? ORDER BY t.pinned DESC, t.last_reply_at DESC, t.created_at DESC LIMIT ?"
+  ).bind(cat.id, limit).all();
+  return json({ category_id: cat.id, threads: results });
+}
+
+async function forumThread(env, id) {
+  const t = await env.DB.prepare(
+    "SELECT t.*, c.slug AS category_slug, c.name AS category_name, u.email AS author_email, u.name AS author_name " +
+    "FROM forum_threads t " +
+    "JOIN forum_categories c ON c.id = t.category_id " +
+    "LEFT JOIN users u ON u.id = t.author_id " +
+    "WHERE t.id = ?"
+  ).bind(id).first();
+  if (!t) return err("thread not found", 404);
+  await env.DB.prepare("UPDATE forum_threads SET views = views + 1 WHERE id = ?").bind(id).run();
+  return json({ thread: t });
+}
+
+async function forumReplies(env, threadId) {
+  const { results } = await env.DB.prepare(
+    "SELECT r.id, r.parent_id, r.body_md, r.votes_up, r.votes_down, r.created_at, r.deleted, " +
+    "       u.email AS author_email, u.name AS author_name " +
+    "FROM forum_replies r LEFT JOIN users u ON u.id = r.author_id " +
+    "WHERE r.thread_id = ? ORDER BY r.created_at"
+  ).bind(threadId).all();
+  return json({ replies: results });
+}
+
+async function forumCreateThread(req, env, catSlug) {
+  const user = await getSessionUser(req, env);
+  if (!user) return err("auth required", 401);
+  const { title, body_md } = await req.json();
+  if (!title || !body_md) return err("missing title or body");
+  const cat = await env.DB.prepare("SELECT id FROM forum_categories WHERE slug = ?").bind(catSlug).first();
+  if (!cat) return err("category not found", 404);
+  const slug = title.toLowerCase().replace(/[^a-z0-9\-\s]/g, "").trim().replace(/\s+/g, "-").slice(0, 80) + "-" + Math.random().toString(36).slice(2, 6);
+  const r = await env.DB.prepare(
+    "INSERT INTO forum_threads (category_id, author_id, slug, title, body_md, created_at, updated_at, last_reply_at) " +
+    "VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+  ).bind(cat.id, user.id, slug, title, body_md, now(), now(), now()).run();
+  await env.DB.prepare("UPDATE forum_categories SET thread_count = thread_count + 1, last_activity = ? WHERE id = ?")
+    .bind(now(), cat.id).run();
+  return json({ ok: true, id: r.meta?.last_row_id, slug });
+}
+
+async function forumCreateReply(req, env, threadId) {
+  const user = await getSessionUser(req, env);
+  if (!user) return err("auth required", 401);
+  const { body_md, parent_id } = await req.json();
+  if (!body_md) return err("missing body");
+  const thread = await env.DB.prepare("SELECT category_id, locked FROM forum_threads WHERE id = ?").bind(threadId).first();
+  if (!thread) return err("thread not found", 404);
+  if (thread.locked) return err("thread locked", 403);
+  const r = await env.DB.prepare(
+    "INSERT INTO forum_replies (thread_id, author_id, parent_id, body_md, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)"
+  ).bind(threadId, user.id, parent_id || null, body_md, now(), now()).run();
+  await env.DB.prepare(
+    "UPDATE forum_threads SET reply_count = reply_count + 1, last_reply_at = ?, last_reply_by = ? WHERE id = ?"
+  ).bind(now(), user.id, threadId).run();
+  await env.DB.prepare("UPDATE forum_categories SET last_activity = ? WHERE id = ?")
+    .bind(now(), thread.category_id).run();
+  return json({ ok: true, id: r.meta?.last_row_id });
+}
+
+async function forumVoteReply(req, env, replyId) {
+  const user = await getSessionUser(req, env);
+  if (!user) return err("auth required", 401);
+  const { direction } = await req.json();
+  const dir = direction > 0 ? 1 : -1;
+  await env.DB.prepare(
+    "INSERT INTO forum_reply_votes (reply_id, user_id, direction, created_at) VALUES (?, ?, ?, ?) " +
+    "ON CONFLICT(reply_id, user_id) DO UPDATE SET direction = excluded.direction"
+  ).bind(replyId, user.id, dir, now()).run();
+  const tot = await env.DB.prepare(
+    "SELECT SUM(CASE WHEN direction>0 THEN 1 ELSE 0 END) AS up, SUM(CASE WHEN direction<0 THEN 1 ELSE 0 END) AS dn FROM forum_reply_votes WHERE reply_id = ?"
+  ).bind(replyId).first();
+  await env.DB.prepare("UPDATE forum_replies SET votes_up = ?, votes_down = ? WHERE id = ?")
+    .bind(tot.up || 0, tot.dn || 0, replyId).run();
+  return json({ ok: true, votes_up: tot.up || 0, votes_down: tot.dn || 0 });
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// MEDIA (R2 — requires MEDIA binding)
+// ════════════════════════════════════════════════════════════════════════
+async function mediaUploadInit(req, env) {
+  const user = await getSessionUser(req, env);
+  if (!user) return err("auth required", 401);
+  if (!env.MEDIA) return err("R2 not configured (env.MEDIA binding missing)", 503);
+  const { filename } = await req.json();
+  if (!filename) return err("missing filename");
+  const d = new Date();
+  const ym = `${d.getUTCFullYear()}/${String(d.getUTCMonth()+1).padStart(2,'0')}`;
+  const key = `${ym}/u${user.id}_${randomToken(6)}_${filename.replace(/[^\w.\-]/g,'_').slice(0,80)}`;
+  return json({ ok: true, key, upload_url: `/media/upload-direct?key=${encodeURIComponent(key)}`,
+                 public_url: `/media/file/${key}` });
+}
+
+async function mediaServe(env, key) {
+  if (!env.MEDIA) return err("R2 not configured", 503);
+  const obj = await env.MEDIA.get(key);
+  if (!obj) return err("not found", 404);
+  const headers = new Headers();
+  obj.writeHttpMetadata(headers);
+  headers.set("etag", obj.httpEtag);
+  headers.set("cache-control", "public, max-age=31536000, immutable");
+  return new Response(obj.body, { headers });
 }
