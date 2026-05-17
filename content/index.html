@@ -4,19 +4,52 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Content &mdash; IECCalc.com</title>
-<meta name="description" content="Articles, videos, presentations and posts on power engineering — short-circuit, cables, grounding, standards." />
+<meta name="description" content="Articles, videos, presentations and posts on power engineering." />
 <link rel="stylesheet" href="/_lib/design.css?v=metal10" />
 <link rel="stylesheet" href="/_lib/mobile.css" />
 <style>
   html, body { height: 100%; } body { background: var(--paper); }
+
   /* Filter chips */
-  .cn-filters { display: flex; gap: 6px; padding: 18px 48px; background: var(--carbon); align-items: center; overflow-x: auto; }
+  .cn-filters { display: flex; gap: 6px; padding: 14px 48px; background: var(--carbon); align-items: center; overflow-x: auto; }
   .cn-filter { font: 800 11px/1 var(--sans); letter-spacing: 0.12em; text-transform: uppercase; padding: 8px 14px; border: 1px solid rgba(255,255,255,0.18); background: transparent; color: rgba(255,255,255,0.7); cursor: pointer; }
   .cn-filter:hover { color: #fff; border-color: rgba(255,255,255,0.4); }
   .cn-filter.is-on { color: #fff; background: var(--red); border-color: var(--red); }
+
+  /* Composer (admin only) */
+  .composer { background: var(--paper-2); border: 2px solid var(--ink); margin: 22px auto; max-width: 880px; padding: 16px 18px; }
+  .composer-head { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; font: 800 11px/1 var(--sans); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3); }
+  .composer-head .red { color: var(--red); }
+  .composer-tabs { display: flex; gap: 4px; margin-bottom: 10px; overflow-x: auto; }
+  .composer-tab { font: 800 11px/1 var(--sans); letter-spacing: 0.10em; padding: 8px 14px; border: 1px solid var(--border); background: var(--paper); color: var(--ink-2); cursor: pointer; text-transform: uppercase; flex-shrink: 0; }
+  .composer-tab:hover { color: var(--ink); border-color: var(--ink); }
+  .composer-tab.is-on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .composer-fields { display: flex; flex-direction: column; gap: 8px; }
+  .composer-fields input, .composer-fields textarea, .composer-fields select {
+    width: 100%; font: 500 14px/1.4 var(--sans); padding: 9px 12px;
+    border: 1px solid var(--border); background: var(--paper);
+  }
+  .composer-fields textarea { min-height: 120px; resize: vertical; font-family: var(--sans); }
+  .composer-fields textarea.short { min-height: 80px; }
+  .composer-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .composer-row > * { flex: 1; min-width: 160px; }
+  .composer-actions { display: flex; gap: 10px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+  .composer-actions .btn { white-space: nowrap; }
+  .composer-msg { font: 600 12px/1.4 var(--sans); }
+  .composer-msg.ok  { color: var(--green); }
+  .composer-msg.err { color: var(--red); }
+  .composer-help { font: 500 11px/1.4 var(--sans); color: var(--ink-3); }
+  .composer-help code { background: var(--surface); padding: 1px 4px; font-family: "Consolas",monospace; font-size: 11px; }
+  .composer-preview { background: var(--surface); border: 1px dashed var(--border); padding: 12px 14px; margin-top: 8px; font: 500 13.5px/1.5 var(--sans); white-space: pre-wrap; word-break: break-word; min-height: 30px; }
+  .composer-preview img { max-width: 100%; }
+  @media (max-width: 600px) {
+    .composer { margin: 12px; padding: 12px 14px; }
+    .composer-row > * { min-width: 100%; }
+  }
+
   /* Feed grid */
-  .cn-feed { max-width: 1280px; margin: 0 auto; padding: 32px 48px 60px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; }
-  @media (max-width:980px) { .cn-feed { grid-template-columns: 1fr 1fr; padding: 22px 18px; } }
+  .cn-feed { max-width: 1280px; margin: 0 auto; padding: 18px 48px 60px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; }
+  @media (max-width:980px) { .cn-feed { grid-template-columns: 1fr 1fr; padding: 18px 18px; } }
   @media (max-width:600px) { .cn-feed { grid-template-columns: 1fr; } }
   .cn-card { background: var(--surface); border: 1px solid var(--border); text-decoration: none; color: inherit; display: flex; flex-direction: column; transition: border-color .12s; }
   .cn-card:hover { border-color: var(--ink); }
@@ -25,16 +58,16 @@
   .cn-cover img { width: 100%; height: 100%; object-fit: cover; }
   .cn-meta { display: flex; gap: 8px; align-items: center; padding: 12px 16px 6px; font: 800 10.5px/1 var(--sans); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); }
   .cn-type { padding: 3px 7px; background: var(--ink); color: #fff; font-size: 10px; letter-spacing: 0.14em; }
-  .cn-type.article { background: var(--ink); }
   .cn-type.video { background: var(--red); }
   .cn-type.presentation { background: #1a3a6a; }
   .cn-type.post { background: var(--green); }
   .cn-title { font: 800 18px/1.2 var(--display); padding: 4px 16px 8px; margin: 0; letter-spacing: -0.01em; }
   .cn-preview { font: 500 13px/1.5 var(--sans); color: var(--ink-2); padding: 0 16px 14px; flex: 1; }
   .cn-foot { padding: 10px 16px 14px; border-top: 1px dashed var(--line); font: 600 11px/1 var(--sans); color: var(--ink-3); display: flex; justify-content: space-between; }
+
   /* Subnav header */
-  .cn-head { background: var(--paper); border-bottom: 2px solid var(--ink); padding: 26px 48px 20px; max-width: 1440px; margin: 0 auto; }
-  .cn-head h1 { font: 900 36px/1 var(--display); letter-spacing: -0.03em; margin: 0; text-transform: uppercase; }
+  .cn-head { background: var(--paper); border-bottom: 2px solid var(--ink); padding: 22px 48px 18px; max-width: 1440px; margin: 0 auto; }
+  .cn-head h1 { font: 900 32px/1 var(--display); letter-spacing: -0.03em; margin: 0; text-transform: uppercase; }
   .cn-head p { font: 500 14px/1.5 var(--sans); color: var(--ink-2); max-width: 720px; margin: 8px 0 0; }
   .empty { padding: 50px 24px; text-align: center; color: var(--ink-3); background: var(--surface); border: 1px dashed var(--border); grid-column: 1/-1; }
 </style>
@@ -42,20 +75,10 @@
 <body>
 <div class="ab v-a">
 
-<!-- Compact nav -->
 <header class="va-nav va-nav-xl">
-  <a href="/" class="logo-nav logo-nav-xl" aria-label="IECCalc.com">
+  <a href="/" class="logo-nav logo-nav-xl">
     <span class="logo-nav-mark" style="width:48px;height:48px">
-      <svg width="48" height="48" viewBox="0 0 64 64" aria-hidden="true">
-        <rect x="1" y="1" width="62" height="62" rx="3" fill="none" stroke="var(--ink)" stroke-width="2"/>
-        <line x1="32" y1="32" x2="32" y2="10" stroke="var(--ink)" stroke-width="3.5"/>
-        <line x1="32" y1="32" x2="51.05" y2="43" stroke="var(--red)" stroke-width="3.5"/>
-        <line x1="32" y1="32" x2="12.95" y2="43" stroke="var(--ink)" stroke-width="3.5"/>
-        <circle cx="32" cy="10" r="3" fill="var(--ink)"/>
-        <circle cx="51.05" cy="43" r="3" fill="var(--red)"/>
-        <circle cx="12.95" cy="43" r="3" fill="var(--ink)"/>
-        <circle cx="32" cy="32" r="4" fill="var(--ink)"/>
-      </svg>
+      <svg width="48" height="48" viewBox="0 0 64 64"><rect x="1" y="1" width="62" height="62" rx="3" fill="none" stroke="var(--ink)" stroke-width="2"/><line x1="32" y1="32" x2="32" y2="10" stroke="var(--ink)" stroke-width="3.5"/><line x1="32" y1="32" x2="51.05" y2="43" stroke="var(--red)" stroke-width="3.5"/><line x1="32" y1="32" x2="12.95" y2="43" stroke="var(--ink)" stroke-width="3.5"/><circle cx="32" cy="10" r="3" fill="var(--ink)"/><circle cx="51.05" cy="43" r="3" fill="var(--red)"/><circle cx="12.95" cy="43" r="3" fill="var(--ink)"/><circle cx="32" cy="32" r="4" fill="var(--ink)"/></svg>
     </span>
     <span class="logo-nav-stack">
       <span class="logo-nav-word logo-nav-word-xl" style="font-size:26px"><b style="color:var(--ink)">IEC</b><b style="color:var(--red)">CALC</b><span class="logo-nav-tld" style="color:var(--ink-3)">.COM</span></span>
@@ -76,8 +99,76 @@
 
 <div class="cn-head">
   <h1>Content</h1>
-  <p>Engineering articles, videos and presentations. Comment, vote, save for later.</p>
+  <p>Articles, videos, presentations and short posts. Comment, vote, save for later.</p>
 </div>
+
+<!-- Composer (admin only) -->
+<section class="composer hidden" id="composer">
+  <div class="composer-head">
+    <span class="red">/ COMPOSE</span>
+    <span id="composer-user"></span>
+  </div>
+  <div class="composer-tabs" id="composer-tabs">
+    <button class="composer-tab is-on" data-kind="post">Post</button>
+    <button class="composer-tab" data-kind="article">Article</button>
+    <button class="composer-tab" data-kind="video">Video</button>
+    <button class="composer-tab" data-kind="presentation">Presentation</button>
+  </div>
+
+  <!-- POST -->
+  <div class="composer-fields" data-form="post">
+    <textarea id="p-body" class="short" placeholder="What's on your mind? Markdown supported. Up to 600 chars."></textarea>
+    <input type="text" id="p-image" placeholder="Image URL (optional, paste any image link)" />
+    <input type="text" id="p-tags" placeholder="Tags, comma-separated (optional)" />
+    <div class="composer-help">Quick post for a thought, link or short observation. <code>**bold**</code> · <code>*italic*</code> · <code>[link](url)</code></div>
+  </div>
+
+  <!-- ARTICLE -->
+  <div class="composer-fields hidden" data-form="article">
+    <input type="text" id="a-title" placeholder="Article title" />
+    <input type="text" id="a-slug" placeholder="URL slug (auto from title if blank)" />
+    <input type="text" id="a-excerpt" placeholder="One-sentence excerpt for the card" />
+    <input type="text" id="a-cover" placeholder="Cover image URL (optional)" />
+    <textarea id="a-body" placeholder="Full article body. Markdown: ## headings, **bold**, [links](url), &gt; quotes, lists."></textarea>
+    <input type="text" id="a-tags" placeholder="Tags, comma-separated" />
+  </div>
+
+  <!-- VIDEO -->
+  <div class="composer-fields hidden" data-form="video">
+    <input type="text" id="v-title" placeholder="Video title" />
+    <input type="text" id="v-slug" placeholder="URL slug (auto from title)" />
+    <div class="composer-row">
+      <select id="v-source">
+        <option value="youtube">YouTube</option>
+        <option value="embed">Embed (iframe HTML)</option>
+        <option value="r2">Upload to R2</option>
+      </select>
+      <input type="text" id="v-id" placeholder="YouTube video ID (e.g. dQw4w9WgXcQ)" />
+    </div>
+    <input type="text" id="v-cover" placeholder="Cover image URL (optional, auto from YouTube)" />
+    <textarea id="v-desc" class="short" placeholder="Description"></textarea>
+    <input type="text" id="v-tags" placeholder="Tags, comma-separated" />
+  </div>
+
+  <!-- PRESENTATION -->
+  <div class="composer-fields hidden" data-form="presentation">
+    <input type="text" id="pr-title" placeholder="Presentation title" />
+    <input type="text" id="pr-slug" placeholder="URL slug (auto from title)" />
+    <input type="text" id="pr-cover" placeholder="Cover image URL (first slide if blank)" />
+    <textarea id="pr-desc" class="short" placeholder="Short description / TL;DR"></textarea>
+    <textarea id="pr-slides" placeholder="One slide per line — each is an image URL, optionally followed by a pipe and caption:&#10;https://example.com/slide1.png | Caption for slide 1&#10;https://example.com/slide2.png | Another slide"></textarea>
+    <input type="text" id="pr-tags" placeholder="Tags, comma-separated" />
+  </div>
+
+  <div class="composer-preview hidden" id="composer-preview"></div>
+
+  <div class="composer-actions">
+    <button class="btn btn-primary" id="btn-publish">PUBLISH</button>
+    <button class="btn" id="btn-draft">Save as draft</button>
+    <button class="btn" id="btn-preview">Preview</button>
+    <span class="composer-msg" id="composer-msg"></span>
+  </div>
+</section>
 
 <div class="cn-filters" id="cn-filters">
   <button class="cn-filter is-on" data-type="all">ALL</button>
@@ -98,7 +189,21 @@
   'use strict';
   function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));}
   function fmtDate(t){return t ? new Date(t).toISOString().slice(0,10) : '';}
+  function slugify(s){return String(s||'').toLowerCase().replace(/[^a-z0-9\s-]/g,'').trim().replace(/\s+/g,'-').slice(0,80);}
+  function md(src){
+    if(!src) return '';
+    let h = esc(src);
+    h = h.replace(/^### (.+)$/gm, '<h3>$1</h3>').replace(/^## (.+)$/gm, '<h2>$1</h2>');
+    h = h.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+    h = h.replace(/(?<!\*)\*([^*\n]+)\*/g, '<i>$1</i>');
+    h = h.replace(/`([^`]+)`/g, '<code>$1</code>');
+    h = h.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+    h = h.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
+    h = h.split(/\n\n+/).map(p => p.trim().startsWith('<') ? p : '<p>'+p.replace(/\n/g,'<br>')+'</p>').join('\n');
+    return h;
+  }
 
+  // Feed rendering
   function card(item) {
     const t = item.type;
     let href;
@@ -128,15 +233,11 @@
     const list = filter === 'all' ? allFeed : allFeed.filter(x => x.type === filter);
     const root = document.getElementById('cn-feed');
     if (!list.length) {
-      const msg = filter === 'all'
-        ? 'No content published yet. First articles, videos and case studies coming soon.'
-        : `No <b>${filter}s</b> yet.`;
-      root.innerHTML = `<div class="empty">${msg}</div>`;
+      root.innerHTML = `<div class="empty">${filter === 'all' ? 'No content yet — be the first.' : 'No <b>'+filter+'s</b> yet.'}</div>`;
       return;
     }
     root.innerHTML = list.map(card).join('');
   }
-
   document.getElementById('cn-filters').addEventListener('click', e => {
     const b = e.target.closest('.cn-filter');
     if (!b) return;
@@ -144,9 +245,153 @@
     b.classList.add('is-on');
     render(b.dataset.type);
   });
+  function loadFeed() {
+    IecApi.contentFeed(60).then(d => { allFeed = d.feed || []; render(document.querySelector('.cn-filter.is-on').dataset.type); })
+      .catch(e => { document.getElementById('cn-feed').innerHTML = '<div class="empty">Content offline ('+esc(e.message)+').</div>'; });
+  }
+  loadFeed();
 
-  IecApi.contentFeed(60).then(d => { allFeed = d.feed || []; render('all'); })
-    .catch(e => { document.getElementById('cn-feed').innerHTML = '<div class="empty">Content offline (' + esc(e.message) + ').</div>'; });
+  // ── COMPOSER (admin only) ─────────────────────────────────────────
+  let currentKind = 'post';
+  function setKind(k) {
+    currentKind = k;
+    document.querySelectorAll('.composer-tab').forEach(t => t.classList.toggle('is-on', t.dataset.kind === k));
+    document.querySelectorAll('.composer-fields').forEach(f => f.classList.toggle('hidden', f.dataset.form !== k));
+    document.getElementById('composer-preview').classList.add('hidden');
+  }
+  document.getElementById('composer-tabs').addEventListener('click', e => {
+    const b = e.target.closest('.composer-tab'); if (!b) return;
+    setKind(b.dataset.kind);
+  });
+
+  // Auto-cover for YouTube
+  document.getElementById('v-id').addEventListener('blur', () => {
+    const id = document.getElementById('v-id').value.trim();
+    if (id && !document.getElementById('v-cover').value) {
+      document.getElementById('v-cover').value = 'https://i.ytimg.com/vi/' + id + '/hqdefault.jpg';
+    }
+  });
+
+  function collectFormPayload(kind, publish) {
+    const tags = (id) => {
+      const v = document.getElementById(id).value.trim();
+      if (!v) return null;
+      return JSON.stringify(v.split(',').map(s => s.trim()).filter(Boolean));
+    };
+    if (kind === 'post') {
+      return {
+        author_id: window.__currentUserId || 1,
+        body_md: document.getElementById('p-body').value.trim(),
+        image_url: document.getElementById('p-image').value.trim() || null,
+        tags_json: tags('p-tags'),
+        publish: publish,
+      };
+    }
+    if (kind === 'article') {
+      const title = document.getElementById('a-title').value.trim();
+      const slug = document.getElementById('a-slug').value.trim() || slugify(title);
+      return {
+        slug,
+        title,
+        excerpt: document.getElementById('a-excerpt').value.trim(),
+        cover_image: document.getElementById('a-cover').value.trim() || null,
+        body_md: document.getElementById('a-body').value.trim(),
+        tags_json: tags('a-tags'),
+        publish: publish,
+      };
+    }
+    if (kind === 'video') {
+      const title = document.getElementById('v-title').value.trim();
+      const slug = document.getElementById('v-slug').value.trim() || slugify(title);
+      return {
+        slug, title,
+        description: document.getElementById('v-desc').value.trim(),
+        source: document.getElementById('v-source').value,
+        youtube_id: document.getElementById('v-source').value === 'youtube' ? document.getElementById('v-id').value.trim() : null,
+        cover_url: document.getElementById('v-cover').value.trim() || null,
+        tags_json: tags('v-tags'),
+        publish: publish,
+      };
+    }
+    if (kind === 'presentation') {
+      const title = document.getElementById('pr-title').value.trim();
+      const slug = document.getElementById('pr-slug').value.trim() || slugify(title);
+      return {
+        slug, title,
+        description: document.getElementById('pr-desc').value.trim(),
+        cover_url: document.getElementById('pr-cover').value.trim() || null,
+        tags_json: tags('pr-tags'),
+        _slides: document.getElementById('pr-slides').value.split('\n').map(l => l.trim()).filter(Boolean).map((l, i) => {
+          const [url, ...rest] = l.split('|');
+          return { idx: i, image_url: url.trim(), caption: rest.join('|').trim() || null };
+        }),
+        publish: publish,
+      };
+    }
+  }
+
+  async function submit(publish) {
+    const msg = document.getElementById('composer-msg');
+    const payload = collectFormPayload(currentKind, publish);
+    msg.textContent = publish ? 'Publishing…' : 'Saving draft…';
+    msg.className = 'composer-msg';
+    const tableMap = { post: 'posts', article: 'articles', video: 'videos', presentation: 'presentations' };
+    const table = tableMap[currentKind];
+    try {
+      // Strip slides before POST (handled separately)
+      const slides = payload._slides;
+      delete payload._slides;
+      const r = await fetch(IecApi.base + '/admin/' + table, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'failed');
+      // For presentation: insert slides
+      if (currentKind === 'presentation' && slides && slides.length) {
+        for (const s of slides) {
+          await fetch(IecApi.base + '/admin/presentation-slides', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ presentation_id: data.id, idx: s.idx, image_url: s.image_url, caption: s.caption }),
+          });
+        }
+      }
+      msg.textContent = publish ? 'Published! Loading feed…' : 'Draft saved.';
+      msg.className = 'composer-msg ok';
+      // Clear form
+      document.querySelectorAll('.composer-fields input, .composer-fields textarea').forEach(el => el.value = '');
+      setTimeout(() => { msg.textContent = ''; loadFeed(); }, 1200);
+    } catch (e) {
+      msg.textContent = 'Failed: ' + e.message;
+      msg.className = 'composer-msg err';
+    }
+  }
+
+  document.getElementById('btn-publish').addEventListener('click', () => submit(true));
+  document.getElementById('btn-draft').addEventListener('click', () => submit(false));
+  document.getElementById('btn-preview').addEventListener('click', () => {
+    const pv = document.getElementById('composer-preview');
+    const p = collectFormPayload(currentKind, false);
+    const html = p.body_md ? md(p.body_md) : (p.description ? md(p.description) : '');
+    pv.innerHTML = (p.cover_image ? `<img src="${esc(p.cover_image)}"><br>` : (p.cover_url ? `<img src="${esc(p.cover_url)}"><br>` : ''))
+                 + (p.title ? `<h3>${esc(p.title)}</h3>` : '')
+                 + html
+                 + (p._slides && p._slides.length ? '<p style="font-size:11px;color:var(--ink-3)">'+p._slides.length+' slides</p>' : '');
+    pv.classList.remove('hidden');
+  });
+
+  // Show composer if user is admin
+  IecApi.me().then(s => {
+    if (s.authenticated && s.isAdmin) {
+      window.__currentUserId = s.user.id;
+      document.getElementById('composer').classList.remove('hidden');
+      document.getElementById('composer-user').textContent = ' posting as ' + (s.user.email || '');
+    }
+  }).catch(()=>{});
 })();
 </script>
 </body>

@@ -1635,3 +1635,34 @@ html, body { height: auto !important; min-height: 100%; overflow-x: hidden; over
 }
 @media (max-width: 1100px) { .va-ql-row { grid-template-columns: repeat(4, 1fr); } .va-ql:nth-child(n+5) { display: none; } }
 @media (max-width: 760px)  { .va-ql-row { grid-template-columns: repeat(2, 1fr); } .va-ql .sub { display: none; } }
+
+/* Quick-launch SINGLE LINE override — eyebrow inline, tools row sized down */
+.va-quicklaunch { display: flex !important; align-items: stretch !important; min-height: 28px; }
+.va-quicklaunch .va-ql-eyebrow {
+  display: inline-flex; align-items: center;
+  padding: 0 16px !important;
+  border-right: 1px solid rgba(255,255,255,0.10);
+  font-size: 9.5px !important;
+  white-space: nowrap;
+  background: rgba(0,0,0,0.25);
+}
+.va-quicklaunch .va-ql-row {
+  flex: 1; min-width: 0;
+  grid-template-columns: repeat(6, 1fr) !important;
+}
+.va-quicklaunch .va-ql { padding: 4px 14px !important; min-height: 28px !important; }
+.va-quicklaunch .va-ql .lbl { font-size: 10.5px !important; }
+.va-quicklaunch .va-ql .sub { font-size: 9px !important; }
+@media (max-width: 760px) {
+  .va-quicklaunch { flex-direction: column !important; }
+  .va-quicklaunch .va-ql-eyebrow { border-right: 0; border-bottom: 1px solid rgba(255,255,255,0.10); padding: 5px 12px !important; }
+}
+
+/* Footer logo size — was huge (96px @ scale 0.95), now compact like nav */
+.va-foot .logo-hero { --scale: 0.45 !important; }
+.va-foot .logo-hero-word { font-size: 38px !important; }
+.va-foot-band { gap: 28px; align-items: center; }
+@media (max-width: 760px) {
+  .va-foot-band { grid-template-columns: 1fr !important; }
+  .va-foot .logo-hero { --scale: 0.4 !important; }
+}

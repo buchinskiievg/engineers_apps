@@ -298,7 +298,9 @@ async function me(req, env) {
     "WHERE l.user_id = ? AND l.revoked = 0 AND (l.expires_at IS NULL OR l.expires_at > ?) " +
     "ORDER BY l.expires_at IS NULL DESC, l.expires_at DESC"
   ).bind(user.id, now()).all();
-  return json({ authenticated: true, user, licenses });
+  // Check admin status
+  const adminRow = await env.DB.prepare("SELECT role FROM admin_users WHERE email = ?").bind(user.email).first();
+  return json({ authenticated: true, user, licenses, isAdmin: !!adminRow, adminRole: adminRow?.role || null });
 }
 
 // ════════════════════════════════════════════════════════════════════════
@@ -721,6 +723,13 @@ async function adminRouter(req, env, url, path) {
     calculators:    { table: "calculators",    listCols: "*" },
     "pricing-rules":{ table: "pricing_rules",  listCols: "*" },
     articles:       { table: "articles",       listCols: "*" },
+    posts:          { table: "posts",          listCols: "*" },
+    videos:         { table: "videos",         listCols: "*" },
+    presentations:  { table: "presentations",  listCols: "*" },
+    "presentation-slides": { table: "presentation_slides", listCols: "*" },
+    "forum-categories":  { table: "forum_categories",  listCols: "*" },
+    "forum-threads":     { table: "forum_threads",     listCols: "*" },
+    "forum-replies":     { table: "forum_replies",     listCols: "*" },
     licenses:       { table: "licenses",       listCols: "*" },
     leads:          { table: "leads",          listCols: "*" },
     orders:         { table: "orders",         listCols: "*" },
@@ -758,10 +767,19 @@ async function adminGet(env, h, id) {
   return json({ item: row });
 }
 
+const TABLES_WITH_UPDATED_AT = new Set([
+  "calculators","pricing_rules","articles","posts","videos",
+  "presentations","forum_threads","forum_replies","forum_categories",
+]);
+
 async function adminCreate(env, h, body) {
   body.created_at = body.created_at || now();
-  if ("updated_at" in (h.cols || {}) || h.table === "calculators" || h.table === "pricing_rules" || h.table === "articles") {
-    body.updated_at = now();
+  if (TABLES_WITH_UPDATED_AT.has(h.table)) body.updated_at = now();
+  // Auto-publish: if body.publish is true, set published_at and status
+  if (body.publish) {
+    body.status = "published";
+    body.published_at = body.published_at || now();
+    delete body.publish;
   }
   const cols = Object.keys(body);
   const placeholders = cols.map(() => "?").join(", ");
@@ -774,7 +792,7 @@ async function adminCreate(env, h, body) {
 
 async function adminUpdate(env, h, id, body) {
   delete body.id;
-  if (["calculators","pricing_rules","articles"].includes(h.table)) body.updated_at = now();
+  if (TABLES_WITH_UPDATED_AT.has(h.table)) body.updated_at = now();
   const cols = Object.keys(body);
   if (!cols.length) return err("nothing to update");
   const set = cols.map(c => `${c} = ?`).join(", ");
