@@ -1,0 +1,137 @@
+/* ieccalc.com — calculator skin shim
+   Re-maps calculator-internal CSS variables to site design tokens so
+   the 4 calculators (001-004) blend with site palette/typography.
+   Load this AFTER the calc's inline <style> and AFTER design.css. */
+
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800;900&family=Archivo:wght@700;800;900&display=swap');
+
+:root {
+  /* Calculators use these names; remap to site warm palette */
+  --bg:        #ECE9E2 !important;        /* paper, was cool gray */
+  --bg-soft:   #E2DED5 !important;
+  --panel:     #F0ECE3 !important;
+  --panel-2:   #F4F1EA !important;
+  --ink:       #2E2B25 !important;        /* warm graphite, was pure black */
+  --ink-soft:  #3A352D !important;
+  --muted:     #4A4640 !important;
+  --line:      #BAB3A4 !important;
+  --line-soft: #D6D1C5 !important;
+  --btn:       #2E2B25 !important;        /* dark warm gray */
+  --btn-hover: #1F1C18 !important;
+  --btn-ink:   #ECE9E2 !important;        /* paper-on-dark */
+  --btn-ghost-bg: #E2DED5 !important;
+  --chip-bg:   #2E2B25 !important;
+  --chip-ink:  #ECE9E2 !important;
+  --tab-bg:    #C6C0B2 !important;
+  --tab-active-bg: #F4F1EA !important;
+  --ok-bg:     #D6E6D8 !important;
+  --ok-ink:    #2F7A3C !important;
+  --warn-bg:   #F4E4C1 !important;
+  --warn-ink:  #6B4A00 !important;
+  --err-bg:    #F8D9DB !important;
+  --err-ink:   #A30E18 !important;
+  /* Add new site tokens */
+  --red:       #DC1A25 !important;
+  --paper:     #ECE9E2 !important;
+  --carbon:    #2A2823 !important;
+  --display: 'Archivo', 'Geist', -apple-system, sans-serif !important;
+  --sans:    'Geist', -apple-system, 'Segoe UI', Helvetica, sans-serif !important;
+}
+
+/* Body uses site font */
+body {
+  font-family: 'Geist', -apple-system, system-ui, 'Segoe UI', Helvetica, sans-serif !important;
+  background: var(--paper) !important;
+  color: var(--ink) !important;
+}
+
+/* Calculator container — give it page margin so chrome.js header has room above */
+.container {
+  max-width: 1280px !important;
+  margin: 0 auto !important;
+  padding-top: 22px !important;
+}
+
+/* Headings — switch to display font */
+h1, .h1 {
+  font-family: 'Archivo', 'Geist', sans-serif !important;
+  font-weight: 900 !important;
+  letter-spacing: -0.02em !important;
+  text-transform: uppercase !important;
+}
+h2, h3, .h2, .h3 {
+  font-family: 'Archivo', 'Geist', sans-serif !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.01em !important;
+}
+
+/* Chips: warmer */
+.chip { background: var(--ink) !important; color: var(--paper) !important; }
+
+/* Buttons: site style */
+button, .btn, input[type="button"], input[type="submit"] {
+  border-radius: 0 !important;
+  letter-spacing: 0.04em !important;
+  font-weight: 700 !important;
+}
+button.primary, .btn.primary, .btn-primary,
+button[type="submit"]:not(.cancel) {
+  background: var(--red) !important;
+  color: #fff !important;
+  border-color: var(--red) !important;
+}
+button.primary:hover, .btn.primary:hover { background: #A30E18 !important; }
+
+/* Tables: warm */
+table { border-color: var(--line) !important; }
+table th { background: var(--panel) !important; color: var(--ink) !important; }
+table td { border-color: var(--line-soft) !important; }
+
+/* Inputs */
+input[type="text"], input[type="number"], input[type="email"],
+select, textarea {
+  border-radius: 0 !important;
+  border-color: var(--line) !important;
+  background: var(--paper) !important;
+  color: var(--ink) !important;
+  font-family: 'Geist', sans-serif !important;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--red) !important;
+  outline: none !important;
+}
+
+/* Tabs (calculator inner tabs, like "Feeder 1") */
+.tab, .tabs button {
+  border-radius: 0 !important;
+  letter-spacing: 0.06em !important;
+  text-transform: uppercase !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+}
+
+/* Cards / panels */
+.panel, .card, .section {
+  border-radius: 0 !important;
+  border-color: var(--line) !important;
+}
+
+/* Old "disclaimer" yellow box — keep but reskin */
+.disclaimer, footer .disclaimer {
+  background: var(--warn-bg) !important;
+  color: var(--warn-ink) !important;
+  border-color: #C99C3C !important;
+  border-radius: 0 !important;
+}
+
+/* Verdict pills (PASS/FAIL/BORDERLINE) — keep semantic colors */
+.pass, .ok, .verdict.pass { background: var(--ok-bg) !important; color: var(--ok-ink) !important; }
+.fail, .err, .verdict.fail { background: var(--err-bg) !important; color: var(--err-ink) !important; }
+.borderline, .warn, .verdict.borderline { background: var(--warn-bg) !important; color: var(--warn-ink) !important; }
+
+/* Author header on right — keep but warmer */
+.author-name { color: var(--ink) !important; }
+.author-email a, .author-wa-hint a { color: var(--ink-soft) !important; }
+
+/* Make sure chrome header doesn't fight with calc internal body */
+.iec-chrome { margin-bottom: 0 !important; }
