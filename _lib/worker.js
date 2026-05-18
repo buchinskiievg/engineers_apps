@@ -176,7 +176,7 @@ async function dispatch(req, env, ctx, url, path) {
 // ════════════════════════════════════════════════════════════════════════
 async function getCalculators(env) {
   const { results } = await env.DB.prepare(
-    "SELECT id, slug, name, short_desc, standards, category, tier, base_url, paid_features_json, preview_image, display_order " +
+    "SELECT id, slug, name, short_desc, standards, category, visibility, tier, base_url, paid_features_json, preview_image, display_order " +
     "FROM calculators WHERE tier != 'archived' ORDER BY display_order, slug"
   ).all();
   return json({ calculators: results });

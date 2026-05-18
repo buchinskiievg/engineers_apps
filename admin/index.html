@@ -119,8 +119,70 @@
           </tbody></table>`;
       },
 
-      async calculators() { return crudView("calculators", "Calculators",
-        ["id","slug","name","category","tier","display_order"], { editable:true }); },
+      async calculators() {
+        // Custom view with inline visibility selector
+        const { items } = await api("/admin/calculators");
+        view.innerHTML = `
+          <h2>Calculators <span style="font-size:12px;color:var(--ink-3);font-weight:400">(${items.length})</span></h2>
+          <p style="font:500 12px/1.4 var(--sans);color:var(--ink-3);margin-bottom:14px">
+            <b>Visibility</b> controls which tabs on the landing page show the calculator:
+            <b>free</b> = Free tab only · <b>pro</b> = Pro tab only · <b>both</b> = shown in both tabs.
+          </p>
+          <div class="toolbar"><button class="primary" id="btn-new">+ New</button></div>
+          <table><thead><tr><th>id</th><th>slug</th><th>name</th><th>category</th><th>visibility</th><th>tier</th><th>order</th><th></th></tr></thead><tbody>
+            ${items.map(c => `<tr data-id="${c.id}">
+              <td>${c.id}</td>
+              <td>${esc(c.slug)}</td>
+              <td>${esc(c.name||'')}</td>
+              <td>${esc(c.category||'')}</td>
+              <td><select data-vis-id="${c.id}" style="font:inherit;padding:3px 6px">
+                <option value="free"${c.visibility==='free'?' selected':''}>free</option>
+                <option value="pro"${c.visibility==='pro'?' selected':''}>pro</option>
+                <option value="both"${c.visibility==='both'?' selected':''}>both</option>
+              </select></td>
+              <td>${esc(c.tier||'')}</td>
+              <td>${c.display_order}</td>
+              <td class="row-actions">
+                <button data-act="edit" data-id="${c.id}">Edit</button>
+                <button class="danger" data-act="del" data-id="${c.id}">Del</button>
+              </td>
+            </tr>`).join("")}
+          </tbody></table>
+        `;
+        // Wire up inline visibility change
+        view.querySelectorAll('select[data-vis-id]').forEach(sel => sel.addEventListener('change', async () => {
+          const id = sel.dataset.visId;
+          const val = sel.value;
+          try {
+            await api(`/admin/calculators/${id}`, { method: 'PUT', body: { visibility: val } });
+            msg(`Calculator #${id} visibility → ${val}`);
+          } catch (e) {
+            msg('Update failed: ' + e.message, 'err');
+          }
+        }));
+        view.querySelectorAll('button[data-act]').forEach(b => b.addEventListener('click', async () => {
+          const id = b.dataset.id, act = b.dataset.act;
+          if (act === 'del' && confirm('Delete calculator #' + id + '?')) {
+            await api(`/admin/calculators/${id}`, { method: 'DELETE' });
+            views.calculators();
+          }
+          if (act === 'edit') {
+            const r = await api(`/admin/calculators/${id}`);
+            const newJson = prompt('Edit JSON for #' + id + ':', JSON.stringify(r.item, null, 2));
+            if (newJson) {
+              try { await api(`/admin/calculators/${id}`, { method: 'PUT', body: JSON.parse(newJson) }); views.calculators(); }
+              catch (e) { msg('Save failed: ' + e.message, 'err'); }
+            }
+          }
+        }));
+        document.getElementById('btn-new')?.addEventListener('click', async () => {
+          const tmpl = { slug:'005', name:'New calculator', short_desc:'', category:'pro', visibility:'pro', tier:'coming_soon', base_url:'/005/', display_order:50 };
+          const body = prompt('New calculator (JSON):', JSON.stringify(tmpl, null, 2));
+          if (!body) return;
+          try { await api('/admin/calculators', { method: 'POST', body: JSON.parse(body) }); views.calculators(); }
+          catch (e) { msg('Create failed: ' + e.message, 'err'); }
+        });
+      },
       async ["pricing-rules"]() { return crudView("pricing-rules", "Pricing rules",
         ["id","name","match_type","period","price_usd","badge","active","display_order"], { editable:true }); },
       async articles() { return crudView("articles", "Articles",

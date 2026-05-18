@@ -504,8 +504,10 @@
     let calculators = SEED;
     try { ({ calculators } = await IecApi.calculators()); } catch (e) {}
     renderQuickLaunch(calculators);
-    const free = calculators.filter(c => c.category === 'free');
-    const pro  = calculators.filter(c => c.category === 'pro');
+    // visibility: 'free' | 'pro' | 'both' — falls back to category for legacy rows
+    const vis = c => (c.visibility || c.category || 'free');
+    const free = calculators.filter(c => vis(c) === 'free' || vis(c) === 'both');
+    const pro  = calculators.filter(c => vis(c) === 'pro'  || vis(c) === 'both');
     document.getElementById('stat-tools').textContent = String(calculators.length).padStart(2,'0');
     document.getElementById('cnt-free').innerHTML = String(free.length) + '<small>ENTRIES</small>';
     document.getElementById('cnt-pro').innerHTML  = String(pro.length)  + '<small>ENTRIES</small>';
