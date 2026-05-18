@@ -24,7 +24,17 @@ database_id = "b16d37b6-1ab6-4018-99d3-4a8fe05ace7b"
 #   RESEND_API_KEY             — Resend API key
 #   ADMIN_API_KEY              — long random; used by /admin endpoints
 
+# Cron trigger: every 2 min, scheduled handler compares GitHub main HEAD
+# vs latest CF Pages deployment and triggers a redeploy if they diverge.
+# Belt-and-braces against CF Pages' native git webhook occasionally
+# silently skipping commits.
+[triggers]
+crons = ["*/2 * * * *"]
+
 [vars]
 SITE_URL = "https://ieccalc.com"
 LS_STORE_SUBDOMAIN = "ieccalc"
 FROM_EMAIL = "license@ieccalc.com"
+GH_REPO = "buchinskiievg/engineers_apps"
+CF_PAGES_PROJECT = "engineers-apps"
+CF_ACCOUNT_ID = "e5d02013758955380085433a5a0b24ed"

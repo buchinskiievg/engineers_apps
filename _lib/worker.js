@@ -94,7 +94,75 @@ export default {
       return err(e?.message || "internal error", 500);
     }
   },
+
+  // ── Scheduled: belt-and-braces Pages deploy ────────────────────────
+  // CF Pages has a native git webhook but has occasionally silently
+  // skipped commits. This cron runs every 2 min, compares latest SHA
+  // on GitHub `main` with latest CF Pages deployment, and triggers a
+  // redeploy if they diverge.
+  //
+  // Required env (set with `wrangler secret put`):
+  //   GH_REPO              "buchinskiievg/engineers_apps" (defaults if unset)
+  //   CF_PAGES_PROJECT     "engineers-apps" (defaults if unset)
+  //   CF_ACCOUNT_ID        from tokens.md
+  //   CF_PAGES_API_TOKEN   token with Account:Cloudflare Pages:Edit
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(pagesAutoDeploy(env).catch(e => {
+      console.error("scheduled pagesAutoDeploy error", e?.stack || e);
+    }));
+  },
 };
+
+async function pagesAutoDeploy(env) {
+  const repo    = env.GH_REPO          || "buchinskiievg/engineers_apps";
+  const project = env.CF_PAGES_PROJECT || "engineers-apps";
+  const acct    = env.CF_ACCOUNT_ID;
+  const token   = env.CF_PAGES_API_TOKEN;
+  if (!acct || !token) {
+    console.warn("pagesAutoDeploy: missing CF_ACCOUNT_ID or CF_PAGES_API_TOKEN — skipping");
+    return;
+  }
+
+  // 1. Latest commit SHA on main from GitHub (anonymous, public repo OK; otherwise GH_PAT)
+  const ghHeaders = { "User-Agent": "ieccalc-deploy-bot", Accept: "application/vnd.github+json" };
+  if (env.GH_PAT) ghHeaders.Authorization = "Bearer " + env.GH_PAT;
+  const ghResp = await fetch(`https://api.github.com/repos/${repo}/branches/main`, { headers: ghHeaders });
+  if (!ghResp.ok) { console.warn("pagesAutoDeploy: GitHub fetch failed", ghResp.status); return; }
+  const ghData = await ghResp.json();
+  const ghSha  = ghData?.commit?.sha;
+  if (!ghSha) { console.warn("pagesAutoDeploy: no SHA in GitHub response"); return; }
+
+  // 2. Latest CF Pages deployment SHA (filter to production / main branch)
+  const cfHeaders = { Authorization: "Bearer " + token };
+  const depsResp = await fetch(
+    `https://api.cloudflare.com/client/v4/accounts/${acct}/pages/projects/${project}/deployments?per_page=5&env=production`,
+    { headers: cfHeaders }
+  );
+  if (!depsResp.ok) { console.warn("pagesAutoDeploy: CF deployments fetch failed", depsResp.status); return; }
+  const depsData = await depsResp.json();
+  const lastDep  = (depsData?.result || [])[0];
+  const cfSha    = lastDep?.deployment_trigger?.metadata?.commit_hash || null;
+
+  if (cfSha && cfSha.toLowerCase().startsWith(ghSha.toLowerCase().slice(0, 7))) {
+    // Up to date
+    return;
+  }
+
+  // 3. Trigger a fresh deploy from main
+  console.log(`pagesAutoDeploy: GH main=${ghSha.slice(0,7)} CF last=${(cfSha||"none").slice(0,7)} — triggering deploy`);
+  const fd = new FormData();
+  fd.set("branch", "main");
+  const trigResp = await fetch(
+    `https://api.cloudflare.com/client/v4/accounts/${acct}/pages/projects/${project}/deployments`,
+    { method: "POST", headers: cfHeaders, body: fd }
+  );
+  const trigJson = await trigResp.json().catch(() => null);
+  if (!trigResp.ok || !trigJson?.success) {
+    console.warn("pagesAutoDeploy: deploy trigger failed", trigResp.status, JSON.stringify(trigJson));
+    return;
+  }
+  console.log("pagesAutoDeploy: triggered deploy", trigJson?.result?.id);
+}
 
 async function dispatch(req, env, ctx, url, path) {
   const method = req.method;
