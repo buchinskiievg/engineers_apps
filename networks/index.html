@@ -168,8 +168,11 @@
   }
 
   /* SVG element styles */
-  .el-node { cursor: grab; }
+  .el-node { cursor: pointer; }
   .el-node.selected rect, .el-node.selected circle { stroke: var(--red); stroke-width: 2.5; }
+  .el-node.moving { opacity: 0.25; }
+  .el-ghost { pointer-events: none; }
+  .el-ghost rect, .el-ghost circle, .el-ghost path { stroke: var(--red) !important; stroke-dasharray: 4 3; }
   .el-node text { font: 700 10px/1 'Geist',sans-serif; user-select: none; }
   .el-line { stroke: var(--ink); stroke-width: 2; cursor: pointer; }
   .el-line.selected { stroke: var(--red); stroke-width: 3; }
@@ -320,7 +323,7 @@
 
 </div>
 
-<script src="/_lib/api.js"></script>
+<script src="/_lib/api.js?v=projects2"></script>
 <script src="/_lib/chrome.js"></script>
 <script src="/_lib/auth-ui.js"></script>
 <script>
@@ -500,13 +503,26 @@
   const svg = document.getElementById('canvas-svg');
   const NS = 'http://www.w3.org/2000/svg';
 
+  // World ↔ screen coords: state.view = { x, y, k } (pan + zoom)
+  state.view = state.view || { x: 0, y: 0, k: 1 };
+
   function svgPoint(evt) {
+    // Convert client pixels → world coords with snap to 20px world grid
     const r = svg.getBoundingClientRect();
-    return { x: Math.round((evt.clientX - r.left) / 20) * 20, y: Math.round((evt.clientY - r.top) / 20) * 20 };
+    const sx = evt.clientX - r.left, sy = evt.clientY - r.top;
+    const wx = (sx - state.view.x) / state.view.k;
+    const wy = (sy - state.view.y) / state.view.k;
+    return { x: Math.round(wx / 20) * 20, y: Math.round(wy / 20) * 20 };
   }
 
   function render() {
     svg.innerHTML = '';
+    // Single transform group — all content scales/pans together
+    const g0 = document.createElementNS(NS, 'g');
+    g0.setAttribute('id', 'zoom-root');
+    g0.setAttribute('transform', `translate(${state.view.x}, ${state.view.y}) scale(${state.view.k})`);
+    svg.appendChild(g0);
+
     // Links first (under nodes)
     for (const link of state.schema.links) {
       const a = state.schema.elements.find(e => e.id === link.from);
@@ -517,18 +533,96 @@
       line.setAttribute('x2', b.x); line.setAttribute('y2', b.y);
       line.setAttribute('class', 'el-line' + (state.selectedId === link.id ? ' selected' : ''));
       line.dataset.id = link.id; line.dataset.type = 'link';
-      svg.appendChild(line);
+      g0.appendChild(line);
     }
     // Elements
     for (const el of state.schema.elements) {
       const g = document.createElementNS(NS, 'g');
-      g.setAttribute('class', 'el-node' + (state.selectedId === el.id ? ' selected' : ''));
+      g.setAttribute('class', 'el-node' + (state.selectedId === el.id ? ' selected' : '') + (state.movingId === el.id ? ' moving' : ''));
       g.setAttribute('transform', `translate(${el.x}, ${el.y})`);
       g.dataset.id = el.id; g.dataset.type = el.type;
       g.innerHTML = renderShape(el);
-      svg.appendChild(g);
+      g0.appendChild(g);
+    }
+    // Ghost (semi-transparent copy of moving element, follows cursor)
+    if (state.movingId != null && state.ghostPos) {
+      const el = state.schema.elements.find(e => e.id === state.movingId);
+      if (el) {
+        const g = document.createElementNS(NS, 'g');
+        g.setAttribute('class', 'el-ghost');
+        g.setAttribute('transform', `translate(${state.ghostPos.x}, ${state.ghostPos.y})`);
+        g.setAttribute('opacity', '0.55');
+        g.style.pointerEvents = 'none';
+        g.innerHTML = renderShape(el);
+        g0.appendChild(g);
+      }
     }
   }
+
+  // Zoom controls
+  function setZoom(k, cx, cy) {
+    const old = state.view.k;
+    const newK = Math.max(0.25, Math.min(3, k));
+    if (cx == null) { cx = svg.clientWidth/2; cy = svg.clientHeight/2; }
+    // Keep cursor world-point stable
+    state.view.x = cx - (cx - state.view.x) * (newK / old);
+    state.view.y = cy - (cy - state.view.y) * (newK / old);
+    state.view.k = newK;
+    render();
+  }
+  document.getElementById('zoom-in').addEventListener('click', () => setZoom(state.view.k * 1.25));
+  document.getElementById('zoom-out').addEventListener('click', () => setZoom(state.view.k / 1.25));
+  document.getElementById('zoom-fit').addEventListener('click', () => {
+    if (!state.schema.elements.length) { state.view = {x:0,y:0,k:1}; render(); return; }
+    const xs = state.schema.elements.map(e => e.x), ys = state.schema.elements.map(e => e.y);
+    const minX = Math.min(...xs)-40, maxX = Math.max(...xs)+40;
+    const minY = Math.min(...ys)-40, maxY = Math.max(...ys)+40;
+    const W = svg.clientWidth, H = svg.clientHeight;
+    const k = Math.min(W/(maxX-minX), H/(maxY-minY), 2);
+    state.view = { x: -minX*k + (W - (maxX-minX)*k)/2, y: -minY*k + (H - (maxY-minY)*k)/2, k };
+    render();
+  });
+  // Mouse wheel zoom
+  svg.addEventListener('wheel', e => {
+    if (!state.currentNet) return;
+    e.preventDefault();
+    const r = svg.getBoundingClientRect();
+    const k = state.view.k * (e.deltaY > 0 ? 0.9 : 1.111);
+    setZoom(k, e.clientX - r.left, e.clientY - r.top);
+  }, { passive: false });
+
+  // Ghost follows cursor while an element is picked up (two-click move)
+  svg.addEventListener('mousemove', evt => {
+    if (state.movingId == null) return;
+    state.ghostPos = svgPoint(evt);
+    // Update only the ghost transform (cheap) — full render() would be wasteful
+    const gh = svg.querySelector('.el-ghost');
+    if (gh) {
+      gh.setAttribute('transform', `translate(${state.ghostPos.x}, ${state.ghostPos.y})`);
+    } else {
+      render();
+    }
+  });
+
+  // Esc cancels move mode, also clears cable-from
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    let dirty = false;
+    if (state.movingId != null) {
+      state.movingId = null;
+      state.ghostPos = null;
+      const s = document.getElementById('canvas-status');
+      if (s) s.textContent = 'Move cancelled.';
+      dirty = true;
+    }
+    if (state.cableFrom != null) {
+      state.cableFrom = null;
+      const s = document.getElementById('canvas-status');
+      if (s) s.textContent = 'Cable cancelled.';
+      dirty = true;
+    }
+    if (dirty) render();
+  });
 
   function renderShape(el) {
     const stroke = 'stroke="var(--ink)" stroke-width="2"';
@@ -561,6 +655,32 @@
     if (!state.currentNet) return;
     const target = evt.target.closest('[data-id]');
     if (state.tool === 'select') {
+      // Two-click move: 1st click on an element picks it up (ghost follows
+      // cursor), 2nd click anywhere drops it at the cursor position.
+      if (state.movingId != null) {
+        // Drop at cursor
+        const p = svgPoint(evt);
+        const el = state.schema.elements.find(e => e.id === state.movingId);
+        if (el) { el.x = p.x; el.y = p.y; }
+        state.movingId = null;
+        state.ghostPos = null;
+        document.getElementById('canvas-status').textContent = 'Moved.';
+        autosave();
+        render();
+        renderParams();
+        return;
+      }
+      if (target && target.dataset.type !== 'link') {
+        // Pick up — start move mode
+        state.selectedId = Number(target.dataset.id);
+        state.movingId = state.selectedId;
+        state.ghostPos = svgPoint(evt);
+        document.getElementById('canvas-status').textContent = 'Pick a new position — click anywhere to drop (Esc to cancel)';
+        render();
+        renderParams();
+        return;
+      }
+      // Click on empty / link — just select
       state.selectedId = target ? Number(target.dataset.id) : null;
       state.cableFrom = null;
       render();
