@@ -250,7 +250,7 @@ async function authCallback(req, env, url) {
     "INSERT INTO auth_tokens (token, email, purpose, expires_at, created_at) VALUES (?, ?, 'session', ?, ?)"
   ).bind(sessionToken, row.email, sessionExpires, now()).run();
 
-  const cookie = `iec_sess=${sessionToken}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${30 * 86400}`;
+  const cookie = `iec_sess=${sessionToken}; Domain=.ieccalc.com; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=${30 * 86400}`;
   return new Response(null, {
     status: 302,
     headers: {
@@ -271,7 +271,7 @@ async function authSignout(req, env) {
     status: 200,
     headers: {
       "Content-Type": "application/json",
-      "Set-Cookie": "iec_sess=; Path=/; Max-Age=0",
+      "Set-Cookie": "iec_sess=; Domain=.ieccalc.com; Path=/; Max-Age=0",
       ...corsHeaders(req),
     },
   });
@@ -414,7 +414,7 @@ async function oauthCallback(req, env, url, provider) {
     "INSERT INTO auth_tokens (token, email, purpose, expires_at, created_at) VALUES (?, ?, 'session', ?, ?)"
   ).bind(sessionToken, email, sessionExpires, now()).run();
 
-  const cookie = `iec_sess=${sessionToken}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${30 * 86400}`;
+  const cookie = `iec_sess=${sessionToken}; Domain=.ieccalc.com; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=${30 * 86400}`;
   const redirectTo = stateRow.redirect_to || "/account/";
   return new Response(null, {
     status: 302,

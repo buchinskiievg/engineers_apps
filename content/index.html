@@ -10,16 +10,63 @@
 <style>
   html, body { height: 100%; } body { background: var(--paper); }
 
+  /* Subnav header */
+  .cn-head { background: var(--paper); border-bottom: 2px solid var(--ink); padding: 22px 48px 18px; max-width: 1440px; margin: 0 auto; }
+  .cn-head h1 { font: 900 32px/1 var(--display); letter-spacing: -0.03em; margin: 0; text-transform: uppercase; }
+  .cn-head p { font: 500 14px/1.5 var(--sans); color: var(--ink-2); max-width: 720px; margin: 8px 0 0; }
+  @media (max-width:760px) { .cn-head { padding-left: 16px; padding-right: 16px; } }
+
   /* Filter chips */
   .cn-filters { display: flex; gap: 6px; padding: 14px 48px; background: var(--carbon); align-items: center; overflow-x: auto; }
   .cn-filter { font: 800 11px/1 var(--sans); letter-spacing: 0.12em; text-transform: uppercase; padding: 8px 14px; border: 1px solid rgba(255,255,255,0.18); background: transparent; color: rgba(255,255,255,0.7); cursor: pointer; }
   .cn-filter:hover { color: #fff; border-color: rgba(255,255,255,0.4); }
   .cn-filter.is-on { color: #fff; background: var(--red); border-color: var(--red); }
+  @media (max-width:760px) { .cn-filters { padding: 10px 16px; } }
 
-  /* Composer (admin only) */
-  .composer { background: var(--paper-2); border: 2px solid var(--ink); margin: 22px auto; max-width: 880px; padding: 16px 18px; }
-  .composer-head { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; font: 800 11px/1 var(--sans); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3); }
-  .composer-head .red { color: var(--red); }
+  /* Compose bar (collapsed by default) */
+  .compose-bar {
+    max-width: 1080px; margin: 18px auto 0; padding: 0 48px;
+  }
+  @media (max-width: 760px) { .compose-bar { padding: 0 16px; } }
+  .compose-toggle {
+    display: flex; align-items: center; gap: 12px;
+    width: 100%;
+    padding: 12px 18px;
+    background: var(--ink);
+    color: var(--paper);
+    border: 0;
+    cursor: pointer;
+    font: 800 13px/1 var(--sans); letter-spacing: 0.14em; text-transform: uppercase;
+  }
+  .compose-toggle:hover { background: var(--carbon); }
+  .compose-toggle .plus {
+    width: 24px; height: 24px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--red); color: #fff;
+    font: 900 16px/1 var(--display);
+    transition: transform .2s;
+  }
+  .compose-toggle.is-open .plus { transform: rotate(45deg); }
+  .compose-toggle .sub {
+    font: 600 11px/1 var(--sans); letter-spacing: 0.06em;
+    color: rgba(255,255,255,0.5); margin-left: auto;
+    text-transform: none;
+  }
+
+  /* Composer (expanded) */
+  .composer {
+    background: var(--paper-2);
+    border: 2px solid var(--ink);
+    border-top: 0;
+    padding: 16px 18px;
+    max-height: 0; overflow: hidden; opacity: 0;
+    transition: max-height .25s, opacity .15s, padding .25s;
+  }
+  .composer.is-open {
+    max-height: 1200px;
+    opacity: 1;
+    padding: 16px 18px;
+  }
   .composer-tabs { display: flex; gap: 4px; margin-bottom: 10px; overflow-x: auto; }
   .composer-tab { font: 800 11px/1 var(--sans); letter-spacing: 0.10em; padding: 8px 14px; border: 1px solid var(--border); background: var(--paper); color: var(--ink-2); cursor: pointer; text-transform: uppercase; flex-shrink: 0; }
   .composer-tab:hover { color: var(--ink); border-color: var(--ink); }
@@ -34,42 +81,83 @@
   .composer-row { display: flex; gap: 8px; flex-wrap: wrap; }
   .composer-row > * { flex: 1; min-width: 160px; }
   .composer-actions { display: flex; gap: 10px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
-  .composer-actions .btn { white-space: nowrap; }
   .composer-msg { font: 600 12px/1.4 var(--sans); }
   .composer-msg.ok  { color: var(--green); }
   .composer-msg.err { color: var(--red); }
   .composer-help { font: 500 11px/1.4 var(--sans); color: var(--ink-3); }
   .composer-help code { background: var(--surface); padding: 1px 4px; font-family: "Consolas",monospace; font-size: 11px; }
   .composer-preview { background: var(--surface); border: 1px dashed var(--border); padding: 12px 14px; margin-top: 8px; font: 500 13.5px/1.5 var(--sans); white-space: pre-wrap; word-break: break-word; min-height: 30px; }
-  .composer-preview img { max-width: 100%; }
-  @media (max-width: 600px) {
-    .composer { margin: 12px; padding: 12px 14px; }
-    .composer-row > * { min-width: 100%; }
+  @media (max-width: 600px) { .composer-row > * { min-width: 100%; } }
+
+  /* ── Sections (dashed placeholders for each content type) ─────────── */
+  .cn-sections { max-width: 1280px; margin: 0 auto; padding: 22px 48px 60px; display: flex; flex-direction: column; gap: 32px; }
+  @media (max-width: 760px) { .cn-sections { padding: 18px 16px; gap: 22px; } }
+  .cn-sec {
+    border: 2px dashed var(--border-strong);
+    padding: 0;
+    position: relative;
+    background: rgba(0,0,0,0.015);
+  }
+  .cn-sec.has-items { background: transparent; border-style: solid; border-color: var(--line); }
+  .cn-sec-head {
+    display: flex; align-items: baseline; gap: 12px;
+    padding: 14px 18px 10px;
+    border-bottom: 1px dashed var(--border-strong);
+    background: var(--paper);
+  }
+  .cn-sec.has-items .cn-sec-head { border-bottom-style: solid; border-bottom-color: var(--line); }
+  .cn-sec-num {
+    font: 900 28px/1 var(--display);
+    color: var(--red);
+    letter-spacing: -0.03em;
+  }
+  .cn-sec-label {
+    font: 900 18px/1 var(--display);
+    letter-spacing: -0.01em;
+    text-transform: uppercase;
+  }
+  .cn-sec-sub {
+    font: 600 11px/1 var(--sans);
+    letter-spacing: 0.12em;
+    color: var(--ink-3);
+    text-transform: uppercase;
+    margin-left: auto;
+  }
+  .cn-sec-body {
+    padding: 18px;
+  }
+  .cn-sec-empty {
+    padding: 36px 24px;
+    text-align: center;
+    color: var(--ink-3);
+    font: 500 13.5px/1.5 var(--sans);
+  }
+  .cn-sec-empty .ico {
+    display: block; margin: 0 auto 10px;
+    width: 48px; height: 48px;
+    border: 2px dashed var(--border-strong);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--ink-4);
+  }
+  .cn-sec-empty .hint {
+    font: 500 11.5px/1.4 var(--sans);
+    color: var(--ink-4);
+    margin-top: 6px;
   }
 
-  /* Feed grid */
-  .cn-feed { max-width: 1280px; margin: 0 auto; padding: 18px 48px 60px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; }
-  @media (max-width:980px) { .cn-feed { grid-template-columns: 1fr 1fr; padding: 18px 18px; } }
-  @media (max-width:600px) { .cn-feed { grid-template-columns: 1fr; } }
+  .cn-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  @media (max-width:980px) { .cn-grid { grid-template-columns: 1fr 1fr; } }
+  @media (max-width:560px) { .cn-grid { grid-template-columns: 1fr; } }
+
   .cn-card { background: var(--surface); border: 1px solid var(--border); text-decoration: none; color: inherit; display: flex; flex-direction: column; transition: border-color .12s; }
   .cn-card:hover { border-color: var(--ink); }
   .cn-cover { aspect-ratio: 16 / 9; background: var(--ink) center/cover; color: #fff; display: flex; align-items: center; justify-content: center; font: 900 22px/1 var(--display); }
   .cn-cover-empty { background: linear-gradient(135deg, var(--ink-2), var(--carbon)); }
   .cn-cover img { width: 100%; height: 100%; object-fit: cover; }
   .cn-meta { display: flex; gap: 8px; align-items: center; padding: 12px 16px 6px; font: 800 10.5px/1 var(--sans); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); }
-  .cn-type { padding: 3px 7px; background: var(--ink); color: #fff; font-size: 10px; letter-spacing: 0.14em; }
-  .cn-type.video { background: var(--red); }
-  .cn-type.presentation { background: #1a3a6a; }
-  .cn-type.post { background: var(--green); }
-  .cn-title { font: 800 18px/1.2 var(--display); padding: 4px 16px 8px; margin: 0; letter-spacing: -0.01em; }
+  .cn-title { font: 800 17px/1.2 var(--display); padding: 4px 16px 8px; margin: 0; letter-spacing: -0.01em; }
   .cn-preview { font: 500 13px/1.5 var(--sans); color: var(--ink-2); padding: 0 16px 14px; flex: 1; }
   .cn-foot { padding: 10px 16px 14px; border-top: 1px dashed var(--line); font: 600 11px/1 var(--sans); color: var(--ink-3); display: flex; justify-content: space-between; }
-
-  /* Subnav header */
-  .cn-head { background: var(--paper); border-bottom: 2px solid var(--ink); padding: 22px 48px 18px; max-width: 1440px; margin: 0 auto; }
-  .cn-head h1 { font: 900 32px/1 var(--display); letter-spacing: -0.03em; margin: 0; text-transform: uppercase; }
-  .cn-head p { font: 500 14px/1.5 var(--sans); color: var(--ink-2); max-width: 720px; margin: 8px 0 0; }
-  .empty { padding: 50px 24px; text-align: center; color: var(--ink-3); background: var(--surface); border: 1px dashed var(--border); grid-column: 1/-1; }
 </style>
 </head>
 <body>
@@ -99,91 +187,157 @@
 
 <div class="cn-head">
   <h1>Content</h1>
-  <p>Articles, videos, presentations and short posts. Comment, vote, save for later.</p>
+  <p>Articles, videos, presentations and posts. Comment, vote, save for later.</p>
 </div>
 
-<!-- Composer (admin only) -->
-<section class="composer hidden" id="composer">
-  <div class="composer-head">
-    <span class="red">/ COMPOSE</span>
-    <span id="composer-user"></span>
-  </div>
-  <div class="composer-tabs" id="composer-tabs">
-    <button class="composer-tab is-on" data-kind="post">Post</button>
-    <button class="composer-tab" data-kind="article">Article</button>
-    <button class="composer-tab" data-kind="video">Video</button>
-    <button class="composer-tab" data-kind="presentation">Presentation</button>
-  </div>
-
-  <!-- POST -->
-  <div class="composer-fields" data-form="post">
-    <textarea id="p-body" class="short" placeholder="What's on your mind? Markdown supported. Up to 600 chars."></textarea>
-    <input type="text" id="p-image" placeholder="Image URL (optional, paste any image link)" />
-    <input type="text" id="p-tags" placeholder="Tags, comma-separated (optional)" />
-    <div class="composer-help">Quick post for a thought, link or short observation. <code>**bold**</code> · <code>*italic*</code> · <code>[link](url)</code></div>
-  </div>
-
-  <!-- ARTICLE -->
-  <div class="composer-fields hidden" data-form="article">
-    <input type="text" id="a-title" placeholder="Article title" />
-    <input type="text" id="a-slug" placeholder="URL slug (auto from title if blank)" />
-    <input type="text" id="a-excerpt" placeholder="One-sentence excerpt for the card" />
-    <input type="text" id="a-cover" placeholder="Cover image URL (optional)" />
-    <textarea id="a-body" placeholder="Full article body. Markdown: ## headings, **bold**, [links](url), &gt; quotes, lists."></textarea>
-    <input type="text" id="a-tags" placeholder="Tags, comma-separated" />
-  </div>
-
-  <!-- VIDEO -->
-  <div class="composer-fields hidden" data-form="video">
-    <input type="text" id="v-title" placeholder="Video title" />
-    <input type="text" id="v-slug" placeholder="URL slug (auto from title)" />
-    <div class="composer-row">
-      <select id="v-source">
-        <option value="youtube">YouTube</option>
-        <option value="embed">Embed (iframe HTML)</option>
-        <option value="r2">Upload to R2</option>
-      </select>
-      <input type="text" id="v-id" placeholder="YouTube video ID (e.g. dQw4w9WgXcQ)" />
+<!-- Compose bar (admin only) — collapsed by default -->
+<div class="compose-bar hidden" id="compose-wrap">
+  <button class="compose-toggle" id="compose-toggle" type="button">
+    <span class="plus">+</span>
+    <span>Compose new content</span>
+    <span class="sub" id="compose-sub">choose post / article / video / presentation</span>
+  </button>
+  <div class="composer" id="composer">
+    <div class="composer-tabs" id="composer-tabs">
+      <button class="composer-tab is-on" data-kind="post">Post</button>
+      <button class="composer-tab" data-kind="article">Article</button>
+      <button class="composer-tab" data-kind="video">Video</button>
+      <button class="composer-tab" data-kind="presentation">Presentation</button>
     </div>
-    <input type="text" id="v-cover" placeholder="Cover image URL (optional, auto from YouTube)" />
-    <textarea id="v-desc" class="short" placeholder="Description"></textarea>
-    <input type="text" id="v-tags" placeholder="Tags, comma-separated" />
-  </div>
 
-  <!-- PRESENTATION -->
-  <div class="composer-fields hidden" data-form="presentation">
-    <input type="text" id="pr-title" placeholder="Presentation title" />
-    <input type="text" id="pr-slug" placeholder="URL slug (auto from title)" />
-    <input type="text" id="pr-cover" placeholder="Cover image URL (first slide if blank)" />
-    <textarea id="pr-desc" class="short" placeholder="Short description / TL;DR"></textarea>
-    <textarea id="pr-slides" placeholder="One slide per line — each is an image URL, optionally followed by a pipe and caption:&#10;https://example.com/slide1.png | Caption for slide 1&#10;https://example.com/slide2.png | Another slide"></textarea>
-    <input type="text" id="pr-tags" placeholder="Tags, comma-separated" />
-  </div>
+    <div class="composer-fields" data-form="post">
+      <textarea id="p-body" class="short" placeholder="What's on your mind? Markdown supported. Up to 600 chars."></textarea>
+      <input type="text" id="p-image" placeholder="Image URL (optional)" />
+      <input type="text" id="p-tags" placeholder="Tags, comma-separated (optional)" />
+      <div class="composer-help">Quick thought, link, or short observation. <code>**bold**</code> · <code>*italic*</code> · <code>[link](url)</code></div>
+    </div>
 
-  <div class="composer-preview hidden" id="composer-preview"></div>
+    <div class="composer-fields hidden" data-form="article">
+      <input type="text" id="a-title" placeholder="Article title" />
+      <input type="text" id="a-slug" placeholder="URL slug (auto from title if blank)" />
+      <input type="text" id="a-excerpt" placeholder="One-sentence excerpt for the card" />
+      <input type="text" id="a-cover" placeholder="Cover image URL (optional)" />
+      <textarea id="a-body" placeholder="Full article body. Markdown: ## headings, **bold**, [links](url), &gt; quotes, lists."></textarea>
+      <input type="text" id="a-tags" placeholder="Tags, comma-separated" />
+    </div>
 
-  <div class="composer-actions">
-    <button class="btn btn-primary" id="btn-publish">PUBLISH</button>
-    <button class="btn" id="btn-draft">Save as draft</button>
-    <button class="btn" id="btn-preview">Preview</button>
-    <span class="composer-msg" id="composer-msg"></span>
+    <div class="composer-fields hidden" data-form="video">
+      <input type="text" id="v-title" placeholder="Video title" />
+      <input type="text" id="v-slug" placeholder="URL slug (auto from title)" />
+      <div class="composer-row">
+        <select id="v-source">
+          <option value="youtube">YouTube</option>
+          <option value="embed">Embed (iframe HTML)</option>
+          <option value="r2">Upload to R2</option>
+        </select>
+        <input type="text" id="v-id" placeholder="YouTube video ID (e.g. dQw4w9WgXcQ)" />
+      </div>
+      <input type="text" id="v-cover" placeholder="Cover image URL (auto from YouTube)" />
+      <textarea id="v-desc" class="short" placeholder="Description"></textarea>
+      <input type="text" id="v-tags" placeholder="Tags, comma-separated" />
+    </div>
+
+    <div class="composer-fields hidden" data-form="presentation">
+      <input type="text" id="pr-title" placeholder="Presentation title" />
+      <input type="text" id="pr-slug" placeholder="URL slug (auto from title)" />
+      <input type="text" id="pr-cover" placeholder="Cover image URL (first slide if blank)" />
+      <textarea id="pr-desc" class="short" placeholder="Short description / TL;DR"></textarea>
+      <textarea id="pr-slides" placeholder="One slide per line:&#10;https://example.com/slide1.png | Caption&#10;https://example.com/slide2.png | Another caption"></textarea>
+      <input type="text" id="pr-tags" placeholder="Tags, comma-separated" />
+    </div>
+
+    <div class="composer-preview hidden" id="composer-preview"></div>
+
+    <div class="composer-actions">
+      <button class="btn btn-primary" id="btn-publish">PUBLISH</button>
+      <button class="btn" id="btn-draft">Save as draft</button>
+      <button class="btn" id="btn-preview">Preview</button>
+      <span class="composer-msg" id="composer-msg"></span>
+    </div>
   </div>
-</section>
+</div>
 
 <div class="cn-filters" id="cn-filters">
-  <button class="cn-filter is-on" data-type="all">ALL</button>
+  <button class="cn-filter is-on" data-type="all">All</button>
   <button class="cn-filter" data-type="article">Articles</button>
+  <button class="cn-filter" data-type="post">Posts</button>
   <button class="cn-filter" data-type="video">Videos</button>
   <button class="cn-filter" data-type="presentation">Presentations</button>
-  <button class="cn-filter" data-type="post">Posts</button>
 </div>
 
-<main class="cn-feed" id="cn-feed">
-  <div class="empty">Loading&hellip;</div>
+<main class="cn-sections" id="cn-sections">
+  <section class="cn-sec" data-type="article" id="sec-article">
+    <header class="cn-sec-head">
+      <span class="cn-sec-num">01</span>
+      <span class="cn-sec-label">Articles</span>
+      <span class="cn-sec-sub" id="cnt-article">0 entries</span>
+    </header>
+    <div class="cn-sec-body" id="body-article">
+      <div class="cn-sec-empty">
+        <span class="ico">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3 H14 L19 8 V21 H5 Z M14 3 V8 H19 M8 12 H16 M8 15 H16 M8 18 H13"/></svg>
+        </span>
+        Articles area &mdash; longform writeups with full markdown, headings, images, code blocks.
+        <div class="hint">Published articles will appear here as cards.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="cn-sec" data-type="post" id="sec-post">
+    <header class="cn-sec-head">
+      <span class="cn-sec-num">02</span>
+      <span class="cn-sec-label">Posts</span>
+      <span class="cn-sec-sub" id="cnt-post">0 entries</span>
+    </header>
+    <div class="cn-sec-body" id="body-post">
+      <div class="cn-sec-empty">
+        <span class="ico">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5 H21 V17 H8 L4 21 V17 H3 Z"/></svg>
+        </span>
+        Posts area &mdash; short LinkedIn-style messages, up to 600 characters with optional image.
+        <div class="hint">Quick thoughts, links, news — ideal for daily updates.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="cn-sec" data-type="video" id="sec-video">
+    <header class="cn-sec-head">
+      <span class="cn-sec-num">03</span>
+      <span class="cn-sec-label">Videos</span>
+      <span class="cn-sec-sub" id="cnt-video">0 entries</span>
+    </header>
+    <div class="cn-sec-body" id="body-video">
+      <div class="cn-sec-empty">
+        <span class="ico">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14"/><path d="M10 9 L16 12 L10 15 Z" fill="currentColor"/></svg>
+        </span>
+        Videos area &mdash; YouTube embeds, MP4 uploads or any embed HTML.
+        <div class="hint">Tutorials, demos, walkthroughs — with thumbnail + description.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="cn-sec" data-type="presentation" id="sec-presentation">
+    <header class="cn-sec-head">
+      <span class="cn-sec-num">04</span>
+      <span class="cn-sec-label">Presentations</span>
+      <span class="cn-sec-sub" id="cnt-presentation">0 entries</span>
+    </header>
+    <div class="cn-sec-body" id="body-presentation">
+      <div class="cn-sec-empty">
+        <span class="ico">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14"/><path d="M9 21 H15 M12 17 V21"/></svg>
+        </span>
+        Presentations area &mdash; LinkedIn-style image carousels with captions per slide.
+        <div class="hint">Slides for case studies, training materials, conference decks.</div>
+      </div>
+    </div>
+  </section>
 </main>
 
 </div>
 <script src="/_lib/api.js"></script>
+<script src="/_lib/auth-ui.js"></script>
 <script>
 (function() {
   'use strict';
@@ -198,12 +352,10 @@
     h = h.replace(/(?<!\*)\*([^*\n]+)\*/g, '<i>$1</i>');
     h = h.replace(/`([^`]+)`/g, '<code>$1</code>');
     h = h.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
-    h = h.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
     h = h.split(/\n\n+/).map(p => p.trim().startsWith('<') ? p : '<p>'+p.replace(/\n/g,'<br>')+'</p>').join('\n');
     return h;
   }
 
-  // Feed rendering
   function card(item) {
     const t = item.type;
     let href;
@@ -215,56 +367,69 @@
       ? `<div class="cn-cover"><img src="${esc(item.cover)}" alt=""></div>`
       : `<div class="cn-cover cn-cover-empty">${t.charAt(0).toUpperCase()}</div>`;
     const title = item.title ? esc(item.title) : '';
-    const preview = (item.preview || '').slice(0, 180);
+    const preview = (item.preview || '').slice(0, 160);
     return `<a class="cn-card" href="${href}">
       ${cover}
-      <div class="cn-meta">
-        <span class="cn-type ${t}">${t}</span>
-        <span>${fmtDate(item.published_at)}</span>
-      </div>
+      <div class="cn-meta"><span>${fmtDate(item.published_at)}</span></div>
       ${title ? `<h3 class="cn-title">${title}</h3>` : ''}
-      <div class="cn-preview">${esc(preview)}${preview.length === 180 ? '&hellip;' : ''}</div>
-      <div class="cn-foot"><span>0 comments</span><span>READ &rarr;</span></div>
+      <div class="cn-preview">${esc(preview)}${preview.length === 160 ? '&hellip;' : ''}</div>
+      <div class="cn-foot"><span>0 comments</span><span>OPEN &rarr;</span></div>
     </a>`;
   }
 
+  // Group feed items into 4 sections
   let allFeed = [];
   function render(filter) {
-    const list = filter === 'all' ? allFeed : allFeed.filter(x => x.type === filter);
-    const root = document.getElementById('cn-feed');
-    if (!list.length) {
-      root.innerHTML = `<div class="empty">${filter === 'all' ? 'No content yet — be the first.' : 'No <b>'+filter+'s</b> yet.'}</div>`;
-      return;
+    const types = ['article','post','video','presentation'];
+    for (const t of types) {
+      const sec = document.getElementById('sec-' + t);
+      const body = document.getElementById('body-' + t);
+      const count = document.getElementById('cnt-' + t);
+      const items = allFeed.filter(x => x.type === t);
+      count.textContent = items.length + (items.length === 1 ? ' entry' : ' entries');
+      if (items.length) {
+        sec.classList.add('has-items');
+        body.innerHTML = '<div class="cn-grid">' + items.map(card).join('') + '</div>';
+      } else {
+        sec.classList.remove('has-items');
+        // Keep the existing dashed empty-state placeholder if no items
+      }
+      // Filter visibility
+      sec.style.display = (filter === 'all' || filter === t) ? '' : 'none';
     }
-    root.innerHTML = list.map(card).join('');
   }
   document.getElementById('cn-filters').addEventListener('click', e => {
-    const b = e.target.closest('.cn-filter');
-    if (!b) return;
+    const b = e.target.closest('.cn-filter'); if (!b) return;
     document.querySelectorAll('.cn-filter').forEach(x => x.classList.remove('is-on'));
     b.classList.add('is-on');
     render(b.dataset.type);
   });
   function loadFeed() {
     IecApi.contentFeed(60).then(d => { allFeed = d.feed || []; render(document.querySelector('.cn-filter.is-on').dataset.type); })
-      .catch(e => { document.getElementById('cn-feed').innerHTML = '<div class="empty">Content offline ('+esc(e.message)+').</div>'; });
+      .catch(e => { document.getElementById('cn-sections').innerHTML = '<div class="cn-sec-empty">Content offline (' + esc(e.message) + ').</div>'; });
   }
   loadFeed();
 
-  // ── COMPOSER (admin only) ─────────────────────────────────────────
+  // ── Composer ──────────────────────────────────────────────────
+  const toggle = document.getElementById('compose-toggle');
+  const composer = document.getElementById('composer');
+  toggle.addEventListener('click', () => {
+    toggle.classList.toggle('is-open');
+    composer.classList.toggle('is-open');
+  });
+
   let currentKind = 'post';
   function setKind(k) {
     currentKind = k;
     document.querySelectorAll('.composer-tab').forEach(t => t.classList.toggle('is-on', t.dataset.kind === k));
     document.querySelectorAll('.composer-fields').forEach(f => f.classList.toggle('hidden', f.dataset.form !== k));
     document.getElementById('composer-preview').classList.add('hidden');
+    document.getElementById('compose-sub').textContent = 'composing: ' + k;
   }
   document.getElementById('composer-tabs').addEventListener('click', e => {
     const b = e.target.closest('.composer-tab'); if (!b) return;
     setKind(b.dataset.kind);
   });
-
-  // Auto-cover for YouTube
   document.getElementById('v-id').addEventListener('blur', () => {
     const id = document.getElementById('v-id').value.trim();
     if (id && !document.getElementById('v-cover').value) {
@@ -280,7 +445,7 @@
     };
     if (kind === 'post') {
       return {
-        author_id: window.__currentUserId || 1,
+        author_id: window.__iec_session?.user?.id || 1,
         body_md: document.getElementById('p-body').value.trim(),
         image_url: document.getElementById('p-image').value.trim() || null,
         tags_json: tags('p-tags'),
@@ -291,8 +456,7 @@
       const title = document.getElementById('a-title').value.trim();
       const slug = document.getElementById('a-slug').value.trim() || slugify(title);
       return {
-        slug,
-        title,
+        slug, title,
         excerpt: document.getElementById('a-excerpt').value.trim(),
         cover_image: document.getElementById('a-cover').value.trim() || null,
         body_md: document.getElementById('a-body').value.trim(),
@@ -338,58 +502,56 @@
     const tableMap = { post: 'posts', article: 'articles', video: 'videos', presentation: 'presentations' };
     const table = tableMap[currentKind];
     try {
-      // Strip slides before POST (handled separately)
       const slides = payload._slides;
       delete payload._slides;
       const r = await fetch(IecApi.base + '/admin/' + table, {
-        method: 'POST',
-        credentials: 'include',
+        method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || 'failed');
-      // For presentation: insert slides
       if (currentKind === 'presentation' && slides && slides.length) {
         for (const s of slides) {
           await fetch(IecApi.base + '/admin/presentation-slides', {
-            method: 'POST',
-            credentials: 'include',
+            method: 'POST', credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ presentation_id: data.id, idx: s.idx, image_url: s.image_url, caption: s.caption }),
+            body: JSON.stringify({ presentation_id: data.id, ...s }),
           });
         }
       }
       msg.textContent = publish ? 'Published! Loading feed…' : 'Draft saved.';
       msg.className = 'composer-msg ok';
-      // Clear form
       document.querySelectorAll('.composer-fields input, .composer-fields textarea').forEach(el => el.value = '');
-      setTimeout(() => { msg.textContent = ''; loadFeed(); }, 1200);
+      setTimeout(() => {
+        msg.textContent = '';
+        loadFeed();
+        // collapse composer
+        toggle.classList.remove('is-open');
+        composer.classList.remove('is-open');
+      }, 1200);
     } catch (e) {
       msg.textContent = 'Failed: ' + e.message;
       msg.className = 'composer-msg err';
     }
   }
-
   document.getElementById('btn-publish').addEventListener('click', () => submit(true));
   document.getElementById('btn-draft').addEventListener('click', () => submit(false));
   document.getElementById('btn-preview').addEventListener('click', () => {
     const pv = document.getElementById('composer-preview');
     const p = collectFormPayload(currentKind, false);
     const html = p.body_md ? md(p.body_md) : (p.description ? md(p.description) : '');
-    pv.innerHTML = (p.cover_image ? `<img src="${esc(p.cover_image)}"><br>` : (p.cover_url ? `<img src="${esc(p.cover_url)}"><br>` : ''))
+    pv.innerHTML = (p.cover_image ? `<img src="${esc(p.cover_image)}" style="max-width:100%"><br>` : (p.cover_url ? `<img src="${esc(p.cover_url)}" style="max-width:100%"><br>` : ''))
                  + (p.title ? `<h3>${esc(p.title)}</h3>` : '')
                  + html
                  + (p._slides && p._slides.length ? '<p style="font-size:11px;color:var(--ink-3)">'+p._slides.length+' slides</p>' : '');
     pv.classList.remove('hidden');
   });
 
-  // Show composer if user is admin
+  // Show compose bar only if admin
   IecApi.me().then(s => {
     if (s.authenticated && s.isAdmin) {
-      window.__currentUserId = s.user.id;
-      document.getElementById('composer').classList.remove('hidden');
-      document.getElementById('composer-user').textContent = ' posting as ' + (s.user.email || '');
+      document.getElementById('compose-wrap').classList.remove('hidden');
     }
   }).catch(()=>{});
 })();

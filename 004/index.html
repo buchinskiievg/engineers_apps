@@ -3078,7 +3078,9 @@ const Trench = (function(){
       h += "<tr><td>"+c.label+"</td><td class='val'>"+r.I.toFixed(1)+"</td><td>"+(is?is.I.toFixed(1):"—")+"</td><td>"+(is&&is.I>0?(r.I/is.I).toFixed(3):"—")+"</td><td>"+(c.maxT||90)+"</td><td>"+(c.Iw||r.I.toFixed(0))+"</td><td class='val'>"+(r.TcWork?r.TcWork.toFixed(1):"—")+"</td><td>"+r.rho+"</td><td>"+r.envT+"</td></tr>";
     });
     h += "</table>";
-    const w=window.open("","_blank"); if(w){w.document.write(h+"</body></html>"); w.document.close();}
+    const w=window.open("","_blank"); if(w){w.document.write(h+"<script src="/_lib/api.js"></script>
+<script src="/_lib/auth-ui.js"></script>
+</body></html>"); w.document.close();}
   }
 
   // === PUBLIC SNAPSHOT for PRO .docx ===
