@@ -593,18 +593,33 @@
   }
 
   function bindCalcList() {
+    // Re-apply gating in case panel re-rendered
+    if (state.entitledCalcs) applyCalcGating();
     document.getElementById('btn-run').addEventListener('click', async () => {
-      const checks = [...document.querySelectorAll('.ed-calc input:checked')].map(c => c.dataset.calc);
-      if (!checks.length) return alert('Select at least one calculation.');
+      const checks = [...document.querySelectorAll('.ed-calc input:checked:not(:disabled)')].map(c => c.dataset.calc);
+      if (!checks.length) return alert('Select at least one enabled calculation.');
       if (!state.currentNet) return;
+      document.getElementById('btn-run').disabled = true;
+      document.getElementById('btn-run').textContent = 'RUNNING…';
       try {
+        // Queue server-side (also enforces limits + entitlements)
         await IecApi.calculateNetwork(state.currentNet.id, checks);
-        alert('Queued calculations: ' + checks.join(', ') + '\nResults will appear here once the computation engine is wired (Phase 2).');
+        // Run client-side engine for those we've wired (voltage_drop), others get pending message
+        const results = window.__iec_runCalcs ? window.__iec_runCalcs(checks) : {};
+        window.__iec_showResults(results);
+        // Persist results to schema
+        state.schema.lastResults = { at: Date.now(), kinds: checks, summary: Object.keys(results).map(k => ({kind:k, hasData: !!results[k].perElement})) };
+        autosave();
         document.getElementById('btn-report').disabled = false;
-      } catch (e) { alert('Failed: ' + e.message); }
+      } catch (e) {
+        alert('Failed: ' + (e.body?.error || e.message));
+      } finally {
+        document.getElementById('btn-run').disabled = false;
+        document.getElementById('btn-run').textContent = 'RUN SELECTED CALCULATIONS';
+      }
     });
     document.getElementById('btn-report').addEventListener('click', () => {
-      alert('Report generation will be wired alongside calculation engine in the next iteration.');
+      alert('Report (.docx) generation reuses the report builders from standalone calculators 001-004. Wiring is the next iteration — for now you can copy results into a doc manually.');
     });
   }
   renderParams();
@@ -623,11 +638,208 @@
     }, 600);
   }
 
-  // ── Auth check + bootstrap ────────────────────────────────────────
-  IecApi.me().then(s => {
-    state.isAuthed = !!(s && s.authenticated);
+  // ── Auth + entitlements ──────────────────────────────────────────
+  Promise.all([
+    IecApi.me().catch(() => ({ authenticated: false })),
+    IecApi.publicSettings().catch(() => ({ free_allowed_calcs: ['voltage_drop'] })),
+  ]).then(([me, settings]) => {
+    state.isAuthed = !!(me && me.authenticated);
+    state.isAdmin = !!(me && me.isAdmin);
+    state.settings = settings;
+    state.licenses = (me && me.licenses) || [];
+    state.entitledCalcs = computeEntitled(state.licenses, settings, state.isAdmin);
+    applyCalcGating();
     loadProjects();
   });
+
+  function computeEntitled(licenses, settings, isAdmin) {
+    if (isAdmin) return new Set(['voltage_drop','short_circuit','ampacity','grounding','protection']);
+    const out = new Set(settings.free_allowed_calcs || []);
+    const slugToCalcs = {
+      '001': ['voltage_drop'],
+      '002': ['short_circuit','protection'],
+      '003': ['grounding'],
+      '004': ['ampacity'],
+    };
+    for (const lic of licenses) {
+      const calcs = slugToCalcs[lic.calc_slug] || [];
+      for (const c of calcs) out.add(c);
+    }
+    return out;
+  }
+
+  function applyCalcGating() {
+    document.querySelectorAll('.ed-calc input[data-calc]').forEach(cb => {
+      const allowed = state.entitledCalcs.has(cb.dataset.calc);
+      cb.disabled = !allowed;
+      const label = cb.closest('.ed-calc');
+      label.style.opacity = allowed ? '1' : '0.45';
+      label.title = allowed ? '' : 'Sign in or upgrade to unlock this calculation.';
+      if (!allowed) {
+        let tag = label.querySelector('.lock');
+        if (!tag) {
+          tag = document.createElement('span');
+          tag.className = 'lock';
+          tag.style.cssText = 'font:800 8.5px/1 var(--sans);letter-spacing:0.14em;color:var(--red);margin-left:auto;padding:2px 5px;border:1px solid var(--red)';
+          tag.textContent = 'LOCKED';
+          label.appendChild(tag);
+        }
+      }
+    });
+  }
+
+  // ── Calc engine (voltage drop, Phase 1) ───────────────────────────
+  // Build cable→cable→load graph from current schema and compute ΔU% per cable.
+  // Formula (IEC 60364-5-52 simplified):
+  //   ΔU = √3 · I · L · (R·cosφ + X·sinφ) / U
+  //   I = P_load / (√3 · U · cosφ)
+  function calcVoltageDrop() {
+    const result = { perElement: {}, summary: {}, warnings: [] };
+    // Need a source bus to compute from. Pick first bus.
+    const buses = state.schema.elements.filter(e => e.type === 'bus');
+    if (!buses.length) { result.warnings.push('Add at least one busbar with voltage to compute.'); return result; }
+    const source = buses[0];
+    const U_kV = parseFloat((source.params && source.params.voltage) || 0.4) || 0.4;
+
+    // Walk graph from source: for each cable, compute its load = sum of loads downstream
+    // Simple BFS from source via links
+    const links = state.schema.links;
+    const elById = {};
+    for (const e of state.schema.elements) elById[e.id] = e;
+
+    const adj = {};
+    for (const l of links) {
+      adj[l.from] = adj[l.from] || [];
+      adj[l.to] = adj[l.to] || [];
+      adj[l.from].push({ via: l.id, to: l.to });
+      adj[l.to].push({ via: l.id, to: l.from });
+    }
+
+    const visited = new Set([source.id]);
+    const queue = [source.id];
+    while (queue.length) {
+      const cur = queue.shift();
+      for (const next of (adj[cur] || [])) {
+        if (visited.has(next.to)) continue;
+        visited.add(next.to);
+        queue.push(next.to);
+      }
+    }
+
+    // For each load, find path from source via BFS parents
+    const parent = {};
+    parent[source.id] = null;
+    visited.clear(); visited.add(source.id);
+    const q2 = [source.id];
+    while (q2.length) {
+      const cur = q2.shift();
+      for (const next of (adj[cur] || [])) {
+        if (visited.has(next.to)) continue;
+        visited.add(next.to);
+        parent[next.to] = { from: cur, via: next.via };
+        q2.push(next.to);
+      }
+    }
+
+    // Cable params: R(Ω/km) ≈ 22.5/S (Cu) ; X(Ω/km) ≈ 0.08
+    function cableRX(linkId) {
+      // Find the link's stored cable params if any (links don't have type, treat as cable)
+      // For Phase 1 default to Cu 95 mm² — admin/per-cable params are TODO
+      const linkObj = links.find(l => l.id === linkId);
+      const params = (linkObj && linkObj.params) || {};
+      const S = parseFloat(params.section || 95);
+      const material = params.material || 'Cu';
+      const rho = material === 'Al' ? 36 : 22.5; // mΩ·mm²/m at 70°C
+      const R = (rho / S);  // Ω/km
+      const X = 0.08;       // typical reactance for LV cables
+      const L_m = parseFloat(params.length || 100);
+      return { R, X, L_m };
+    }
+
+    for (const load of state.schema.elements.filter(e => e.type === 'load')) {
+      const P_kW = parseFloat((load.params && load.params.p_kw) || 100);
+      const cosphi = parseFloat((load.params && load.params.cos_phi) || 0.9);
+      const sinphi = Math.sqrt(Math.max(0, 1 - cosphi*cosphi));
+      const I = (P_kW * 1000) / (Math.sqrt(3) * U_kV * 1000 * cosphi);   // A
+
+      // Walk parent chain to source, summing ΔU per cable hop
+      let totalDU_V = 0;
+      let chain = [];
+      let cur = load.id;
+      while (parent[cur]) {
+        const linkId = parent[cur].via;
+        const { R, X, L_m } = cableRX(linkId);
+        const dU = Math.sqrt(3) * I * (L_m / 1000) * (R * cosphi + X * sinphi);
+        totalDU_V += dU;
+        chain.push({ linkId, dU });
+        cur = parent[cur].from;
+      }
+      const dU_pct = (totalDU_V / (U_kV * 1000)) * 100;
+      result.perElement[load.id] = {
+        I_A: I.toFixed(1),
+        dU_V: totalDU_V.toFixed(2),
+        dU_pct: dU_pct.toFixed(2),
+        verdict: dU_pct > 5 ? 'FAIL (>5%)' : dU_pct > 3 ? 'BORDERLINE' : 'PASS',
+      };
+      for (const seg of chain) {
+        result.perElement[seg.linkId] = result.perElement[seg.linkId] || { dU_V: 0 };
+        result.perElement[seg.linkId].dU_V = (parseFloat(result.perElement[seg.linkId].dU_V) + seg.dU).toFixed(2);
+      }
+    }
+    result.summary = { source: source.name || ('B' + source.id), U_kV };
+    return result;
+  }
+
+  function runCalcs(checks) {
+    const results = {};
+    if (checks.includes('voltage_drop')) results.voltage_drop = calcVoltageDrop();
+    for (const k of checks) {
+      if (k !== 'voltage_drop' && !results[k]) {
+        results[k] = { warnings: ['Engine pending — runs queued in DB. Will be wired from existing standalone calculators in next iteration.'] };
+      }
+    }
+    return results;
+  }
+
+  function showResults(results) {
+    let html = '<div style="border:2px solid var(--ink);background:var(--paper);padding:12px 14px;margin-bottom:10px"><h4 style="font:800 11px/1 var(--sans);letter-spacing:0.14em;margin:0 0 8px;color:var(--red);text-transform:uppercase">/ Calculation results</h4>';
+    for (const [kind, res] of Object.entries(results)) {
+      html += '<div style="margin-bottom:8px"><b style="font:800 11px/1 var(--sans);letter-spacing:0.10em;text-transform:uppercase">' + esc(kind.replace(/_/g,' ')) + '</b>';
+      if (res.warnings && res.warnings.length) {
+        html += '<div style="font:500 11.5px/1.4 var(--sans);color:var(--ink-3);margin-top:4px">' + res.warnings.map(esc).join('<br>') + '</div>';
+      }
+      if (res.perElement) {
+        const rows = Object.entries(res.perElement).map(([id, r]) => {
+          const el = state.schema.elements.find(e => e.id === Number(id));
+          if (!el) return '';
+          const verdict = r.verdict || '';
+          const vcolor = verdict.startsWith('FAIL') ? 'color:#A30E18'
+                       : verdict === 'BORDERLINE' ? 'color:#6B4A00' : 'color:#2F7A3C';
+          return '<tr><td>' + esc(el.type) + ' #' + el.id + ' ' + esc(el.name || '') + '</td>' +
+                 (r.I_A    ? '<td>' + r.I_A + ' A</td>'  : '<td></td>') +
+                 (r.dU_V   ? '<td>' + r.dU_V + ' V</td>' : '<td></td>') +
+                 (r.dU_pct ? '<td>' + r.dU_pct + ' %</td>' : '<td></td>') +
+                 (verdict ? '<td style="' + vcolor + ';font-weight:800">' + esc(verdict) + '</td>' : '<td></td>') +
+                 '</tr>';
+        }).filter(Boolean).join('');
+        if (rows) {
+          html += '<table style="width:100%;border-collapse:collapse;font:500 11px/1.4 var(--sans);margin-top:6px">' +
+                  '<thead><tr style="font:800 9.5px/1 var(--sans);letter-spacing:0.10em;text-transform:uppercase"><th style="text-align:left;padding:3px 4px;border-bottom:1px solid var(--ink)">Element</th><th style="padding:3px 4px;border-bottom:1px solid var(--ink)">I</th><th style="padding:3px 4px;border-bottom:1px solid var(--ink)">ΔU</th><th style="padding:3px 4px;border-bottom:1px solid var(--ink)">ΔU%</th><th style="padding:3px 4px;border-bottom:1px solid var(--ink)">Verdict</th></tr></thead>' +
+                  '<tbody>' + rows + '</tbody></table>';
+        }
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+    // Insert results above the calc-list
+    const calcList = document.querySelector('.ed-calc-list');
+    let resBox = document.getElementById('ed-results');
+    if (!resBox) { resBox = document.createElement('div'); resBox.id = 'ed-results'; calcList.parentNode.insertBefore(resBox, calcList); }
+    resBox.innerHTML = html;
+  }
+  // Expose for the run button (inside bindCalcList scope above)
+  window.__iec_runCalcs = runCalcs;
+  window.__iec_showResults = showResults;
 })();
 </script>
 </body>

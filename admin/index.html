@@ -67,6 +67,7 @@
       <a data-view="leads">Leads</a>
       <a data-view="campaigns">Email campaigns</a>
       <a data-view="articles">Content</a>
+      <a data-view="settings">Site settings</a>
       <a data-view="events">Events log</a>
     </nav>
     <main id="main">
@@ -198,6 +199,51 @@
       async campaigns() { return crudView("campaigns", "Email campaigns",
         ["id","name","subject","status","recipients_count","sent_at"], { editable:true, extraActions: (row) => row.status === "draft"
           ? `<button data-act="send" data-id="${row.id}">Send</button>` : "" }); },
+
+      async settings() {
+        const { items } = await api("/admin/settings");
+        const html = items.map(s => {
+          let inputHtml;
+          if (s.kind === 'int') {
+            inputHtml = `<input type="number" data-skey="${esc(s.key)}" value="${esc(s.value)}" style="width:100px;font:inherit;padding:5px 8px;border:1px solid var(--line)">`;
+          } else if (s.kind === 'json') {
+            inputHtml = `<textarea data-skey="${esc(s.key)}" style="width:100%;min-height:55px;font:13px/1.4 'Consolas',monospace;padding:5px 8px;border:1px solid var(--line)">${esc(s.value)}</textarea>`;
+          } else {
+            inputHtml = `<input type="text" data-skey="${esc(s.key)}" value="${esc(s.value)}" style="width:100%;font:inherit;padding:5px 8px;border:1px solid var(--line)">`;
+          }
+          return `<div style="margin-bottom:18px;padding:14px;background:var(--paper);border:1px solid var(--line)">
+            <div style="font:800 11px/1 var(--sans);letter-spacing:0.10em;color:var(--red);text-transform:uppercase;margin-bottom:4px"><code>${esc(s.key)}</code> &middot; ${esc(s.kind)}</div>
+            <div style="font:500 12px/1.4 var(--sans);color:var(--ink-3);margin-bottom:8px">${esc(s.description||'')}</div>
+            ${inputHtml}
+            <div style="margin-top:6px;display:flex;gap:8px;align-items:center">
+              <button class="primary" data-save-skey="${esc(s.key)}">Save</button>
+              <span class="msg-${esc(s.key)}" style="font:600 11px/1 var(--sans)"></span>
+            </div>
+          </div>`;
+        }).join('');
+        view.innerHTML = `
+          <h2>Site settings</h2>
+          <p style="font:500 12px/1.5 var(--sans);color:var(--ink-3);margin-bottom:18px;max-width:680px">
+            These settings control free-tier behaviour. <code>free_allowed_calcs</code> takes a JSON array — valid kinds:
+            <code>"voltage_drop"</code>, <code>"short_circuit"</code>, <code>"ampacity"</code>, <code>"grounding"</code>, <code>"protection"</code>.
+          </p>
+          ${html}
+        `;
+        view.querySelectorAll('button[data-save-skey]').forEach(b => b.addEventListener('click', async () => {
+          const key = b.dataset.saveSkey;
+          const el = view.querySelector(`[data-skey="${key}"]`);
+          const val = el.value;
+          const msgEl = view.querySelector(`.msg-${key.replace(/[^a-z0-9_]/g,'')}`) || view.querySelector(`.msg-${key}`);
+          try {
+            // Find the row by key via admin list (we already have items)
+            const item = items.find(i => i.key === key);
+            await api(`/admin/settings/${encodeURIComponent(item.key)}`, { method: 'PUT', body: { value: val } });
+            if (msgEl) { msgEl.textContent = 'Saved'; msgEl.style.color = 'var(--green)'; setTimeout(() => msgEl.textContent = '', 2000); }
+          } catch (e) {
+            if (msgEl) { msgEl.textContent = e.message; msgEl.style.color = 'var(--red)'; }
+          }
+        }));
+      },
 
       async events() {
         const url = new URL(IecApi.base + "/admin/events");

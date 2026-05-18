@@ -87,6 +87,7 @@
     deleteNetwork:  (id)                     => request("/networks/" + id, { method:"DELETE" }),
     calculateNetwork:(id, calcs)             => request("/networks/" + id + "/calculate", { method:"POST", body:{ calcs } }),
     networkReports: (id)                     => request("/networks/" + id + "/reports"),
+    publicSettings: ()                       => request("/settings/public"),
     voteReply:       (id, dir)                => request("/forum/replies/" + id + "/vote", { method: "POST", body: { direction: dir } }),
   };
 

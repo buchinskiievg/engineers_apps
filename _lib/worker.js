@@ -166,6 +166,9 @@ async function dispatch(req, env, ctx, url, path) {
   if ((m = path.match(/^\/networks\/(\d+)\/calculate$/)) && method === "POST") return calculateNetwork(req, env, Number(m[1]));
   if ((m = path.match(/^\/networks\/(\d+)\/reports$/)) && method === "GET")    return listNetworkReports(req, env, Number(m[1]));
 
+  // ── Site settings ──────────────────────────────────────────────────────
+  if (path === "/settings/public" && method === "GET") return publicSettings(env);
+
   // ── Media (R2 signed upload) ───────────────────────────────────────────
   if (path === "/media/upload" && method === "POST") return mediaUploadInit(req, env);
   if (path.startsWith("/media/file/") && method === "GET") return mediaServe(env, path.slice("/media/file/".length));
@@ -746,6 +749,9 @@ async function adminRouter(req, env, url, path) {
     "forum-categories":  { table: "forum_categories",  listCols: "*" },
     "forum-threads":     { table: "forum_threads",     listCols: "*" },
     "forum-replies":     { table: "forum_replies",     listCols: "*" },
+    "settings":     { table: "site_settings",  listCols: "*" },
+    "projects":     { table: "projects",       listCols: "*" },
+    "network-schemes":   { table: "network_schemes",   listCols: "*" },
     licenses:       { table: "licenses",       listCols: "*" },
     leads:          { table: "leads",          listCols: "*" },
     orders:         { table: "orders",         listCols: "*" },
@@ -755,6 +761,18 @@ async function adminRouter(req, env, url, path) {
 
   if (resource === "analytics" && id === "summary" && method === "GET") return adminAnalyticsSummary(env);
   if (resource === "events" && method === "GET") return adminEvents(env, url);
+  // site_settings uses string key as PK — handle specially
+  if (resource === "settings" && id && method === "PUT") {
+    const body = await req.json();
+    if (typeof body.value !== "string") return err("missing value");
+    await env.DB.prepare("UPDATE site_settings SET value = ?, updated_at = ? WHERE key = ?")
+      .bind(body.value, now(), decodeURIComponent(id)).run();
+    return json({ ok: true });
+  }
+  if (resource === "settings" && !id && method === "GET") {
+    const { results } = await env.DB.prepare("SELECT key, value, kind, description, updated_at FROM site_settings ORDER BY key").all();
+    return json({ items: results });
+  }
   if (resource === "campaigns" && action === "send" && method === "POST") return adminCampaignSend(env, Number(id));
 
   const h = handlers[resource];
@@ -1234,10 +1252,50 @@ async function createProject(req, env) {
   if (!user) return err("auth required", 401);
   const { name, kind, description } = await req.json();
   if (!name) return err("missing name");
+
+  // Enforce free-tier project limit (skip for admins)
+  const isAdmin = await env.DB.prepare("SELECT 1 FROM admin_users WHERE email = ?").bind(user.email).first();
+  if (!isAdmin) {
+    const settings = await loadSettings(env);
+    const limit = parseInt(settings.free_max_projects || "0", 10);
+    if (limit > 0) {
+      // Paid users get more — count by max(license-permitted, free limit)
+      const hasAnyLicense = await env.DB.prepare(
+        "SELECT 1 FROM licenses WHERE user_id = ? AND revoked = 0 AND (expires_at IS NULL OR expires_at > ?)"
+      ).bind(user.id, now()).first();
+      if (!hasAnyLicense) {
+        const { count } = await env.DB.prepare("SELECT COUNT(*) AS count FROM projects WHERE user_id = ?")
+          .bind(user.id).first();
+        if (count >= limit) {
+          return err(`Free tier limit reached: max ${limit} project(s). Upgrade to add more.`, 402);
+        }
+      }
+    }
+  }
+
   const r = await env.DB.prepare(
     "INSERT INTO projects (user_id, name, kind, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)"
   ).bind(user.id, name, kind || "grid", description || null, now(), now()).run();
   return json({ ok: true, id: r.meta?.last_row_id });
+}
+
+// Helper: load all site settings as a flat map
+async function loadSettings(env) {
+  const { results } = await env.DB.prepare("SELECT key, value FROM site_settings").all();
+  const out = {};
+  for (const r of results) out[r.key] = r.value;
+  return out;
+}
+
+// Public settings (only safe-to-expose keys)
+async function publicSettings(env) {
+  const s = await loadSettings(env);
+  return json({
+    free_max_projects: parseInt(s.free_max_projects || "0", 10),
+    free_max_calc_runs: parseInt(s.free_max_calc_runs || "0", 10),
+    free_max_elements: parseInt(s.free_max_elements || "0", 10),
+    free_allowed_calcs: (function() { try { return JSON.parse(s.free_allowed_calcs || "[]"); } catch(e) { return []; } })(),
+  });
 }
 
 async function getProject(req, env, id) {
@@ -1342,17 +1400,60 @@ async function calculateNetwork(req, env, id) {
   const user = await getSessionUser(req, env);
   if (!user) return err("auth required", 401);
   if (!(await ownsScheme(env, user.id, id))) return err("forbidden", 403);
-  const { calcs } = await req.json();    // e.g. ['voltage_drop','short_circuit']
-  // Phase 1: queue rows; actual computation will be wired to existing
-  // calculator engines in a later iteration.
+  const { calcs } = await req.json();
+  if (!Array.isArray(calcs) || !calcs.length) return err("no calculations selected");
+
+  // Enforce: free user can only run calcs in free_allowed_calcs, unless
+  // they own a license for a calculator that covers that calc.
+  const isAdmin = await env.DB.prepare("SELECT 1 FROM admin_users WHERE email = ?").bind(user.email).first();
+  if (!isAdmin) {
+    const settings = await loadSettings(env);
+    let freeAllowed = [];
+    try { freeAllowed = JSON.parse(settings.free_allowed_calcs || "[]"); } catch (e) {}
+    // Licenses the user has (active)
+    const { results: licRows } = await env.DB.prepare(
+      "SELECT c.slug FROM licenses l JOIN calculators c ON c.id = l.calc_id " +
+      "WHERE l.user_id = ? AND l.revoked = 0 AND (l.expires_at IS NULL OR l.expires_at > ?)"
+    ).bind(user.id, now()).all();
+    const licensedSlugs = new Set(licRows.map(r => r.slug));
+    // Map calc kind → calc slug it requires
+    const SLUG_BY_CALC = {
+      voltage_drop: "001",
+      short_circuit: "002",
+      grounding: "003",
+      ampacity: "004",
+      protection: "002",  // protection studies use 002 engine for now
+    };
+    const denied = calcs.filter(c => !freeAllowed.includes(c) && !licensedSlugs.has(SLUG_BY_CALC[c]));
+    if (denied.length) {
+      return err(`Not allowed: ${denied.join(", ")}. ` +
+                 `Free tier includes: ${freeAllowed.join(", ") || "none"}. ` +
+                 `Buy a licence to unlock more.`, 402, { denied });
+    }
+    // Free-run quota
+    const limit = parseInt(settings.free_max_calc_runs || "0", 10);
+    if (limit > 0 && licensedSlugs.size === 0) {
+      const { count } = await env.DB.prepare(
+        "SELECT COUNT(*) AS count FROM network_calc_runs r " +
+        "JOIN network_schemes s ON s.id = r.scheme_id JOIN projects p ON p.id = s.project_id " +
+        "WHERE p.user_id = ?"
+      ).bind(user.id).first();
+      if (count >= limit) {
+        return err(`Free tier limit reached: max ${limit} calculation runs. Upgrade for unlimited runs.`, 402);
+      }
+    }
+  }
+
+  // Queue all runs (engine wiring is per-calc; voltage_drop wired client-side
+  // for Phase 1, other engines come from the existing standalone calculators)
   const runIds = [];
-  for (const kind of (calcs || [])) {
+  for (const kind of calcs) {
     const r = await env.DB.prepare(
       "INSERT INTO network_calc_runs (scheme_id, calc_kind, status, created_at) VALUES (?, ?, 'queued', ?)"
     ).bind(id, kind, now()).run();
     runIds.push(r.meta?.last_row_id);
   }
-  return json({ ok: true, queued: runIds, note: "Calculation engine wiring is the next iteration." });
+  return json({ ok: true, queued: runIds });
 }
 
 async function listNetworkReports(req, env, id) {
