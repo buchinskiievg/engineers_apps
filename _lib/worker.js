@@ -150,6 +150,22 @@ async function dispatch(req, env, ctx, url, path) {
   if ((m = path.match(/^\/forum\/t\/(\d+)\/replies$/)) && method === "POST") return forumCreateReply(req, env, Number(m[1]));
   if ((m = path.match(/^\/forum\/replies\/(\d+)\/vote$/)) && method === "POST") return forumVoteReply(req, env, Number(m[1]));
 
+  // ── Projects ───────────────────────────────────────────────────────────
+  if (path === "/projects" && method === "GET") return listProjects(req, env);
+  if (path === "/projects" && method === "POST") return createProject(req, env);
+  if ((m = path.match(/^\/projects\/(\d+)$/)) && method === "GET")    return getProject(req, env, Number(m[1]));
+  if ((m = path.match(/^\/projects\/(\d+)$/)) && method === "PUT")    return updateProject(req, env, Number(m[1]));
+  if ((m = path.match(/^\/projects\/(\d+)$/)) && method === "DELETE") return deleteProject(req, env, Number(m[1]));
+
+  // ── Network schemes ────────────────────────────────────────────────────
+  if ((m = path.match(/^\/projects\/(\d+)\/networks$/)) && method === "GET")  return listNetworks(req, env, Number(m[1]));
+  if ((m = path.match(/^\/projects\/(\d+)\/networks$/)) && method === "POST") return createNetwork(req, env, Number(m[1]));
+  if ((m = path.match(/^\/networks\/(\d+)$/)) && method === "GET")    return getNetwork(req, env, Number(m[1]));
+  if ((m = path.match(/^\/networks\/(\d+)$/)) && method === "PUT")    return updateNetwork(req, env, Number(m[1]));
+  if ((m = path.match(/^\/networks\/(\d+)$/)) && method === "DELETE") return deleteNetwork(req, env, Number(m[1]));
+  if ((m = path.match(/^\/networks\/(\d+)\/calculate$/)) && method === "POST") return calculateNetwork(req, env, Number(m[1]));
+  if ((m = path.match(/^\/networks\/(\d+)\/reports$/)) && method === "GET")    return listNetworkReports(req, env, Number(m[1]));
+
   // ── Media (R2 signed upload) ───────────────────────────────────────────
   if (path === "/media/upload" && method === "POST") return mediaUploadInit(req, env);
   if (path.startsWith("/media/file/") && method === "GET") return mediaServe(env, path.slice("/media/file/".length));
@@ -1199,4 +1215,152 @@ async function mediaServe(env, key) {
   headers.set("etag", obj.httpEtag);
   headers.set("cache-control", "public, max-age=31536000, immutable");
   return new Response(obj.body, { headers });
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// PROJECTS — user-scoped CRUD
+// ════════════════════════════════════════════════════════════════════════
+async function listProjects(req, env) {
+  const user = await getSessionUser(req, env);
+  if (!user) return err("auth required", 401);
+  const { results } = await env.DB.prepare(
+    "SELECT id, name, kind, description, created_at, updated_at FROM projects WHERE user_id = ? ORDER BY updated_at DESC"
+  ).bind(user.id).all();
+  return json({ projects: results });
+}
+
+async function createProject(req, env) {
+  const user = await getSessionUser(req, env);
+  if (!user) return err("auth required", 401);
+  const { name, kind, description } = await req.json();
+  if (!name) return err("missing name");
+  const r = await env.DB.prepare(
+    "INSERT INTO projects (user_id, name, kind, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)"
+  ).bind(user.id, name, kind || "grid", description || null, now(), now()).run();
+  return json({ ok: true, id: r.meta?.last_row_id });
+}
+
+async function getProject(req, env, id) {
+  const user = await getSessionUser(req, env);
+  if (!user) return err("auth required", 401);
+  const row = await env.DB.prepare("SELECT * FROM projects WHERE id = ? AND user_id = ?").bind(id, user.id).first();
+  if (!row) return err("not found", 404);
+  return json({ project: row });
+}
+
+async function updateProject(req, env, id) {
+  const user = await getSessionUser(req, env);
+  if (!user) return err("auth required", 401);
+  const body = await req.json();
+  delete body.id; delete body.user_id; delete body.created_at;
+  body.updated_at = now();
+  const cols = Object.keys(body); if (!cols.length) return err("nothing to update");
+  await env.DB.prepare(
+    `UPDATE projects SET ${cols.map(c => `${c} = ?`).join(", ")} WHERE id = ? AND user_id = ?`
+  ).bind(...cols.map(c => body[c]), id, user.id).run();
+  return json({ ok: true });
+}
+
+async function deleteProject(req, env, id) {
+  const user = await getSessionUser(req, env);
+  if (!user) return err("auth required", 401);
+  await env.DB.prepare("DELETE FROM network_schemes WHERE project_id IN (SELECT id FROM projects WHERE id = ? AND user_id = ?)")
+    .bind(id, user.id).run();
+  await env.DB.prepare("DELETE FROM projects WHERE id = ? AND user_id = ?").bind(id, user.id).run();
+  return json({ ok: true });
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// NETWORK SCHEMES
+// ════════════════════════════════════════════════════════════════════════
+async function ownsProject(env, userId, projectId) {
+  const row = await env.DB.prepare("SELECT 1 FROM projects WHERE id = ? AND user_id = ?").bind(projectId, userId).first();
+  return !!row;
+}
+async function ownsScheme(env, userId, schemeId) {
+  const row = await env.DB.prepare(
+    "SELECT s.id FROM network_schemes s JOIN projects p ON p.id = s.project_id WHERE s.id = ? AND p.user_id = ?"
+  ).bind(schemeId, userId).first();
+  return !!row;
+}
+
+async function listNetworks(req, env, projectId) {
+  const user = await getSessionUser(req, env);
+  if (!user) return err("auth required", 401);
+  if (!(await ownsProject(env, user.id, projectId))) return err("forbidden", 403);
+  const { results } = await env.DB.prepare(
+    "SELECT id, name, kind, updated_at, created_at FROM network_schemes WHERE project_id = ? ORDER BY updated_at DESC"
+  ).bind(projectId).all();
+  return json({ networks: results });
+}
+
+async function createNetwork(req, env, projectId) {
+  const user = await getSessionUser(req, env);
+  if (!user) return err("auth required", 401);
+  if (!(await ownsProject(env, user.id, projectId))) return err("forbidden", 403);
+  const { name, kind, schema_json } = await req.json();
+  if (!name) return err("missing name");
+  const r = await env.DB.prepare(
+    "INSERT INTO network_schemes (project_id, name, kind, schema_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)"
+  ).bind(projectId, name, kind || "grid", schema_json || "{}", now(), now()).run();
+  // bump project updated_at
+  await env.DB.prepare("UPDATE projects SET updated_at = ? WHERE id = ?").bind(now(), projectId).run();
+  return json({ ok: true, id: r.meta?.last_row_id });
+}
+
+async function getNetwork(req, env, id) {
+  const user = await getSessionUser(req, env);
+  if (!user) return err("auth required", 401);
+  if (!(await ownsScheme(env, user.id, id))) return err("forbidden", 403);
+  const row = await env.DB.prepare("SELECT * FROM network_schemes WHERE id = ?").bind(id).first();
+  if (!row) return err("not found", 404);
+  return json({ network: row });
+}
+
+async function updateNetwork(req, env, id) {
+  const user = await getSessionUser(req, env);
+  if (!user) return err("auth required", 401);
+  if (!(await ownsScheme(env, user.id, id))) return err("forbidden", 403);
+  const body = await req.json();
+  delete body.id; delete body.project_id; delete body.created_at;
+  body.updated_at = now();
+  const cols = Object.keys(body); if (!cols.length) return err("nothing to update");
+  await env.DB.prepare(`UPDATE network_schemes SET ${cols.map(c => `${c} = ?`).join(", ")} WHERE id = ?`)
+    .bind(...cols.map(c => body[c]), id).run();
+  return json({ ok: true });
+}
+
+async function deleteNetwork(req, env, id) {
+  const user = await getSessionUser(req, env);
+  if (!user) return err("auth required", 401);
+  if (!(await ownsScheme(env, user.id, id))) return err("forbidden", 403);
+  await env.DB.prepare("DELETE FROM network_schemes WHERE id = ?").bind(id).run();
+  return json({ ok: true });
+}
+
+async function calculateNetwork(req, env, id) {
+  const user = await getSessionUser(req, env);
+  if (!user) return err("auth required", 401);
+  if (!(await ownsScheme(env, user.id, id))) return err("forbidden", 403);
+  const { calcs } = await req.json();    // e.g. ['voltage_drop','short_circuit']
+  // Phase 1: queue rows; actual computation will be wired to existing
+  // calculator engines in a later iteration.
+  const runIds = [];
+  for (const kind of (calcs || [])) {
+    const r = await env.DB.prepare(
+      "INSERT INTO network_calc_runs (scheme_id, calc_kind, status, created_at) VALUES (?, ?, 'queued', ?)"
+    ).bind(id, kind, now()).run();
+    runIds.push(r.meta?.last_row_id);
+  }
+  return json({ ok: true, queued: runIds, note: "Calculation engine wiring is the next iteration." });
+}
+
+async function listNetworkReports(req, env, id) {
+  const user = await getSessionUser(req, env);
+  if (!user) return err("auth required", 401);
+  if (!(await ownsScheme(env, user.id, id))) return err("forbidden", 403);
+  const { results } = await env.DB.prepare(
+    "SELECT id, name, format, file_url, generated_at FROM network_reports WHERE scheme_id = ? ORDER BY generated_at DESC"
+  ).bind(id).all();
+  return json({ reports: results });
 }

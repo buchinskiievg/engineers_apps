@@ -1666,3 +1666,83 @@ html, body { height: auto !important; min-height: 100%; overflow-x: hidden; over
   .va-foot-band { grid-template-columns: 1fr !important; }
   .va-foot .logo-hero { --scale: 0.4 !important; }
 }
+
+/* ── Industry tiles (3 entry points to CAD editors) ───────────────────── */
+.industry-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  margin-bottom: 36px;
+}
+@media (max-width: 980px) { .industry-tiles { grid-template-columns: 1fr; } }
+
+.industry-tile {
+  background: var(--ink);
+  color: var(--paper);
+  text-decoration: none;
+  padding: 22px 24px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+  border: 1px solid var(--ink);
+  transition: background .15s, transform .1s;
+  min-height: 320px;
+}
+.industry-tile:hover {
+  background: var(--carbon);
+  transform: translateY(-2px);
+}
+.industry-tile .ind-icon {
+  display: flex; align-items: center;
+  color: var(--red);
+  margin-bottom: 4px;
+}
+.industry-tile .ind-eyebrow {
+  font: 800 11px/1 var(--sans);
+  letter-spacing: 0.18em;
+  color: var(--red);
+  text-transform: uppercase;
+}
+.industry-tile h3 {
+  font: 900 24px/1.1 var(--display);
+  letter-spacing: -0.025em;
+  margin: 4px 0 6px;
+  color: #fff;
+  text-transform: uppercase;
+}
+.industry-tile p {
+  font: 500 13px/1.5 var(--sans);
+  color: rgba(255,255,255,0.7);
+  margin: 0;
+  flex: 1;
+}
+.industry-tile .ind-stats {
+  font: 700 10px/1 var(--sans);
+  letter-spacing: 0.14em;
+  color: rgba(255,255,255,0.5);
+  margin-top: 10px;
+}
+.industry-tile .ind-cta {
+  font: 800 12px/1 var(--sans);
+  letter-spacing: 0.14em;
+  color: var(--red);
+  text-transform: uppercase;
+  border-top: 1px solid rgba(255,255,255,0.15);
+  padding-top: 12px;
+  margin-top: 10px;
+}
+
+.pro-tools-sep {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 22px 0 14px;
+  font: 800 12px/1 var(--sans);
+  letter-spacing: 0.18em;
+  color: var(--ink-3);
+  text-transform: uppercase;
+}
+.pro-tools-sep::before, .pro-tools-sep::after {
+  content: ""; flex: 1; height: 1px; background: var(--line);
+}

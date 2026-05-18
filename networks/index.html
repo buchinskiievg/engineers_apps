@@ -1,0 +1,634 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Electrical Networks Editor &mdash; IECCalc.com</title>
+<meta name="description" content="LV/MV electrical network editor — draw the single-line, set parameters, run voltage-drop / short-circuit / ampacity / protection studies in one pass." />
+<link rel="stylesheet" href="/_lib/design.css?v=metal10" />
+<link rel="stylesheet" href="/_lib/mobile.css" />
+<link rel="stylesheet" href="/_lib/calc-skin.css" />
+<style>
+  html, body { height: 100%; }
+  body { background: var(--paper); overflow: hidden; }
+
+  /* 3-panel app layout (left nav · canvas · right params) */
+  .ed-app {
+    display: grid;
+    grid-template-columns: 260px 1fr 320px;
+    height: calc(100vh - 200px);   /* room for chrome above */
+    min-height: 500px;
+    border-top: 2px solid var(--ink);
+  }
+  @media (max-width: 1100px) { .ed-app { grid-template-columns: 220px 1fr 280px; } }
+  @media (max-width: 900px) {
+    .ed-app { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; height: auto; }
+    .ed-side, .ed-params { max-height: 280px; overflow: auto; }
+  }
+
+  /* Left: project + tools nav */
+  .ed-side {
+    background: var(--surface);
+    border-right: 2px solid var(--ink);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .ed-side-head {
+    display: grid; grid-template-columns: 1fr 1fr;
+    border-bottom: 2px solid var(--ink);
+  }
+  .ed-side-tab {
+    font: 800 10.5px/1 var(--sans); letter-spacing: 0.14em;
+    padding: 11px 6px; background: var(--paper); color: var(--ink-3);
+    border: 0; border-right: 1px solid var(--line); cursor: pointer;
+  }
+  .ed-side-tab:last-child { border-right: 0; }
+  .ed-side-tab.is-on { background: var(--ink); color: var(--paper); }
+  .ed-side-body { flex: 1; overflow-y: auto; }
+
+  /* Projects tree */
+  .ed-proj-add {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--line);
+    background: var(--paper);
+  }
+  .ed-proj-add button {
+    width: 100%; padding: 7px 10px;
+    background: var(--red); color: #fff; border: 0; cursor: pointer;
+    font: 800 11px/1 var(--sans); letter-spacing: 0.12em; text-transform: uppercase;
+  }
+  .ed-proj-add button:hover { background: #A30E18; }
+  .ed-tree { list-style: none; padding: 0; margin: 0; }
+  .ed-tree-proj { border-bottom: 1px solid var(--line-soft); }
+  .ed-tree-proj-row {
+    display: grid; grid-template-columns: 18px 1fr 18px;
+    align-items: center; gap: 8px;
+    padding: 9px 14px;
+    cursor: pointer; color: var(--ink);
+    font: 700 12px/1.2 var(--sans);
+  }
+  .ed-tree-proj-row:hover { background: var(--paper); }
+  .ed-tree-proj-row.is-on { background: var(--ink); color: var(--paper); }
+  .ed-tree-proj-row .chev { transition: transform .15s; font-family: var(--display); font-weight: 900; font-size: 11px; color: var(--ink-3); }
+  .ed-tree-proj-row.is-open .chev { transform: rotate(90deg); }
+  .ed-tree-proj-row .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: uppercase; letter-spacing: 0.03em; }
+  .ed-tree-proj-row .add {
+    width: 16px; height: 16px;
+    border: 1px solid var(--border-strong);
+    background: var(--paper); color: var(--ink-3);
+    font: 800 13px/1 var(--sans); cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    opacity: 0;
+  }
+  .ed-tree-proj-row:hover .add, .ed-tree-proj-row.is-on .add { opacity: 1; }
+  .ed-tree-nets { list-style: none; padding: 0; margin: 0; background: var(--paper-2); display: none; }
+  .ed-tree-proj.is-open .ed-tree-nets { display: block; }
+  .ed-tree-net {
+    display: flex; gap: 8px; align-items: center;
+    padding: 7px 14px 7px 32px;
+    text-decoration: none; color: var(--ink);
+    font: 600 11.5px/1.2 var(--sans);
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .ed-tree-net:hover { background: var(--paper); }
+  .ed-tree-net.is-on { background: var(--red); color: #fff; }
+
+  /* Tools palette */
+  .ed-palette { padding: 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .ed-tool {
+    display: flex; flex-direction: column; gap: 4px; align-items: center;
+    padding: 12px 6px;
+    background: var(--paper); border: 1px solid var(--line);
+    cursor: pointer;
+    font: 700 10px/1 var(--sans); letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--ink-2);
+  }
+  .ed-tool:hover { border-color: var(--ink); color: var(--ink); }
+  .ed-tool.is-on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .ed-tool.is-on .ico { color: var(--red); }
+  .ed-tool .ico { color: var(--ink-2); display: flex; }
+  .ed-tool.is-on .ico { color: var(--red); }
+
+  /* Canvas */
+  .ed-canvas {
+    background: var(--paper);
+    background-image:
+      linear-gradient(rgba(0,0,0,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,0,0,0.04) 1px, transparent 1px),
+      linear-gradient(rgba(0,0,0,0.10) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,0,0,0.10) 1px, transparent 1px);
+    background-size: 20px 20px, 20px 20px, 100px 100px, 100px 100px;
+    background-position: 0 0;
+    position: relative;
+    overflow: hidden;
+  }
+  .ed-canvas.disabled::before {
+    content: "Create a network in the project tree to start drawing";
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(236, 233, 226, 0.92);
+    color: var(--ink-3);
+    font: 800 14px/1.5 var(--sans); letter-spacing: 0.06em; text-transform: uppercase;
+    text-align: center; padding: 24px;
+    z-index: 10;
+    backdrop-filter: blur(2px);
+  }
+  .ed-canvas-svg { width: 100%; height: 100%; cursor: crosshair; }
+  .ed-canvas.tool-select .ed-canvas-svg { cursor: default; }
+  .ed-canvas-toolbar {
+    position: absolute; top: 10px; left: 10px; right: 10px;
+    display: flex; gap: 8px; align-items: center;
+    z-index: 5; pointer-events: none;
+  }
+  .ed-canvas-toolbar > * { pointer-events: auto; }
+  .ed-net-name {
+    background: var(--ink); color: var(--paper);
+    padding: 6px 12px;
+    font: 800 12px/1 var(--sans); letter-spacing: 0.10em;
+    text-transform: uppercase;
+  }
+  .ed-canvas-toolbar .spacer { flex: 1; }
+  .ed-zoom {
+    background: var(--paper); border: 1px solid var(--ink); padding: 4px 8px;
+    font: 700 11px/1 var(--sans); color: var(--ink); cursor: pointer;
+  }
+  .ed-status {
+    position: absolute; bottom: 10px; left: 10px;
+    background: var(--ink); color: var(--paper);
+    padding: 5px 11px;
+    font: 700 10px/1 var(--sans); letter-spacing: 0.10em; text-transform: uppercase;
+    z-index: 5;
+  }
+
+  /* SVG element styles */
+  .el-node { cursor: grab; }
+  .el-node.selected rect, .el-node.selected circle { stroke: var(--red); stroke-width: 2.5; }
+  .el-node text { font: 700 10px/1 'Geist',sans-serif; user-select: none; }
+  .el-line { stroke: var(--ink); stroke-width: 2; cursor: pointer; }
+  .el-line.selected { stroke: var(--red); stroke-width: 3; }
+
+  /* Right params panel */
+  .ed-params {
+    background: var(--surface);
+    border-left: 2px solid var(--ink);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .ed-params-head {
+    padding: 12px 14px;
+    border-bottom: 2px solid var(--ink);
+    background: var(--paper);
+    font: 800 11px/1 var(--sans); letter-spacing: 0.14em;
+    color: var(--red); text-transform: uppercase;
+  }
+  .ed-params-body {
+    flex: 1; overflow-y: auto;
+    padding: 14px;
+  }
+  .ed-params-body .nosel {
+    font: 500 12.5px/1.5 var(--sans);
+    color: var(--ink-3);
+    text-align: center; padding: 30px 14px;
+  }
+  .ed-field { margin-bottom: 10px; }
+  .ed-field label {
+    display: block;
+    font: 700 10px/1 var(--sans); letter-spacing: 0.10em;
+    color: var(--ink-3); margin-bottom: 4px; text-transform: uppercase;
+  }
+  .ed-field input, .ed-field select {
+    width: 100%; padding: 7px 10px;
+    border: 1px solid var(--line); background: var(--paper);
+    font: 500 13px/1.4 var(--sans);
+  }
+  .ed-calc-list { margin-top: 16px; padding-top: 14px; border-top: 2px solid var(--ink); }
+  .ed-calc-list h4 {
+    font: 800 11px/1 var(--sans); letter-spacing: 0.14em;
+    color: var(--ink); text-transform: uppercase; margin: 0 0 10px;
+  }
+  .ed-calc {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 0;
+    font: 600 12px/1.3 var(--sans);
+  }
+  .ed-calc input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
+  .ed-run-btn {
+    width: 100%; padding: 11px;
+    background: var(--red); color: #fff; border: 0; cursor: pointer;
+    font: 800 12px/1 var(--sans); letter-spacing: 0.14em; text-transform: uppercase;
+    margin-top: 12px;
+  }
+  .ed-run-btn:hover { background: #A30E18; }
+  .ed-run-btn:disabled { background: var(--ink-4); cursor: not-allowed; }
+  .ed-report-btn {
+    width: 100%; padding: 9px;
+    background: var(--ink); color: var(--paper); border: 0; cursor: pointer;
+    font: 800 11px/1 var(--sans); letter-spacing: 0.14em; text-transform: uppercase;
+    margin-top: 6px;
+  }
+  .ed-report-btn:hover { background: var(--carbon); }
+</style>
+</head>
+<body>
+
+<div class="ed-app">
+
+  <!-- LEFT: project tree + tool palette -->
+  <aside class="ed-side">
+    <div class="ed-side-head">
+      <button class="ed-side-tab is-on" data-side="proj">PROJECTS</button>
+      <button class="ed-side-tab" data-side="tools">TOOLS</button>
+    </div>
+    <div class="ed-side-body" id="side-proj">
+      <div class="ed-proj-add">
+        <button id="btn-new-project">+ NEW PROJECT</button>
+      </div>
+      <ul class="ed-tree" id="proj-tree">
+        <li style="padding:14px;color:var(--ink-3);font:500 12px/1.4 var(--sans)">Sign in to manage projects.</li>
+      </ul>
+    </div>
+    <div class="ed-side-body hidden" id="side-tools">
+      <div class="ed-palette" id="palette">
+        <button class="ed-tool is-on" data-tool="select" title="Select / move (S)">
+          <span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3 L19 12 L13 13 L17 21 L14 22 L10 14 L5 17 Z"/></svg></span>
+          SELECT
+        </button>
+        <button class="ed-tool" data-tool="bus" title="Place busbar">
+          <span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><rect x="3" y="10" width="18" height="4"/></svg></span>
+          BUS
+        </button>
+        <button class="ed-tool" data-tool="cable" title="Draw cable (click 2 nodes)">
+          <span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M3 12 q 6 -6 9 0 t 9 0"/></svg></span>
+          CABLE
+        </button>
+        <button class="ed-tool" data-tool="tx" title="Transformer">
+          <span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="9" cy="12" r="5"/><circle cx="15" cy="12" r="5"/></svg></span>
+          TRANSFORMER
+        </button>
+        <button class="ed-tool" data-tool="load" title="Load">
+          <span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 3 V14 M6 14 H18 L12 21 Z"/></svg></span>
+          LOAD
+        </button>
+        <button class="ed-tool" data-tool="gen" title="Generator">
+          <span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="8"/><text x="12" y="16" text-anchor="middle" font-size="11" font-weight="900" fill="currentColor" stroke="none">G</text></svg></span>
+          GENERATOR
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- CENTER: canvas -->
+  <main class="ed-canvas disabled tool-select" id="canvas-wrap">
+    <div class="ed-canvas-toolbar">
+      <span class="ed-net-name" id="net-name">NO NETWORK SELECTED</span>
+      <span class="spacer"></span>
+      <button class="ed-zoom" id="zoom-fit">FIT</button>
+      <button class="ed-zoom" id="zoom-out">−</button>
+      <button class="ed-zoom" id="zoom-in">+</button>
+    </div>
+    <svg class="ed-canvas-svg" id="canvas-svg"></svg>
+    <div class="ed-status" id="canvas-status">Idle</div>
+  </main>
+
+  <!-- RIGHT: params + calc -->
+  <aside class="ed-params">
+    <div class="ed-params-head" id="params-title">/ PARAMETERS</div>
+    <div class="ed-params-body" id="params-body">
+      <div class="nosel">No element selected.<br><br>Pick a tool from the left and click on the canvas to place a node, or click an existing element to edit.</div>
+      <div class="ed-calc-list">
+        <h4>Available calculations</h4>
+        <label class="ed-calc"><input type="checkbox" data-calc="voltage_drop"> Voltage drop (IEC 60364-5-52)</label>
+        <label class="ed-calc"><input type="checkbox" data-calc="short_circuit"> Short-circuit (IEC 60909)</label>
+        <label class="ed-calc"><input type="checkbox" data-calc="ampacity"> Cable ampacity (IEC 60287)</label>
+        <label class="ed-calc"><input type="checkbox" data-calc="grounding"> Grounding (IEEE 80)</label>
+        <label class="ed-calc"><input type="checkbox" data-calc="protection"> Protection coordination</label>
+        <button class="ed-run-btn" id="btn-run" disabled>RUN SELECTED CALCULATIONS</button>
+        <button class="ed-report-btn" id="btn-report" disabled>GENERATE REPORT</button>
+        <div style="font:500 10.5px/1.4 var(--sans);color:var(--ink-3);margin-top:10px">
+          Reports appear in the project tree under the network. Phase 1 queues the runs — actual computation will be wired to existing tools in the next iteration.
+        </div>
+      </div>
+    </div>
+  </aside>
+
+</div>
+
+<script src="/_lib/api.js"></script>
+<script src="/_lib/chrome.js"></script>
+<script src="/_lib/auth-ui.js"></script>
+<script>
+(function() {
+  'use strict';
+  function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));}
+
+  // ── State ─────────────────────────────────────────────────────────
+  const state = {
+    isAuthed: false,
+    currentNet: null,            // { id, name, kind, schema_json:parsed }
+    schema: { elements: [], links: [] },
+    tool: 'select',
+    selectedId: null,
+    cableFrom: null,             // for cable tool: id of first node
+    nextId: 1,
+    zoom: 1,
+  };
+
+  // ── Side tabs (Projects / Tools) ──────────────────────────────────
+  document.querySelectorAll('.ed-side-tab').forEach(t => t.addEventListener('click', () => {
+    document.querySelectorAll('.ed-side-tab').forEach(x => x.classList.remove('is-on'));
+    t.classList.add('is-on');
+    document.getElementById('side-proj').classList.toggle('hidden', t.dataset.side !== 'proj');
+    document.getElementById('side-tools').classList.toggle('hidden', t.dataset.side !== 'tools');
+  }));
+
+  // ── Tool palette ──────────────────────────────────────────────────
+  document.querySelectorAll('.ed-tool').forEach(t => t.addEventListener('click', () => {
+    document.querySelectorAll('.ed-tool').forEach(x => x.classList.remove('is-on'));
+    t.classList.add('is-on');
+    state.tool = t.dataset.tool;
+    state.cableFrom = null;
+    const wrap = document.getElementById('canvas-wrap');
+    wrap.className = 'ed-canvas tool-' + state.tool + (state.currentNet ? '' : ' disabled');
+    document.getElementById('canvas-status').textContent = 'Tool: ' + state.tool.toUpperCase();
+  }));
+
+  // ── Projects tree ─────────────────────────────────────────────────
+  async function loadProjects() {
+    const root = document.getElementById('proj-tree');
+    if (!state.isAuthed) {
+      root.innerHTML = '<li style="padding:14px;color:var(--ink-3);font:500 12px/1.4 var(--sans)">Sign in to manage projects.<br><a class="btn btn-primary btn-sm" style="margin-top:10px" href="/account/?intent=signin">SIGN IN</a></li>';
+      return;
+    }
+    try {
+      const { projects } = await IecApi.listProjects();
+      if (!projects.length) {
+        root.innerHTML = '<li style="padding:14px;color:var(--ink-3);font:500 12px/1.4 var(--sans)">No projects yet — create one above.</li>';
+        return;
+      }
+      root.innerHTML = projects.map(p => `
+        <li class="ed-tree-proj" data-pid="${p.id}">
+          <div class="ed-tree-proj-row">
+            <span class="chev">▸</span>
+            <span class="name">${esc(p.name)}</span>
+            <button class="add" data-act="add-net" data-pid="${p.id}" title="New network">+</button>
+          </div>
+          <ul class="ed-tree-nets" data-nets="${p.id}"><li style="padding:8px 14px 8px 32px;color:var(--ink-3);font:500 11px/1.4 var(--sans)">Click to expand</li></ul>
+        </li>
+      `).join('');
+
+      // Wire up project rows
+      root.querySelectorAll('.ed-tree-proj').forEach(li => {
+        const row = li.querySelector('.ed-tree-proj-row');
+        const nets = li.querySelector('.ed-tree-nets');
+        row.addEventListener('click', async (e) => {
+          if (e.target.closest('.add')) return;
+          li.classList.toggle('is-open');
+          row.classList.toggle('is-open');
+          if (li.classList.contains('is-open')) {
+            const pid = li.dataset.pid;
+            const { networks } = await IecApi.listNetworks(pid);
+            nets.innerHTML = networks.length
+              ? networks.map(n => `<li><a href="javascript:void(0)" class="ed-tree-net" data-nid="${n.id}">⚡ ${esc(n.name)}</a></li>`).join('')
+              : '<li style="padding:8px 14px 8px 32px;color:var(--ink-3);font:500 11px/1.4 var(--sans)">No networks yet — use [+] above.</li>';
+            nets.querySelectorAll('.ed-tree-net').forEach(a => a.addEventListener('click', () => openNetwork(a.dataset.nid)));
+          }
+        });
+      });
+      root.querySelectorAll('button[data-act="add-net"]').forEach(b => b.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const pid = b.dataset.pid;
+        const name = prompt('Network name (e.g. "Main feeder LV-1"):');
+        if (!name) return;
+        try {
+          const r = await IecApi.createNetwork(pid, name, 'grid');
+          await loadProjects();
+          openNetwork(r.id);
+        } catch (e) { alert('Failed: ' + e.message); }
+      }));
+    } catch (e) {
+      root.innerHTML = '<li style="padding:14px;color:var(--ink-3);font:500 12px/1.4 var(--sans)">Failed: ' + esc(e.message) + '</li>';
+    }
+  }
+
+  document.getElementById('btn-new-project').addEventListener('click', async () => {
+    if (!state.isAuthed) { location.href = '/account/?intent=signin'; return; }
+    const name = prompt('Project name:');
+    if (!name) return;
+    try { await IecApi.createProject(name, 'grid', null); loadProjects(); }
+    catch (e) { alert('Failed: ' + e.message); }
+  });
+
+  async function openNetwork(id) {
+    try {
+      const { network } = await IecApi.getNetwork(id);
+      state.currentNet = network;
+      try { state.schema = JSON.parse(network.schema_json || '{}'); }
+      catch (e) { state.schema = { elements: [], links: [] }; }
+      if (!state.schema.elements) state.schema.elements = [];
+      if (!state.schema.links) state.schema.links = [];
+      state.nextId = (state.schema.elements.reduce((m, e) => Math.max(m, e.id || 0), 0) + 1) || 1;
+      document.getElementById('net-name').textContent = network.name.toUpperCase();
+      document.getElementById('canvas-wrap').classList.remove('disabled');
+      document.getElementById('btn-run').disabled = false;
+      document.getElementById('canvas-status').textContent = 'Network loaded — click anywhere to place elements';
+      render();
+    } catch (e) { alert('Failed to open: ' + e.message); }
+  }
+
+  // ── Canvas: SVG-based ─────────────────────────────────────────────
+  const svg = document.getElementById('canvas-svg');
+  const NS = 'http://www.w3.org/2000/svg';
+
+  function svgPoint(evt) {
+    const r = svg.getBoundingClientRect();
+    return { x: Math.round((evt.clientX - r.left) / 20) * 20, y: Math.round((evt.clientY - r.top) / 20) * 20 };
+  }
+
+  function render() {
+    svg.innerHTML = '';
+    // Links first (under nodes)
+    for (const link of state.schema.links) {
+      const a = state.schema.elements.find(e => e.id === link.from);
+      const b = state.schema.elements.find(e => e.id === link.to);
+      if (!a || !b) continue;
+      const line = document.createElementNS(NS, 'line');
+      line.setAttribute('x1', a.x); line.setAttribute('y1', a.y);
+      line.setAttribute('x2', b.x); line.setAttribute('y2', b.y);
+      line.setAttribute('class', 'el-line' + (state.selectedId === link.id ? ' selected' : ''));
+      line.dataset.id = link.id; line.dataset.type = 'link';
+      svg.appendChild(line);
+    }
+    // Elements
+    for (const el of state.schema.elements) {
+      const g = document.createElementNS(NS, 'g');
+      g.setAttribute('class', 'el-node' + (state.selectedId === el.id ? ' selected' : ''));
+      g.setAttribute('transform', `translate(${el.x}, ${el.y})`);
+      g.dataset.id = el.id; g.dataset.type = el.type;
+      g.innerHTML = renderShape(el);
+      svg.appendChild(g);
+    }
+  }
+
+  function renderShape(el) {
+    const stroke = 'stroke="var(--ink)" stroke-width="2"';
+    if (el.type === 'bus') {
+      return `<rect x="-30" y="-4" width="60" height="8" fill="var(--ink)" />
+              <text x="0" y="-10" text-anchor="middle" fill="var(--ink)">${esc(el.name || 'B' + el.id)}</text>`;
+    }
+    if (el.type === 'cable') {
+      return `<circle r="8" fill="var(--paper)" ${stroke}/>
+              <text x="0" y="-14" text-anchor="middle" fill="var(--ink)">${esc(el.name || 'CAB' + el.id)}</text>`;
+    }
+    if (el.type === 'tx') {
+      return `<circle cx="-7" cy="0" r="10" fill="var(--paper)" ${stroke}/>
+              <circle cx="7" cy="0" r="10" fill="var(--paper)" ${stroke}/>
+              <text x="0" y="-18" text-anchor="middle" fill="var(--ink)">${esc(el.name || 'T' + el.id)}</text>`;
+    }
+    if (el.type === 'load') {
+      return `<path d="M0 -12 V8 M-8 8 L0 18 L8 8 Z" fill="var(--ink)" ${stroke}/>
+              <text x="14" y="-2" fill="var(--ink)">${esc(el.name || 'L' + el.id)}</text>`;
+    }
+    if (el.type === 'gen') {
+      return `<circle r="12" fill="var(--paper)" ${stroke}/>
+              <text x="0" y="4" text-anchor="middle" font-weight="900" fill="var(--red)">G</text>
+              <text x="0" y="-18" text-anchor="middle" fill="var(--ink)">${esc(el.name || 'G' + el.id)}</text>`;
+    }
+    return `<circle r="6" fill="var(--red)"/>`;
+  }
+
+  svg.addEventListener('click', evt => {
+    if (!state.currentNet) return;
+    const target = evt.target.closest('[data-id]');
+    if (state.tool === 'select') {
+      state.selectedId = target ? Number(target.dataset.id) : null;
+      state.cableFrom = null;
+      render();
+      renderParams();
+    } else if (state.tool === 'cable') {
+      // Click 2 nodes to draw cable between them
+      if (!target || target.dataset.type === 'link') return;
+      const id = Number(target.dataset.id);
+      if (!state.cableFrom) {
+        state.cableFrom = id;
+        document.getElementById('canvas-status').textContent = 'Cable: pick second node';
+        return;
+      }
+      if (id === state.cableFrom) return;
+      const linkId = -state.nextId++;   // negative ids for links to keep separate
+      state.schema.links.push({ id: linkId, from: state.cableFrom, to: id });
+      state.cableFrom = null;
+      document.getElementById('canvas-status').textContent = 'Cable added';
+      autosave();
+      render();
+    } else {
+      // Place new element at click point
+      if (target) return;   // don't place on existing element
+      const p = svgPoint(evt);
+      const el = { id: state.nextId++, type: state.tool, x: p.x, y: p.y, name: '', params: {} };
+      state.schema.elements.push(el);
+      state.selectedId = el.id;
+      autosave();
+      render();
+      renderParams();
+    }
+  });
+
+  // ── Parameters panel ──────────────────────────────────────────────
+  const PARAMS = {
+    bus:   [['name','Bus name','text','B1'], ['voltage','Voltage U, kV','number','0.4'], ['frequency','Frequency, Hz','number','50']],
+    cable: [['name','Cable tag','text','CAB-1'], ['length','Length, m','number','100'], ['section','Cross-section, mm²','number','95'], ['material','Material','select','Cu|Cu Al']],
+    tx:    [['name','Transformer name','text','T1'], ['rating','Rated S, kVA','number','1000'], ['hv','HV, kV','number','20'], ['lv','LV, kV','number','0.4'], ['z_pu','%Z','number','6']],
+    load:  [['name','Load name','text','L1'], ['p_kw','P, kW','number','100'], ['cos_phi','cosφ','number','0.9']],
+    gen:   [['name','Generator name','text','G1'], ['rating','S, kVA','number','500'], ['voltage','U, kV','number','0.4'], ['x_d_pu','X″d, p.u.','number','0.18']],
+  };
+
+  function renderParams() {
+    const body = document.getElementById('params-body');
+    const calcList = body.querySelector('.ed-calc-list').outerHTML;
+    if (!state.selectedId) {
+      body.innerHTML = '<div class="nosel">No element selected.<br><br>Pick a tool from the left and click on the canvas to place a node, or click an existing element to edit.</div>' + calcList;
+      bindCalcList();
+      return;
+    }
+    const el = state.schema.elements.find(e => e.id === state.selectedId) || state.schema.links.find(l => l.id === state.selectedId);
+    if (!el) {
+      body.innerHTML = '<div class="nosel">Element not found.</div>' + calcList;
+      bindCalcList();
+      return;
+    }
+    const isLink = el.from !== undefined;
+    const type = isLink ? 'cable' : el.type;
+    document.getElementById('params-title').textContent = '/ ' + type.toUpperCase() + ' #' + el.id;
+    const defs = PARAMS[type] || [];
+    const fields = defs.map(([key, label, kind, def]) => {
+      const val = el.params && el.params[key] != null ? el.params[key] : (key === 'name' ? (el.name || '') : def);
+      if (kind === 'select') {
+        const opts = def.split('|').map(o => `<option value="${esc(o)}"${o===val?' selected':''}>${esc(o)}</option>`).join('');
+        return `<div class="ed-field"><label>${esc(label)}</label><select data-key="${esc(key)}">${opts}</select></div>`;
+      }
+      return `<div class="ed-field"><label>${esc(label)}</label><input type="${kind}" data-key="${esc(key)}" value="${esc(val)}"></div>`;
+    }).join('');
+    body.innerHTML = fields
+      + '<button class="ed-report-btn" id="btn-del" style="background:#A30E18">DELETE ELEMENT</button>'
+      + calcList;
+    body.querySelectorAll('[data-key]').forEach(inp => inp.addEventListener('input', () => {
+      const k = inp.dataset.key;
+      if (k === 'name') { el.name = inp.value; }
+      else { el.params = el.params || {}; el.params[k] = inp.value; }
+      autosave();
+      render();
+    }));
+    document.getElementById('btn-del').addEventListener('click', () => {
+      if (isLink) state.schema.links = state.schema.links.filter(l => l.id !== el.id);
+      else {
+        state.schema.elements = state.schema.elements.filter(e => e.id !== el.id);
+        state.schema.links = state.schema.links.filter(l => l.from !== el.id && l.to !== el.id);
+      }
+      state.selectedId = null;
+      autosave();
+      render();
+      renderParams();
+    });
+    bindCalcList();
+  }
+
+  function bindCalcList() {
+    document.getElementById('btn-run').addEventListener('click', async () => {
+      const checks = [...document.querySelectorAll('.ed-calc input:checked')].map(c => c.dataset.calc);
+      if (!checks.length) return alert('Select at least one calculation.');
+      if (!state.currentNet) return;
+      try {
+        await IecApi.calculateNetwork(state.currentNet.id, checks);
+        alert('Queued calculations: ' + checks.join(', ') + '\nResults will appear here once the computation engine is wired (Phase 2).');
+        document.getElementById('btn-report').disabled = false;
+      } catch (e) { alert('Failed: ' + e.message); }
+    });
+    document.getElementById('btn-report').addEventListener('click', () => {
+      alert('Report generation will be wired alongside calculation engine in the next iteration.');
+    });
+  }
+  renderParams();
+
+  // ── Autosave (debounced) ──────────────────────────────────────────
+  let saveTimer = null;
+  function autosave() {
+    if (!state.currentNet) return;
+    clearTimeout(saveTimer);
+    document.getElementById('canvas-status').textContent = 'Saving…';
+    saveTimer = setTimeout(async () => {
+      try {
+        await IecApi.updateNetwork(state.currentNet.id, { schema_json: JSON.stringify(state.schema) });
+        document.getElementById('canvas-status').textContent = 'Saved ' + new Date().toLocaleTimeString();
+      } catch (e) { document.getElementById('canvas-status').textContent = 'Save failed: ' + e.message; }
+    }, 600);
+  }
+
+  // ── Auth check + bootstrap ────────────────────────────────────────
+  IecApi.me().then(s => {
+    state.isAuthed = !!(s && s.authenticated);
+    loadProjects();
+  });
+})();
+</script>
+</body>
+</html>

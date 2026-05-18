@@ -72,6 +72,21 @@
     forumReplies:    (id)                     => request("/forum/t/" + id + "/replies"),
     createThread:    (catSlug, title, body_md) => request("/forum/c/" + catSlug + "/threads", { method: "POST", body: { title, body_md } }),
     createReply:     (threadId, body_md, parent_id) => request("/forum/t/" + threadId + "/replies", { method: "POST", body: { body_md, parent_id } }),
+    
+    // Projects
+    listProjects:   ()                       => request("/projects"),
+    createProject:  (name, kind, description) => request("/projects", { method:"POST", body:{ name, kind, description } }),
+    getProject:     (id)                     => request("/projects/" + id),
+    updateProject:  (id, body)               => request("/projects/" + id, { method:"PUT", body }),
+    deleteProject:  (id)                     => request("/projects/" + id, { method:"DELETE" }),
+    // Networks
+    listNetworks:   (projectId)              => request("/projects/" + projectId + "/networks"),
+    createNetwork:  (projectId, name, kind)  => request("/projects/" + projectId + "/networks", { method:"POST", body:{ name, kind } }),
+    getNetwork:     (id)                     => request("/networks/" + id),
+    updateNetwork:  (id, body)               => request("/networks/" + id, { method:"PUT", body }),
+    deleteNetwork:  (id)                     => request("/networks/" + id, { method:"DELETE" }),
+    calculateNetwork:(id, calcs)             => request("/networks/" + id + "/calculate", { method:"POST", body:{ calcs } }),
+    networkReports: (id)                     => request("/networks/" + id + "/reports"),
     voteReply:       (id, dir)                => request("/forum/replies/" + id + "/vote", { method: "POST", body: { direction: dir } }),
   };
 
