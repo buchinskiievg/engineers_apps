@@ -423,77 +423,151 @@
   };
   const CHEV_SVG = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 5 L16 12 L9 19"/></svg>';
 
-  // Demo tree (replaced by API data when projects endpoint lands)
-  const DEMO_TREE = [
-    { id:'p1', type:'project', label:'DEMO SUBSTATION 110/20 kV', open:true, children: [
-      { id:'i1', type:'installation', label:'Switchgear A · 20 kV', open:true, children: [
-        { id:'f1', type:'feeder', label:'Outgoing feeder F1' },
-        { id:'f2', type:'feeder', label:'Outgoing feeder F2' },
-      ]},
-      { id:'i2', type:'installation', label:'Transformer T1 · 110/20', children: [
-        { id:'s1', type:'scenario', label:'Short-circuit study' },
-      ]},
-    ]},
-    { id:'p2', type:'project', label:'CABLE ROUTE — CITY CENTRE' },
-  ];
+  // Render projects loaded from API (real backend)
+  async function loadSidebar() {
+    const body = document.getElementById('sb-body');
+    let me = null;
+    try { me = await IecApi.me(); } catch (e) {}
+    if (!me || !me.authenticated) return;  // keep default sign-in CTA
 
-  function renderTree(nodes) {
-    return '<ul class="va-tree">' + nodes.map(renderNode).join('') + '</ul>';
-  }
-  function renderNode(n) {
-    const hasKids = Array.isArray(n.children) && n.children.length > 0;
-    const open = n.open !== false;
-    const rowClass = 'va-tree-row' + (open ? ' is-open' : '');
-    return ''
-      + '<li class="va-tree-node" data-id="'+esc(n.id)+'" data-type="'+esc(n.type)+'">'
-      + '  <div class="'+rowClass+'" data-id="'+esc(n.id)+'">'
-      + '    <span class="chev">'+(hasKids ? CHEV_SVG : '')+'</span>'
-      + '    <span class="icn">'+(TREE_ICON[n.type]||'')+'</span>'
-      + '    <span class="label" title="'+esc(n.label)+'">'+esc(n.label)+'</span>'
-      + '    <button class="add" data-act="add-child" data-id="'+esc(n.id)+'" title="Add child">+</button>'
-      + '  </div>'
-      + (hasKids ? '<ul class="va-tree-children'+(open?'':' hidden')+'">'+n.children.map(renderNode).join('')+'</ul>' : '')
-      + '</li>';
+    try {
+      const { projects } = await IecApi.listProjects();
+      renderProjects(projects);
+    } catch (e) {
+      body.innerHTML = '<div style="padding:14px;color:var(--ink-3);font-size:12px">Failed to load projects: '+esc(e.message)+'</div>';
+    }
   }
 
-  function bindTree(rootEl) {
-    rootEl.querySelectorAll('.va-tree-row').forEach(row => {
-      row.addEventListener('click', e => {
-        if (e.target.closest('[data-act="add-child"]')) {
+  function renderProjects(projects) {
+    const body = document.getElementById('sb-body');
+    const items = projects.map(p =>
+      `<li class="va-tree-node" data-pid="${p.id}">
+        <div class="va-tree-row" data-pid="${p.id}">
+          <span class="chev">${CHEV_SVG}</span>
+          <span class="icn">${TREE_ICON.project}</span>
+          <span class="label" title="${esc(p.name)}">${esc(p.name)}</span>
+          <button class="add" data-act="add-net" data-pid="${p.id}" title="New network">+</button>
+        </div>
+        <ul class="va-tree-children hidden" data-nets="${p.id}"></ul>
+      </li>`
+    ).join('');
+    body.innerHTML = `<ul class="va-tree" id="sb-tree">${items}</ul>`;
+    bindTree();
+  }
+
+  // Append an editable row (inline rename) at the top of the tree.
+  // When user presses Enter → create real project via API.
+  function startInlineCreate() {
+    const tree = document.getElementById('sb-tree');
+    if (!tree) {
+      // First-time: replace empty body with empty tree
+      document.getElementById('sb-body').innerHTML = '<ul class="va-tree" id="sb-tree"></ul>';
+    }
+    const tree2 = document.getElementById('sb-tree');
+    // Avoid duplicate edit-row
+    if (tree2.querySelector('.va-tree-edit')) {
+      tree2.querySelector('.va-tree-edit input').focus();
+      return;
+    }
+    const li = document.createElement('li');
+    li.className = 'va-tree-node va-tree-edit';
+    li.innerHTML = `
+      <div class="va-tree-row">
+        <span class="chev"></span>
+        <span class="icn">${TREE_ICON.project}</span>
+        <input class="label-input" placeholder="New project name…" style="flex:1;min-width:0;padding:3px 6px;border:1px solid var(--red);background:var(--paper);font:inherit;outline:none">
+      </div>
+    `;
+    tree2.insertBefore(li, tree2.firstChild);
+    const inp = li.querySelector('input');
+    inp.focus();
+    const commit = async () => {
+      const name = inp.value.trim();
+      if (!name) { li.remove(); return; }
+      try {
+        await IecApi.createProject(name, 'grid', null);
+        loadSidebar();  // reload tree
+      } catch (e) {
+        const errBox = document.createElement('div');
+        errBox.style.cssText = 'padding:6px 14px;font:600 11px/1.4 var(--sans);color:var(--red);background:#FBE7E8';
+        errBox.textContent = e.body?.error || e.message || 'Failed';
+        li.appendChild(errBox);
+        setTimeout(() => { errBox.remove(); inp.focus(); }, 3500);
+      }
+    };
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); commit(); }
+      else if (e.key === 'Escape') { li.remove(); }
+    });
+    inp.addEventListener('blur', () => { if (inp.value.trim()) commit(); else li.remove(); });
+  }
+
+  function bindTree() {
+    const tree = document.getElementById('sb-tree');
+    if (!tree) return;
+    tree.querySelectorAll('.va-tree-row').forEach(row => {
+      row.addEventListener('click', async e => {
+        if (e.target.closest('[data-act="add-net"]')) {
           e.stopPropagation();
-          const name = prompt('Name of new child node:');
-          if (!name) return;
-          // For Phase 1 just refresh local demo data; backend wiring later
-          alert('Stub: would create child under ' + row.dataset.id + ' = ' + name + '. (Backend API for projects pending.)');
+          const pid = row.dataset.pid;
+          startInlineCreateNetwork(pid);
           return;
         }
+        // Toggle expand: load networks if first time
         const node = row.closest('.va-tree-node');
         const kids = node.querySelector(':scope > .va-tree-children');
-        if (kids) {
-          kids.classList.toggle('hidden');
-          row.classList.toggle('is-open');
+        const opening = !node.classList.contains('is-open');
+        node.classList.toggle('is-open');
+        row.classList.toggle('is-open');
+        if (kids) kids.classList.toggle('hidden', !opening);
+        if (opening && kids && kids.children.length === 0) {
+          const pid = row.dataset.pid;
+          try {
+            const { networks } = await IecApi.listNetworks(pid);
+            kids.innerHTML = networks.length
+              ? networks.map(n => `<li><a class="va-tree-net" href="/networks/?net=${n.id}" style="display:flex;gap:8px;align-items:center;padding:6px 14px 6px 32px;text-decoration:none;color:var(--ink);border-bottom:1px solid var(--line-soft);font:600 11.5px/1.2 var(--sans)">⚡ ${esc(n.name)}</a></li>`).join('')
+              : `<li style="padding:6px 14px 8px 32px;color:var(--ink-3);font:500 11px/1.4 var(--sans)">no networks — click [+] to add</li>`;
+          } catch (e) {
+            kids.innerHTML = '<li style="padding:6px 14px 8px 32px;color:var(--red);font-size:11px">'+esc(e.message)+'</li>';
+          }
         }
-        // toggle selection
-        rootEl.querySelectorAll('.va-tree-row.is-on').forEach(r => r.classList.remove('is-on'));
+        tree.querySelectorAll('.va-tree-row.is-on').forEach(r => r.classList.remove('is-on'));
         row.classList.add('is-on');
       });
     });
   }
 
-  async function loadSidebar() {
-    const body = document.getElementById('sb-body');
-    let me = null;
-    try { me = await IecApi.me(); } catch (e) {}
-    if (me && me.authenticated) {
-      body.innerHTML = renderTree(DEMO_TREE);
-      bindTree(body);
-    } // else: leave default empty state with sign-in CTA
+  function startInlineCreateNetwork(pid) {
+    const ul = document.querySelector(`[data-nets="${pid}"]`);
+    if (!ul) return;
+    ul.classList.remove('hidden');
+    if (ul.querySelector('.va-net-edit')) { ul.querySelector('.va-net-edit input').focus(); return; }
+    const li = document.createElement('li');
+    li.className = 'va-net-edit';
+    li.innerHTML = `<div style="padding:6px 14px 6px 32px"><input placeholder="New network name…" style="width:100%;padding:3px 6px;border:1px solid var(--red);font:inherit;outline:none"></div>`;
+    ul.appendChild(li);
+    const inp = li.querySelector('input');
+    inp.focus();
+    const commit = async () => {
+      const name = inp.value.trim();
+      if (!name) { li.remove(); return; }
+      try {
+        const r = await IecApi.createNetwork(pid, name, 'grid');
+        // jump straight into the editor
+        location.href = '/networks/?net=' + r.id;
+      } catch (e) {
+        alert(e.body?.error || e.message);
+        li.remove();
+      }
+    };
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); commit(); }
+      else if (e.key === 'Escape') li.remove();
+    });
+    inp.addEventListener('blur', () => { if (inp.value.trim()) commit(); else li.remove(); });
   }
-  document.getElementById('sb-add-project').addEventListener('click', () => {
-    const name = prompt('Name of new project:');
-    if (!name) return;
-    alert('Stub: would create project "' + name + '". Backend API pending.');
-  });
+
+  document.getElementById('sb-add-project').addEventListener('click', startInlineCreate);
   loadSidebar();
 
   // ── Sign-in modal ─────────────────────────────────────────────

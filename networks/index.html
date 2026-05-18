@@ -360,7 +360,8 @@
   }));
 
   // ── Projects tree ─────────────────────────────────────────────────
-  async function loadProjects() {
+  function loadProjects() { return _loadProjects(); }
+  async function _loadProjects() {
     const root = document.getElementById('proj-tree');
     if (!state.isAuthed) {
       root.innerHTML = '<li style="padding:14px;color:var(--ink-3);font:500 12px/1.4 var(--sans)">Sign in to manage projects.<br><a class="btn btn-primary btn-sm" style="margin-top:10px" href="/account/?intent=signin">SIGN IN</a></li>';
@@ -401,29 +402,82 @@
           }
         });
       });
-      root.querySelectorAll('button[data-act="add-net"]').forEach(b => b.addEventListener('click', async (e) => {
+      root.querySelectorAll('button[data-act="add-net"]').forEach(b => b.addEventListener('click', (e) => {
         e.stopPropagation();
         const pid = b.dataset.pid;
-        const name = prompt('Network name (e.g. "Main feeder LV-1"):');
-        if (!name) return;
-        try {
-          const r = await IecApi.createNetwork(pid, name, 'grid');
-          await loadProjects();
-          openNetwork(r.id);
-        } catch (e) { alert('Failed: ' + e.message); }
+        startInlineCreateNetwork(pid);
       }));
     } catch (e) {
       root.innerHTML = '<li style="padding:14px;color:var(--ink-3);font:500 12px/1.4 var(--sans)">Failed: ' + esc(e.message) + '</li>';
     }
   }
 
-  document.getElementById('btn-new-project').addEventListener('click', async () => {
+  document.getElementById('btn-new-project').addEventListener('click', () => {
     if (!state.isAuthed) { location.href = '/account/?intent=signin'; return; }
-    const name = prompt('Project name:');
-    if (!name) return;
-    try { await IecApi.createProject(name, 'grid', null); loadProjects(); }
-    catch (e) { alert('Failed: ' + e.message); }
+    startInlineCreateProject();
   });
+
+  function startInlineCreateNetwork(pid) {
+    // Expand the project node if needed
+    const projLi = document.querySelector(`.ed-tree-proj[data-pid="${pid}"]`);
+    if (!projLi) return;
+    projLi.classList.add('is-open');
+    projLi.querySelector('.ed-tree-proj-row').classList.add('is-open');
+    const nets = projLi.querySelector('.ed-tree-nets');
+    if (nets.querySelector('.ed-net-edit')) { nets.querySelector('.ed-net-edit input').focus(); return; }
+    const li = document.createElement('li');
+    li.className = 'ed-net-edit';
+    li.innerHTML = `<div style="padding:6px 14px 6px 32px"><input placeholder="New network name…" style="width:100%;padding:3px 6px;border:1px solid var(--red);font:inherit;outline:none"></div>`;
+    nets.appendChild(li);
+    const inp = li.querySelector('input');
+    inp.focus();
+    const commit = async () => {
+      const name = inp.value.trim();
+      if (!name) { li.remove(); return; }
+      try {
+        const r = await IecApi.createNetwork(pid, name, 'grid');
+        await loadProjects();
+        openNetwork(r.id);
+      } catch (e) { alert(e.body?.error || e.message); li.remove(); }
+    };
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); commit(); }
+      else if (e.key === 'Escape') li.remove();
+    });
+    inp.addEventListener('blur', () => { if (inp.value.trim()) commit(); else li.remove(); });
+  }
+
+  function startInlineCreateProject() {
+    const tree = document.getElementById('proj-tree');
+    if (tree.querySelector('.ed-tree-edit')) { tree.querySelector('.ed-tree-edit input').focus(); return; }
+    const li = document.createElement('li');
+    li.className = 'ed-tree-proj ed-tree-edit';
+    li.innerHTML = `
+      <div class="ed-tree-proj-row" style="grid-template-columns:18px 1fr;padding:7px 14px">
+        <span style="font-family:var(--display);font-weight:900;color:var(--red)">+</span>
+        <input placeholder="New project name…" style="width:100%;padding:3px 6px;border:1px solid var(--red);background:var(--paper);font:inherit;outline:none">
+      </div>`;
+    tree.insertBefore(li, tree.firstChild);
+    const inp = li.querySelector('input');
+    inp.focus();
+    const commit = async () => {
+      const name = inp.value.trim();
+      if (!name) { li.remove(); return; }
+      try { await IecApi.createProject(name, 'grid', null); loadProjects(); }
+      catch (e) {
+        const eb = document.createElement('div');
+        eb.style.cssText = 'padding:6px 14px;font:600 11px/1.4 var(--sans);color:var(--red);background:#FBE7E8';
+        eb.textContent = e.body?.error || e.message;
+        li.appendChild(eb);
+        setTimeout(() => { eb.remove(); inp.focus(); }, 3500);
+      }
+    };
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); commit(); }
+      else if (e.key === 'Escape') li.remove();
+    });
+    inp.addEventListener('blur', () => { if (inp.value.trim()) commit(); else li.remove(); });
+  }
 
   async function openNetwork(id) {
     try {
@@ -656,7 +710,11 @@
     state.licenses = (me && me.licenses) || [];
     state.entitledCalcs = computeEntitled(state.licenses, settings, state.isAdmin);
     applyCalcGating();
-    loadProjects();
+    loadProjects().then(() => {
+      // Auto-open network if specified in URL ?net=N
+      const netId = new URLSearchParams(location.search).get('net');
+      if (netId) openNetwork(Number(netId));
+    });
   });
 
   function computeEntitled(licenses, settings, isAdmin) {
