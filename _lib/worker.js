@@ -1267,7 +1267,7 @@ async function createProject(req, env) {
         const { count } = await env.DB.prepare("SELECT COUNT(*) AS count FROM projects WHERE user_id = ?")
           .bind(user.id).first();
         if (count >= limit) {
-          return err(`Free tier limit reached: max ${limit} project(s). Upgrade to add more.`, 402);
+          return err(`You have ${count} project(s); free tier allows up to ${limit}. Delete one to add another, or buy a licence for unlimited projects.`, 402);
         }
       }
     }
@@ -1426,9 +1426,9 @@ async function calculateNetwork(req, env, id) {
     };
     const denied = calcs.filter(c => !freeAllowed.includes(c) && !licensedSlugs.has(SLUG_BY_CALC[c]));
     if (denied.length) {
-      return err(`Not allowed: ${denied.join(", ")}. ` +
-                 `Free tier includes: ${freeAllowed.join(", ") || "none"}. ` +
-                 `Buy a licence to unlock more.`, 402, { denied });
+      return err(`These calculations need a licence: ${denied.join(", ")}. ` +
+                 `Free tier currently includes: ${freeAllowed.join(", ") || "none"}.`,
+                 402, { denied });
     }
     // Free-run quota
     const limit = parseInt(settings.free_max_calc_runs || "0", 10);
