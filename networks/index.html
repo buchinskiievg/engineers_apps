@@ -169,13 +169,66 @@
 
   /* SVG element styles */
   .el-node { cursor: pointer; }
-  .el-node.selected rect, .el-node.selected circle { stroke: var(--red); stroke-width: 2.5; }
+  .el-node.selected .el-body { stroke: var(--red); stroke-width: 2.5; }
+  .el-node.selected .el-body[fill="var(--ink)"] { stroke: var(--red); }
   .el-node.moving { opacity: 0.25; }
   .el-ghost { pointer-events: none; }
-  .el-ghost rect, .el-ghost circle, .el-ghost path { stroke: var(--red) !important; stroke-dasharray: 4 3; }
-  .el-node text { font: 700 10px/1 'Geist',sans-serif; user-select: none; }
-  .el-line { stroke: var(--ink); stroke-width: 2; cursor: pointer; }
-  .el-line.selected { stroke: var(--red); stroke-width: 3; }
+  .el-ghost .el-body { stroke: var(--red) !important; stroke-dasharray: 4 3; }
+  .el-node text { font: 700 10px/1 'Geist',sans-serif; user-select: none; pointer-events: none; }
+
+  /* Ports — small circles shown when a node is selected or when WIRE tool is active */
+  .el-port {
+    fill: var(--paper);
+    stroke: var(--ink);
+    stroke-width: 1.4;
+    cursor: crosshair;
+    transition: fill .08s, stroke .08s;
+  }
+  .el-port:hover, .el-port.snap-target {
+    fill: var(--red);
+    stroke: var(--red);
+    r: 5;
+  }
+  .ed-canvas.tool-wire .el-port,
+  .el-node.selected .el-port { opacity: 1; }
+  .el-port { opacity: 0; }                /* hide ports unless explicitly shown */
+
+  /* Wires (orthogonal port-to-port) */
+  .el-wire {
+    fill: none;
+    stroke: var(--ink);
+    stroke-width: 2;
+    cursor: pointer;
+  }
+  .el-wire.selected { stroke: var(--red); stroke-width: 3; }
+  .el-wire-preview {
+    fill: none;
+    stroke: var(--red);
+    stroke-width: 1.8;
+    stroke-dasharray: 5 3;
+    pointer-events: none;
+  }
+
+  /* Palette categories */
+  .ed-pal-cat {
+    grid-column: 1 / -1;
+    font: 800 9.5px/1 var(--sans);
+    letter-spacing: 0.16em;
+    color: var(--ink-3);
+    padding: 10px 4px 4px;
+    border-top: 1px solid var(--line);
+  }
+  .ed-pal-cat:first-child { border-top: 0; padding-top: 4px; }
+
+  /* Scale-aware grid canvas sits BEHIND the SVG */
+  .ed-canvas { position: relative; }
+  .ed-grid-cv {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    image-rendering: crisp-edges;
+  }
+  .ed-canvas-svg { position: relative; z-index: 1; }
 
   /* Right params panel */
   .ed-params {
@@ -259,29 +312,79 @@
     </div>
     <div class="ed-side-body hidden" id="side-tools">
       <div class="ed-palette" id="palette">
+        <!-- Cursor tools -->
+        <div class="ed-pal-cat">CURSOR</div>
         <button class="ed-tool is-on" data-tool="select" title="Select / move (S)">
           <span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3 L19 12 L13 13 L17 21 L14 22 L10 14 L5 17 Z"/></svg></span>
           SELECT
         </button>
-        <button class="ed-tool" data-tool="bus" title="Place busbar">
-          <span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><rect x="3" y="10" width="18" height="4"/></svg></span>
-          BUS
+        <button class="ed-tool" data-tool="wire" title="Draw wire — click port → click port">
+          <span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M3 4 H10 V14 H21"/><circle cx="3" cy="4" r="1.6" fill="currentColor"/><circle cx="21" cy="14" r="1.6" fill="currentColor"/></svg></span>
+          WIRE
         </button>
-        <button class="ed-tool" data-tool="cable" title="Draw cable (click 2 nodes)">
-          <span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M3 12 q 6 -6 9 0 t 9 0"/></svg></span>
+
+        <!-- Conductors -->
+        <div class="ed-pal-cat">CONDUCTORS</div>
+        <button class="ed-tool" data-tool="bus" title="Busbar (multiple taps)">
+          <span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="2" y="10" width="20" height="4"/></svg></span>
+          BUSBAR
+        </button>
+        <button class="ed-tool" data-tool="cable" title="Cable segment (inline)">
+          <span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M3 12 H21"/><circle cx="6" cy="12" r="1.6" fill="currentColor"/><circle cx="18" cy="12" r="1.6" fill="currentColor"/></svg></span>
           CABLE
         </button>
-        <button class="ed-tool" data-tool="tx" title="Transformer">
-          <span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="9" cy="12" r="5"/><circle cx="15" cy="12" r="5"/></svg></span>
-          TRANSFORMER
+
+        <!-- Switchgear -->
+        <div class="ed-pal-cat">SWITCHGEAR</div>
+        <button class="ed-tool" data-tool="cb_lv" title="LV circuit breaker (MCCB)">
+          <span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><rect x="7" y="5" width="10" height="14"/><path d="M12 2 V5 M12 19 V22"/></svg></span>
+          CB-LV
         </button>
-        <button class="ed-tool" data-tool="load" title="Load">
-          <span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 3 V14 M6 14 H18 L12 21 Z"/></svg></span>
-          LOAD
+        <button class="ed-tool" data-tool="cb_mv" title="MV circuit breaker">
+          <span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><rect x="6" y="6" width="12" height="12"/><path d="M8 8 L16 16 M16 8 L8 16 M12 2 V6 M12 18 V22"/></svg></span>
+          CB-MV
+        </button>
+        <button class="ed-tool" data-tool="ds" title="Disconnector (knife switch)">
+          <span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 2 V8 L17 12 M12 14 V22"/><circle cx="12" cy="8" r="1.5" fill="currentColor"/><circle cx="17" cy="12" r="1.5" fill="currentColor"/></svg></span>
+          DISC
+        </button>
+        <button class="ed-tool" data-tool="fuse" title="Fuse">
+          <span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><rect x="9" y="5" width="6" height="14"/><path d="M12 2 V5 M12 19 V22"/></svg></span>
+          FUSE
+        </button>
+
+        <!-- Transformers / Sources -->
+        <div class="ed-pal-cat">TX &amp; SOURCES</div>
+        <button class="ed-tool" data-tool="tx2" title="2-winding transformer">
+          <span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="9" r="4"/><circle cx="12" cy="15" r="4"/></svg></span>
+          TX-2W
+        </button>
+        <button class="ed-tool" data-tool="tx3" title="3-winding transformer">
+          <span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="7" r="3.5"/><circle cx="8" cy="15" r="3.5"/><circle cx="16" cy="15" r="3.5"/></svg></span>
+          TX-3W
+        </button>
+        <button class="ed-tool" data-tool="grid" title="Utility / PCC infinite bus">
+          <span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 2 L8 10 H12 L9 22 L17 11 H13 L15 2 Z"/></svg></span>
+          GRID
         </button>
         <button class="ed-tool" data-tool="gen" title="Generator">
           <span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="8"/><text x="12" y="16" text-anchor="middle" font-size="11" font-weight="900" fill="currentColor" stroke="none">G</text></svg></span>
-          GENERATOR
+          GEN
+        </button>
+
+        <!-- Loads -->
+        <div class="ed-pal-cat">LOADS</div>
+        <button class="ed-tool" data-tool="load" title="Generic load">
+          <span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 3 V14 M6 14 H18 L12 21 Z"/></svg></span>
+          LOAD
+        </button>
+        <button class="ed-tool" data-tool="mot" title="Motor">
+          <span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="8"/><text x="12" y="16" text-anchor="middle" font-size="11" font-weight="900" fill="currentColor" stroke="none">M</text></svg></span>
+          MOTOR
+        </button>
+        <button class="ed-tool" data-tool="cap" title="Capacitor bank">
+          <span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12 H10 M14 12 H20 M10 5 V19 M14 5 V19"/></svg></span>
+          CAP
         </button>
       </div>
     </div>
@@ -296,6 +399,7 @@
       <button class="ed-zoom" id="zoom-out">−</button>
       <button class="ed-zoom" id="zoom-in">+</button>
     </div>
+    <canvas class="ed-grid-cv" id="grid-cv"></canvas>
     <svg class="ed-canvas-svg" id="canvas-svg"></svg>
     <div class="ed-status" id="canvas-status">Idle</div>
   </main>
@@ -335,13 +439,230 @@
   const state = {
     isAuthed: false,
     currentNet: null,            // { id, name, kind, schema_json:parsed }
-    schema: { elements: [], links: [] },
+    // SLD-style schema:
+    //   nodes: { [id]: { id, type, x, y, rot:0..3, name, params:{...} } }
+    //   conns: [ { id, from, fp, to, tp, pts:[{x,y}…], locked } ]
+    schema: { nodes: {}, conns: [] },
     tool: 'select',
-    selectedId: null,
-    cableFrom: null,             // for cable tool: id of first node
+    selectedId: null,            // node id or 'C'+conn id when wire selected
+    wireFrom: null,              // { nodeId, portId, p:{x,y} } during WIRE tool
+    movingId: null,              // node currently being moved (two-click move)
+    ghostPos: null,              // current cursor pos for ghost preview
+    placePreview: null,          // {type, p:{x,y}} when placing a new symbol
     nextId: 1,
-    zoom: 1,
+    view: { x: 0, y: 0, k: 1 },
   };
+
+  // Grid in world units (px). Snap step.
+  const G = 20;
+  const snap = v => Math.round(v / G) * G;
+
+  // ── Symbol library (geometry + ports + draw) ──────────────────────
+  // Each SYM has: w, h (bounding box in world units), ports [{id, x, y, side}],
+  // and draw(p, col) → SVG fragment string (children of a <g> placed at node origin).
+  // Origin of a symbol is its TOP-LEFT corner (0,0); coordinates of ports are
+  // relative to that. Rotation 0..3 = 0°/90°/180°/270° clockwise around the
+  // bounding-box center.
+  const SYM = {
+    bus: {
+      w: 120, h: 8,
+      ports: [
+        { id:'L',  x:0,   y:4, side:'W' },
+        { id:'R',  x:120, y:4, side:'E' },
+        { id:'T1', x:20,  y:0, side:'N' },
+        { id:'T2', x:60,  y:0, side:'N' },
+        { id:'T3', x:100, y:0, side:'N' },
+        { id:'B1', x:20,  y:8, side:'S' },
+        { id:'B2', x:60,  y:8, side:'S' },
+        { id:'B3', x:100, y:8, side:'S' },
+      ],
+      draw: (p, col) => `<rect class="el-body" x="0" y="0" width="120" height="8" fill="${col}" stroke="${col}"/>
+                         <text x="60" y="-6" text-anchor="middle">${esc(p.name||'BUS')}</text>`,
+    },
+    cable: {
+      w: 60, h: 16,
+      ports: [
+        { id:'A', x:0,  y:8, side:'W' },
+        { id:'B', x:60, y:8, side:'E' },
+      ],
+      draw: (p, col) => `<line class="el-body" x1="0" y1="8" x2="60" y2="8" stroke="${col}" stroke-width="3" fill="none"/>
+                         <circle cx="0"  cy="8" r="3" fill="${col}"/>
+                         <circle cx="60" cy="8" r="3" fill="${col}"/>
+                         <text x="30" y="-4" text-anchor="middle">${esc(p.name||'CAB')}</text>`,
+    },
+    cb_lv: {
+      w: 24, h: 40,
+      ports: [
+        { id:'A', x:12, y:0,  side:'N' },
+        { id:'B', x:12, y:40, side:'S' },
+      ],
+      draw: (p, col) => `<line x1="12" y1="0"  x2="12" y2="10" stroke="${col}" stroke-width="2"/>
+                         <rect class="el-body" x="2" y="10" width="20" height="20" fill="var(--paper)" stroke="${col}" stroke-width="2"/>
+                         <path d="M2 10 L22 30" stroke="${col}" stroke-width="1.4" fill="none"/>
+                         <line x1="12" y1="30" x2="12" y2="40" stroke="${col}" stroke-width="2"/>
+                         <text x="28" y="22">${esc(p.name||'Q')}</text>`,
+    },
+    cb_mv: {
+      w: 28, h: 48,
+      ports: [
+        { id:'A', x:14, y:0,  side:'N' },
+        { id:'B', x:14, y:48, side:'S' },
+      ],
+      draw: (p, col) => `<line x1="14" y1="0"  x2="14" y2="10" stroke="${col}" stroke-width="2"/>
+                         <rect class="el-body" x="2" y="10" width="24" height="28" fill="var(--paper)" stroke="${col}" stroke-width="2"/>
+                         <path d="M6 14 L22 34 M22 14 L6 34" stroke="${col}" stroke-width="1.8" fill="none"/>
+                         <line x1="14" y1="38" x2="14" y2="48" stroke="${col}" stroke-width="2"/>
+                         <text x="32" y="26">${esc(p.name||'Q')}</text>`,
+    },
+    ds: {
+      w: 24, h: 40,
+      ports: [
+        { id:'A', x:12, y:0,  side:'N' },
+        { id:'B', x:12, y:40, side:'S' },
+      ],
+      draw: (p, col) => `<line x1="12" y1="0"  x2="12" y2="12" stroke="${col}" stroke-width="2"/>
+                         <line class="el-body" x1="12" y1="12" x2="22" y2="22" stroke="${col}" stroke-width="2.4" fill="none"/>
+                         <circle cx="12" cy="12" r="2.4" fill="${col}"/>
+                         <circle cx="22" cy="22" r="2.4" fill="${col}"/>
+                         <line x1="12" y1="22" x2="12" y2="40" stroke="${col}" stroke-width="2"/>
+                         <text x="28" y="22">${esc(p.name||'QS')}</text>`,
+    },
+    fuse: {
+      w: 16, h: 40,
+      ports: [
+        { id:'A', x:8, y:0,  side:'N' },
+        { id:'B', x:8, y:40, side:'S' },
+      ],
+      draw: (p, col) => `<line x1="8" y1="0"  x2="8" y2="10" stroke="${col}" stroke-width="2"/>
+                         <rect class="el-body" x="3" y="10" width="10" height="20" fill="var(--paper)" stroke="${col}" stroke-width="2"/>
+                         <line x1="8" y1="30" x2="8" y2="40" stroke="${col}" stroke-width="2"/>
+                         <text x="18" y="22">${esc(p.name||'F')}</text>`,
+    },
+    tx2: {
+      w: 32, h: 56,
+      ports: [
+        { id:'HV', x:16, y:0,  side:'N' },
+        { id:'LV', x:16, y:56, side:'S' },
+      ],
+      draw: (p, col) => `<line x1="16" y1="0" x2="16" y2="10" stroke="${col}" stroke-width="2"/>
+                         <circle class="el-body" cx="16" cy="20" r="10" fill="var(--paper)" stroke="${col}" stroke-width="2"/>
+                         <circle class="el-body" cx="16" cy="36" r="10" fill="var(--paper)" stroke="${col}" stroke-width="2"/>
+                         <line x1="16" y1="46" x2="16" y2="56" stroke="${col}" stroke-width="2"/>
+                         <text x="36" y="30">${esc(p.name||'T')}</text>`,
+    },
+    tx3: {
+      w: 40, h: 64,
+      ports: [
+        { id:'HV', x:20, y:0,  side:'N' },
+        { id:'LV', x:6,  y:64, side:'S' },
+        { id:'TV', x:34, y:64, side:'S' },
+      ],
+      draw: (p, col) => `<line x1="20" y1="0" x2="20" y2="14" stroke="${col}" stroke-width="2"/>
+                         <circle class="el-body" cx="20" cy="22" r="8" fill="var(--paper)" stroke="${col}" stroke-width="2"/>
+                         <circle class="el-body" cx="13" cy="36" r="8" fill="var(--paper)" stroke="${col}" stroke-width="2"/>
+                         <circle class="el-body" cx="27" cy="36" r="8" fill="var(--paper)" stroke="${col}" stroke-width="2"/>
+                         <line x1="6"  y1="44" x2="6"  y2="64" stroke="${col}" stroke-width="2"/>
+                         <line x1="34" y1="44" x2="34" y2="64" stroke="${col}" stroke-width="2"/>
+                         <text x="44" y="34">${esc(p.name||'T3')}</text>`,
+    },
+    grid: {
+      w: 32, h: 48,
+      ports: [ { id:'A', x:16, y:48, side:'S' } ],
+      draw: (p, col) => `<path class="el-body" d="M16 0 L8 18 H14 L11 36 L24 16 H18 L22 0 Z" fill="${col}" stroke="${col}"/>
+                         <line x1="16" y1="36" x2="16" y2="48" stroke="${col}" stroke-width="2"/>
+                         <text x="36" y="20">${esc(p.name||'GRID')}</text>`,
+    },
+    gen: {
+      w: 32, h: 48,
+      ports: [ { id:'A', x:16, y:0, side:'N' } ],
+      draw: (p, col) => `<line x1="16" y1="0" x2="16" y2="8" stroke="${col}" stroke-width="2"/>
+                         <circle class="el-body" cx="16" cy="28" r="16" fill="var(--paper)" stroke="${col}" stroke-width="2"/>
+                         <text x="16" y="33" text-anchor="middle" font-weight="900" fill="var(--red)" font-size="14">G</text>
+                         <text x="36" y="32">${esc(p.name||'G')}</text>`,
+    },
+    mot: {
+      w: 32, h: 48,
+      ports: [ { id:'A', x:16, y:0, side:'N' } ],
+      draw: (p, col) => `<line x1="16" y1="0" x2="16" y2="8" stroke="${col}" stroke-width="2"/>
+                         <circle class="el-body" cx="16" cy="28" r="16" fill="var(--paper)" stroke="${col}" stroke-width="2"/>
+                         <text x="16" y="33" text-anchor="middle" font-weight="900" fill="var(--ink)" font-size="14">M</text>
+                         <text x="36" y="32">${esc(p.name||'M')}</text>`,
+    },
+    load: {
+      w: 24, h: 32,
+      ports: [ { id:'A', x:12, y:0, side:'N' } ],
+      draw: (p, col) => `<line x1="12" y1="0" x2="12" y2="12" stroke="${col}" stroke-width="2"/>
+                         <path class="el-body" d="M0 12 L24 12 L12 32 Z" fill="${col}" stroke="${col}"/>
+                         <text x="30" y="22">${esc(p.name||'L')}</text>`,
+    },
+    cap: {
+      w: 24, h: 36,
+      ports: [ { id:'A', x:12, y:0, side:'N' } ],
+      draw: (p, col) => `<line x1="12" y1="0" x2="12" y2="14" stroke="${col}" stroke-width="2"/>
+                         <line class="el-body" x1="2"  y1="14" x2="22" y2="14" stroke="${col}" stroke-width="2.4"/>
+                         <line class="el-body" x1="2"  y1="22" x2="22" y2="22" stroke="${col}" stroke-width="2.4"/>
+                         <line x1="12" y1="22" x2="12" y2="36" stroke="${col}" stroke-width="2"/>
+                         <text x="30" y="22">${esc(p.name||'C')}</text>`,
+    },
+  };
+
+  // Electrical component layer — wraps a SYM with electrical metadata
+  // (label, category, default parameters that show up in the right panel).
+  const COMP = {
+    bus:   { sym:'bus',   label:'Busbar',           cat:'bus',         defaults:{ U:0.4, freq:50 } },
+    cable: { sym:'cable', label:'Cable',            cat:'cable',       defaults:{ length:100, section:95, material:'Cu' } },
+    cb_lv: { sym:'cb_lv', label:'MCCB',             cat:'switchgear',  defaults:{ In:160,  Icu:36,  Ir:1.0 } },
+    cb_mv: { sym:'cb_mv', label:'CB MV',            cat:'switchgear',  defaults:{ In:1250, Icu:31.5 } },
+    ds:    { sym:'ds',    label:'Disconnector',     cat:'switchgear',  defaults:{ In:630 } },
+    fuse:  { sym:'fuse',  label:'Fuse',             cat:'switchgear',  defaults:{ In:160 } },
+    tx2:   { sym:'tx2',   label:'Transformer 2W',   cat:'tx',          defaults:{ S:1000, HV:20,  LV:0.4, uk:6 } },
+    tx3:   { sym:'tx3',   label:'Transformer 3W',   cat:'tx',          defaults:{ S:1000, HV:110, MV:35, LV:10, uk_HM:10, uk_ML:6, uk_HL:17 } },
+    grid:  { sym:'grid',  label:'Utility (PCC)',    cat:'source',      defaults:{ U:110, Sk:5000, X_R:10 } },
+    gen:   { sym:'gen',   label:'Generator',        cat:'source',      defaults:{ S:500,  U:0.4, xdpu:0.18 } },
+    mot:   { sym:'mot',   label:'Motor',            cat:'load',        defaults:{ P:55, U:0.4, cosphi:0.85, eta:0.94 } },
+    load:  { sym:'load',  label:'Load',             cat:'load',        defaults:{ P:100, cosphi:0.9 } },
+    cap:   { sym:'cap',   label:'Capacitor',        cat:'load',        defaults:{ Q:50, U:0.4 } },
+  };
+
+  // After 90°-CW rotation `rot` times, return port world-relative coords
+  // (origin still top-left, but bbox is reoriented). The bbox of rotated
+  // symbol is (w,h) for rot=0,2 and (h,w) for rot=1,3.
+  function rotatedPorts(symKey, rot) {
+    const s = SYM[symKey]; if (!s) return [];
+    rot = ((rot|0) % 4 + 4) % 4;
+    return s.ports.map(p => {
+      let x = p.x, y = p.y, side = p.side;
+      for (let i = 0; i < rot; i++) {
+        // 90° CW about bbox center
+        const cur = (i % 2 === 0) ? { w:s.w, h:s.h } : { w:s.h, h:s.w };
+        const nx = cur.h - y;
+        const ny = x;
+        x = nx; y = ny;
+        side = { N:'E', E:'S', S:'W', W:'N' }[side];
+      }
+      return { id:p.id, x, y, side };
+    });
+  }
+  function symBox(symKey, rot) {
+    const s = SYM[symKey]; if (!s) return { w:0, h:0 };
+    return (rot % 2 === 0) ? { w:s.w, h:s.h } : { w:s.h, h:s.w };
+  }
+  function nodePortWorld(node, portId) {
+    const ports = rotatedPorts(node.type, node.rot || 0);
+    const p = ports.find(pp => pp.id === portId) || ports[0];
+    return { x: node.x + p.x, y: node.y + p.y, side: p.side };
+  }
+  function nearestPort(node, worldPt) {
+    const ports = rotatedPorts(node.type, node.rot || 0);
+    let best = null, bd = Infinity;
+    for (const p of ports) {
+      const dx = (node.x + p.x) - worldPt.x;
+      const dy = (node.y + p.y) - worldPt.y;
+      const d = dx*dx + dy*dy;
+      if (d < bd) { bd = d; best = p; }
+    }
+    return best ? { port: best, d: Math.sqrt(bd) } : null;
+  }
 
   // ── Side tabs (Projects / Tools) ──────────────────────────────────
   document.querySelectorAll('.ed-side-tab').forEach(t => t.addEventListener('click', () => {
@@ -356,10 +677,18 @@
     document.querySelectorAll('.ed-tool').forEach(x => x.classList.remove('is-on'));
     t.classList.add('is-on');
     state.tool = t.dataset.tool;
-    state.cableFrom = null;
+    state.wireFrom = null;
+    state.movingId = null;
+    state.placePreview = null;
+    state.ghostPos = null;
     const wrap = document.getElementById('canvas-wrap');
     wrap.className = 'ed-canvas tool-' + state.tool + (state.currentNet ? '' : ' disabled');
-    document.getElementById('canvas-status').textContent = 'Tool: ' + state.tool.toUpperCase();
+    const hint = {
+      select: 'SELECT — click a node to pick up, click again to drop. R rotates. Del removes.',
+      wire:   'WIRE — click a port to start, then click another port to connect.',
+    }[state.tool] || `Tool: ${state.tool.toUpperCase()} — click on canvas to place. Esc to cancel.`;
+    document.getElementById('canvas-status').textContent = hint;
+    render();
   }));
 
   // ── Projects tree ─────────────────────────────────────────────────
@@ -482,82 +811,254 @@
     inp.addEventListener('blur', () => { if (inp.value.trim()) commit(); else li.remove(); });
   }
 
+  // Migrate v1 schema (elements/links) → v2 (nodes/conns).
+  function migrateSchema(s) {
+    s = s || {};
+    if (s.nodes && s.conns) {
+      // Already v2 — just normalise
+      if (Array.isArray(s.nodes)) {
+        const obj = {}; for (const n of s.nodes) obj[n.id] = n; s.nodes = obj;
+      }
+      return s;
+    }
+    const out = { nodes: {}, conns: [] };
+    const typeMap = { bus:'bus', cable:'cable', tx:'tx2', load:'load', gen:'gen' };
+    for (const e of (s.elements || [])) {
+      const t = typeMap[e.type] || e.type;
+      if (!SYM[t]) continue;
+      out.nodes[e.id] = { id:e.id, type:t, x:e.x|0, y:e.y|0, rot:0, name:e.name||'', params:e.params||{} };
+    }
+    for (const l of (s.links || [])) {
+      const a = out.nodes[l.from], b = out.nodes[l.to];
+      if (!a || !b) continue;
+      out.conns.push({
+        id: l.id || (-Math.floor(Math.random()*1e6)),
+        from: a.id, fp: (SYM[a.type].ports[0]||{}).id || 'A',
+        to:   b.id, tp: (SYM[b.type].ports[0]||{}).id || 'A',
+        pts: [], locked: false,
+      });
+    }
+    return out;
+  }
+
   async function openNetwork(id) {
     try {
       const { network } = await IecApi.getNetwork(id);
       state.currentNet = network;
-      try { state.schema = JSON.parse(network.schema_json || '{}'); }
-      catch (e) { state.schema = { elements: [], links: [] }; }
-      if (!state.schema.elements) state.schema.elements = [];
-      if (!state.schema.links) state.schema.links = [];
-      state.nextId = (state.schema.elements.reduce((m, e) => Math.max(m, e.id || 0), 0) + 1) || 1;
+      try { state.schema = migrateSchema(JSON.parse(network.schema_json || '{}')); }
+      catch (e) { state.schema = { nodes: {}, conns: [] }; }
+      const ids = [
+        ...Object.keys(state.schema.nodes).map(Number),
+        ...state.schema.conns.map(c => Number(c.id)),
+      ];
+      state.nextId = (ids.length ? Math.max(...ids) : 0) + 1;
+      state.selectedId = null;
+      state.movingId = null;
+      state.wireFrom = null;
+      state.placePreview = null;
       document.getElementById('net-name').textContent = network.name.toUpperCase();
       document.getElementById('canvas-wrap').classList.remove('disabled');
       document.getElementById('btn-run').disabled = false;
-      document.getElementById('canvas-status').textContent = 'Network loaded — click anywhere to place elements';
+      document.getElementById('canvas-status').textContent = 'Network loaded — pick a symbol from the left and click to place.';
       render();
+      renderParams();
     } catch (e) { alert('Failed to open: ' + e.message); }
   }
 
   // ── Canvas: SVG-based ─────────────────────────────────────────────
   const svg = document.getElementById('canvas-svg');
+  const gridCv = document.getElementById('grid-cv');
   const NS = 'http://www.w3.org/2000/svg';
 
-  // World ↔ screen coords: state.view = { x, y, k } (pan + zoom)
-  state.view = state.view || { x: 0, y: 0, k: 1 };
-
   function svgPoint(evt) {
-    // Convert client pixels → world coords with snap to 20px world grid
+    // Convert client pixels → world coords (snapped to grid)
     const r = svg.getBoundingClientRect();
     const sx = evt.clientX - r.left, sy = evt.clientY - r.top;
     const wx = (sx - state.view.x) / state.view.k;
     const wy = (sy - state.view.y) / state.view.k;
-    return { x: Math.round(wx / 20) * 20, y: Math.round(wy / 20) * 20 };
+    return { x: snap(wx), y: snap(wy) };
+  }
+  function svgPointRaw(evt) {
+    const r = svg.getBoundingClientRect();
+    const sx = evt.clientX - r.left, sy = evt.clientY - r.top;
+    return { x: (sx - state.view.x) / state.view.k, y: (sy - state.view.y) / state.view.k };
+  }
+
+  // ── Orthogonal port-to-port routing ───────────────────────────────
+  // Given two ports (world-coords + side), return [{x,y},…] polyline.
+  // Idea (after SLD's routeOrtho): start with a stub 2G perpendicular
+  // to each port side, then either one bend (mixed-axis) or one
+  // midpoint perpendicular bend (same-axis).
+  function routeOrtho(p1, p2) {
+    const STUB = 2 * G;
+    const dir = (s) => ({ N:{x:0,y:-1}, S:{x:0,y:1}, E:{x:1,y:0}, W:{x:-1,y:0} })[s];
+    const d1 = dir(p1.side) || {x:0,y:-1};
+    const d2 = dir(p2.side) || {x:0,y:1};
+    const s1 = { x: snap(p1.x + d1.x * STUB), y: snap(p1.y + d1.y * STUB) };
+    const s2 = { x: snap(p2.x + d2.x * STUB), y: snap(p2.y + d2.y * STUB) };
+    const vert1 = (p1.side === 'N' || p1.side === 'S');
+    const vert2 = (p2.side === 'N' || p2.side === 'S');
+    let mid = [];
+    if (vert1 === vert2) {
+      // Same axis at both ports — need a perpendicular zigzag
+      if (vert1) {
+        const my = snap((s1.y + s2.y) / 2);
+        mid = [ { x:s1.x, y:my }, { x:s2.x, y:my } ];
+      } else {
+        const mx = snap((s1.x + s2.x) / 2);
+        mid = [ { x:mx, y:s1.y }, { x:mx, y:s2.y } ];
+      }
+    } else {
+      // Mixed axes — single L-bend at the corner. Corner sits on the
+      // axis perpendicular to whichever port is vertical.
+      if (vert1) mid = [ { x:s2.x, y:s1.y } ];
+      else       mid = [ { x:s1.x, y:s2.y } ];
+    }
+    const pts = [ {x:p1.x,y:p1.y}, s1, ...mid, s2, {x:p2.x,y:p2.y} ];
+    // Dedupe consecutive equal points
+    const out = [];
+    for (const p of pts) {
+      const prev = out[out.length-1];
+      if (!prev || prev.x !== p.x || prev.y !== p.y) out.push(p);
+    }
+    return out;
+  }
+  function pointsToPath(pts) {
+    if (!pts.length) return '';
+    return 'M' + pts.map(p => `${p.x} ${p.y}`).join(' L');
+  }
+
+  // ── Grid canvas — scale-aware dot grid ────────────────────────────
+  function drawGrid() {
+    if (!gridCv) return;
+    const dpr = window.devicePixelRatio || 1;
+    const W = svg.clientWidth, H = svg.clientHeight;
+    if (gridCv.width !== W*dpr || gridCv.height !== H*dpr) {
+      gridCv.width = W*dpr; gridCv.height = H*dpr;
+      gridCv.style.width = W+'px'; gridCv.style.height = H+'px';
+    }
+    const ctx = gridCv.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    const k = state.view.k;
+    const stepScreen = G * k;          // distance between dots in pixels
+    if (stepScreen < 5) return;        // too dense — skip drawing
+    const offX = ((state.view.x % stepScreen) + stepScreen) % stepScreen;
+    const offY = ((state.view.y % stepScreen) + stepScreen) % stepScreen;
+    ctx.fillStyle = stepScreen < 10 ? 'rgba(0,0,0,0.10)' : 'rgba(0,0,0,0.18)';
+    const r = stepScreen < 14 ? 0.7 : 1.0;
+    for (let x = offX; x < W; x += stepScreen) {
+      for (let y = offY; y < H; y += stepScreen) {
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI*2);
+        ctx.fill();
+      }
+    }
+  }
+
+  function nodeBodyTransform(node) {
+    // Translate to top-left, then rotate around bbox center.
+    const s = SYM[node.type];
+    if (!s) return `translate(${node.x},${node.y})`;
+    const rot = ((node.rot|0) % 4 + 4) % 4;
+    const cx = s.w / 2, cy = s.h / 2;
+    if (rot === 0) return `translate(${node.x},${node.y})`;
+    const box = symBox(node.type, rot);
+    // After rotation, bbox is (box.w, box.h). To keep top-left at (node.x,node.y),
+    // we translate by node + a correction.
+    const ox = (box.w - s.w) / 2;
+    const oy = (box.h - s.h) / 2;
+    return `translate(${node.x + ox},${node.y + oy}) rotate(${rot * 90}, ${cx},${cy})`;
+  }
+
+  function renderNodeInto(g, node, isSelected, isMoving) {
+    const s = SYM[node.type];
+    if (!s) {
+      g.innerHTML = `<circle class="el-body" r="6" cx="0" cy="0" fill="var(--red)"/>`;
+      g.setAttribute('transform', `translate(${node.x},${node.y})`);
+      return;
+    }
+    let cls = 'el-node';
+    if (isSelected) cls += ' selected';
+    if (isMoving)   cls += ' moving';
+    g.setAttribute('class', cls);
+    g.setAttribute('transform', nodeBodyTransform(node));
+    g.dataset.id = node.id;
+    g.dataset.type = node.type;
+    // Symbol body + ports
+    let inner = s.draw(node, 'var(--ink)');
+    for (const p of s.ports) {
+      inner += `<circle class="el-port" cx="${p.x}" cy="${p.y}" r="3.5" data-port="${p.id}" data-node="${node.id}"></circle>`;
+    }
+    g.innerHTML = inner;
   }
 
   function render() {
+    drawGrid();
     svg.innerHTML = '';
-    // Single transform group — all content scales/pans together
     const g0 = document.createElementNS(NS, 'g');
     g0.setAttribute('id', 'zoom-root');
     g0.setAttribute('transform', `translate(${state.view.x}, ${state.view.y}) scale(${state.view.k})`);
     svg.appendChild(g0);
 
-    // Links first (under nodes)
-    for (const link of state.schema.links) {
-      const a = state.schema.elements.find(e => e.id === link.from);
-      const b = state.schema.elements.find(e => e.id === link.to);
+    // Wires first (under nodes)
+    for (const c of state.schema.conns) {
+      const a = state.schema.nodes[c.from], b = state.schema.nodes[c.to];
       if (!a || !b) continue;
-      const line = document.createElementNS(NS, 'line');
-      line.setAttribute('x1', a.x); line.setAttribute('y1', a.y);
-      line.setAttribute('x2', b.x); line.setAttribute('y2', b.y);
-      line.setAttribute('class', 'el-line' + (state.selectedId === link.id ? ' selected' : ''));
-      line.dataset.id = link.id; line.dataset.type = 'link';
-      g0.appendChild(line);
+      const ap = nodePortWorld(a, c.fp), bp = nodePortWorld(b, c.tp);
+      const pts = (c.pts && c.pts.length >= 2 && c.locked) ? c.pts : routeOrtho(ap, bp);
+      c.pts = pts;
+      const path = document.createElementNS(NS, 'path');
+      path.setAttribute('d', pointsToPath(pts));
+      path.setAttribute('class', 'el-wire' + (state.selectedId === ('C'+c.id) ? ' selected' : ''));
+      path.dataset.id = 'C' + c.id;
+      path.dataset.type = 'wire';
+      g0.appendChild(path);
     }
-    // Elements
-    for (const el of state.schema.elements) {
+
+    // Nodes
+    for (const id in state.schema.nodes) {
+      const node = state.schema.nodes[id];
       const g = document.createElementNS(NS, 'g');
-      g.setAttribute('class', 'el-node' + (state.selectedId === el.id ? ' selected' : '') + (state.movingId === el.id ? ' moving' : ''));
-      g.setAttribute('transform', `translate(${el.x}, ${el.y})`);
-      g.dataset.id = el.id; g.dataset.type = el.type;
-      g.innerHTML = renderShape(el);
+      renderNodeInto(g, node, state.selectedId === node.id, state.movingId === node.id);
       g0.appendChild(g);
     }
-    // Ghost (semi-transparent copy of moving element, follows cursor)
+
+    // Wire-tool preview line
+    if (state.tool === 'wire' && state.wireFrom && state.ghostPos) {
+      const path = document.createElementNS(NS, 'path');
+      path.setAttribute('class', 'el-wire-preview');
+      const pts = routeOrtho(state.wireFrom.p, { x: state.ghostPos.x, y: state.ghostPos.y, side: 'N' });
+      path.setAttribute('d', pointsToPath(pts));
+      g0.appendChild(path);
+    }
+
+    // Place-preview ghost (after a palette pick, before first click)
+    if (state.placePreview && state.placePreview.p) {
+      const node = { id:-1, type: state.placePreview.type, x: state.placePreview.p.x, y: state.placePreview.p.y, rot:0, params:{}, name:'' };
+      const g = document.createElementNS(NS, 'g');
+      renderNodeInto(g, node, false, false);
+      g.setAttribute('opacity', '0.45');
+      g.setAttribute('class', 'el-ghost');
+      g.style.pointerEvents = 'none';
+      g0.appendChild(g);
+    }
+
+    // Move-mode ghost
     if (state.movingId != null && state.ghostPos) {
-      const el = state.schema.elements.find(e => e.id === state.movingId);
-      if (el) {
+      const orig = state.schema.nodes[state.movingId];
+      if (orig) {
+        const node = { ...orig, x: state.ghostPos.x, y: state.ghostPos.y };
         const g = document.createElementNS(NS, 'g');
-        g.setAttribute('class', 'el-ghost');
-        g.setAttribute('transform', `translate(${state.ghostPos.x}, ${state.ghostPos.y})`);
+        renderNodeInto(g, node, false, false);
         g.setAttribute('opacity', '0.55');
+        g.setAttribute('class', 'el-ghost');
         g.style.pointerEvents = 'none';
-        g.innerHTML = renderShape(el);
         g0.appendChild(g);
       }
     }
   }
+  window.addEventListener('resize', () => drawGrid());
 
   // Zoom controls
   function setZoom(k, cx, cy) {
@@ -573,12 +1074,15 @@
   document.getElementById('zoom-in').addEventListener('click', () => setZoom(state.view.k * 1.25));
   document.getElementById('zoom-out').addEventListener('click', () => setZoom(state.view.k / 1.25));
   document.getElementById('zoom-fit').addEventListener('click', () => {
-    if (!state.schema.elements.length) { state.view = {x:0,y:0,k:1}; render(); return; }
-    const xs = state.schema.elements.map(e => e.x), ys = state.schema.elements.map(e => e.y);
-    const minX = Math.min(...xs)-40, maxX = Math.max(...xs)+40;
-    const minY = Math.min(...ys)-40, maxY = Math.max(...ys)+40;
+    const nodes = Object.values(state.schema.nodes);
+    if (!nodes.length) { state.view = {x:0,y:0,k:1}; render(); return; }
+    const boxes = nodes.map(n => { const b = symBox(n.type, n.rot||0); return { x:n.x, y:n.y, w:b.w, h:b.h }; });
+    const minX = Math.min(...boxes.map(b=>b.x)) - 40;
+    const minY = Math.min(...boxes.map(b=>b.y)) - 40;
+    const maxX = Math.max(...boxes.map(b=>b.x+b.w)) + 40;
+    const maxY = Math.max(...boxes.map(b=>b.y+b.h)) + 40;
     const W = svg.clientWidth, H = svg.clientHeight;
-    const k = Math.min(W/(maxX-minX), H/(maxY-minY), 2);
+    const k = Math.max(0.25, Math.min(W/(maxX-minX), H/(maxY-minY), 2));
     state.view = { x: -minX*k + (W - (maxX-minX)*k)/2, y: -minY*k + (H - (maxY-minY)*k)/2, k };
     render();
   });
@@ -591,184 +1095,249 @@
     setZoom(k, e.clientX - r.left, e.clientY - r.top);
   }, { passive: false });
 
-  // Ghost follows cursor while an element is picked up (two-click move)
-  svg.addEventListener('mousemove', evt => {
-    if (state.movingId == null) return;
-    state.ghostPos = svgPoint(evt);
-    // Update only the ghost transform (cheap) — full render() would be wasteful
-    const gh = svg.querySelector('.el-ghost');
-    if (gh) {
-      gh.setAttribute('transform', `translate(${state.ghostPos.x}, ${state.ghostPos.y})`);
-    } else {
-      render();
-    }
-  });
-
-  // Esc cancels move mode, also clears cable-from
-  document.addEventListener('keydown', e => {
-    if (e.key !== 'Escape') return;
-    let dirty = false;
-    if (state.movingId != null) {
-      state.movingId = null;
-      state.ghostPos = null;
-      const s = document.getElementById('canvas-status');
-      if (s) s.textContent = 'Move cancelled.';
-      dirty = true;
-    }
-    if (state.cableFrom != null) {
-      state.cableFrom = null;
-      const s = document.getElementById('canvas-status');
-      if (s) s.textContent = 'Cable cancelled.';
-      dirty = true;
-    }
-    if (dirty) render();
-  });
-
-  function renderShape(el) {
-    const stroke = 'stroke="var(--ink)" stroke-width="2"';
-    if (el.type === 'bus') {
-      return `<rect x="-30" y="-4" width="60" height="8" fill="var(--ink)" />
-              <text x="0" y="-10" text-anchor="middle" fill="var(--ink)">${esc(el.name || 'B' + el.id)}</text>`;
-    }
-    if (el.type === 'cable') {
-      return `<circle r="8" fill="var(--paper)" ${stroke}/>
-              <text x="0" y="-14" text-anchor="middle" fill="var(--ink)">${esc(el.name || 'CAB' + el.id)}</text>`;
-    }
-    if (el.type === 'tx') {
-      return `<circle cx="-7" cy="0" r="10" fill="var(--paper)" ${stroke}/>
-              <circle cx="7" cy="0" r="10" fill="var(--paper)" ${stroke}/>
-              <text x="0" y="-18" text-anchor="middle" fill="var(--ink)">${esc(el.name || 'T' + el.id)}</text>`;
-    }
-    if (el.type === 'load') {
-      return `<path d="M0 -12 V8 M-8 8 L0 18 L8 8 Z" fill="var(--ink)" ${stroke}/>
-              <text x="14" y="-2" fill="var(--ink)">${esc(el.name || 'L' + el.id)}</text>`;
-    }
-    if (el.type === 'gen') {
-      return `<circle r="12" fill="var(--paper)" ${stroke}/>
-              <text x="0" y="4" text-anchor="middle" font-weight="900" fill="var(--red)">G</text>
-              <text x="0" y="-18" text-anchor="middle" fill="var(--ink)">${esc(el.name || 'G' + el.id)}</text>`;
-    }
-    return `<circle r="6" fill="var(--red)"/>`;
+  // ── Pointer handlers ──────────────────────────────────────────────
+  // SLD-style state machine.  Click semantics per tool:
+  //   SELECT — empty: deselect & clear preview.  On node: pick up
+  //            (move mode); second click drops at cursor.
+  //   WIRE   — click port → ghost preview follows cursor (orthogonal
+  //            route).  Click another port: commit conn.  Esc cancels.
+  //   <symbol> — palette is "armed".  Mousemove shows ghost at cursor
+  //              position.  Click on empty space places a new node.
+  //              Tool stays armed for repeat insertions.
+  function setStatus(msg) {
+    const el = document.getElementById('canvas-status');
+    if (el) el.textContent = msg;
   }
+
+  svg.addEventListener('mousemove', evt => {
+    if (!state.currentNet) return;
+    const w = svgPoint(evt);
+    let need = false;
+    // Ghost for move mode
+    if (state.movingId != null) {
+      if (!state.ghostPos || state.ghostPos.x !== w.x || state.ghostPos.y !== w.y) {
+        state.ghostPos = w; need = true;
+      }
+    }
+    // Ghost for wire preview
+    if (state.tool === 'wire' && state.wireFrom) {
+      if (!state.ghostPos || state.ghostPos.x !== w.x || state.ghostPos.y !== w.y) {
+        state.ghostPos = w; need = true;
+      }
+    }
+    // Ghost for place mode (any symbol tool except select/wire)
+    if (state.tool !== 'select' && state.tool !== 'wire' && state.tool !== '' && COMP[state.tool]) {
+      if (!state.placePreview || state.placePreview.p.x !== w.x || state.placePreview.p.y !== w.y) {
+        state.placePreview = { type: state.tool, p: w }; need = true;
+      }
+    }
+    if (need) render();
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      let dirty = false;
+      if (state.movingId != null) { state.movingId = null; state.ghostPos = null; setStatus('Move cancelled.'); dirty = true; }
+      if (state.wireFrom != null) { state.wireFrom = null; state.ghostPos = null; setStatus('Wire cancelled.'); dirty = true; }
+      if (state.placePreview)     { state.placePreview = null; dirty = true; }
+      if (state.tool !== 'select') {
+        state.tool = 'select';
+        document.querySelectorAll('.ed-tool').forEach(x => x.classList.remove('is-on'));
+        const sel = document.querySelector('.ed-tool[data-tool="select"]');
+        if (sel) sel.classList.add('is-on');
+        const wrap = document.getElementById('canvas-wrap');
+        if (wrap) wrap.className = 'ed-canvas tool-select' + (state.currentNet ? '' : ' disabled');
+        dirty = true;
+      }
+      if (dirty) render();
+    }
+    if ((e.key === 'r' || e.key === 'R') && state.selectedId != null) {
+      // Rotate selected node 90° CW
+      const node = state.schema.nodes[state.selectedId];
+      if (node) {
+        node.rot = ((node.rot|0) + 1) % 4;
+        autosave(); render();
+      }
+    }
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      if (state.selectedId == null) return;
+      const sid = state.selectedId;
+      if (typeof sid === 'string' && sid[0] === 'C') {
+        // wire delete
+        const cid = Number(sid.slice(1));
+        state.schema.conns = state.schema.conns.filter(c => c.id !== cid);
+      } else {
+        // node delete + any conns touching it
+        delete state.schema.nodes[sid];
+        state.schema.conns = state.schema.conns.filter(c => c.from !== sid && c.to !== sid);
+      }
+      state.selectedId = null;
+      autosave(); render(); renderParams();
+    }
+  });
 
   svg.addEventListener('click', evt => {
     if (!state.currentNet) return;
-    const target = evt.target.closest('[data-id]');
-    if (state.tool === 'select') {
-      // Two-click move: 1st click on an element picks it up (ghost follows
-      // cursor), 2nd click anywhere drops it at the cursor position.
-      if (state.movingId != null) {
-        // Drop at cursor
-        const p = svgPoint(evt);
-        const el = state.schema.elements.find(e => e.id === state.movingId);
-        if (el) { el.x = p.x; el.y = p.y; }
-        state.movingId = null;
-        state.ghostPos = null;
-        document.getElementById('canvas-status').textContent = 'Moved.';
-        autosave();
+    // Detect what was clicked
+    const portEl = evt.target.classList && evt.target.classList.contains('el-port') ? evt.target : null;
+    const nodeG  = evt.target.closest('.el-node');
+    const wireEl = evt.target.classList && evt.target.classList.contains('el-wire') ? evt.target : null;
+    const tool   = state.tool;
+
+    if (tool === 'wire') {
+      if (!portEl) {
+        // Click on empty in wire mode — cancel
+        if (state.wireFrom) { state.wireFrom = null; state.ghostPos = null; setStatus('Wire cancelled.'); render(); }
+        return;
+      }
+      const nid = Number(portEl.dataset.node);
+      const pid = portEl.dataset.port;
+      const node = state.schema.nodes[nid];
+      if (!node) return;
+      const pw = nodePortWorld(node, pid);
+      if (!state.wireFrom) {
+        state.wireFrom = { nodeId: nid, portId: pid, p: pw };
+        state.ghostPos = pw;
+        setStatus(`Wire: from ${node.type}:${pid} — pick destination port`);
         render();
-        renderParams();
-        return;
+      } else {
+        // Don't connect to same port
+        if (state.wireFrom.nodeId === nid && state.wireFrom.portId === pid) return;
+        const cid = state.nextId++;
+        state.schema.conns.push({
+          id: cid, from: state.wireFrom.nodeId, fp: state.wireFrom.portId,
+          to: nid, tp: pid, pts: [], locked: false,
+        });
+        state.wireFrom = null; state.ghostPos = null;
+        setStatus('Wire added.');
+        autosave(); render();
       }
-      if (target && target.dataset.type !== 'link') {
-        // Pick up — start move mode
-        state.selectedId = Number(target.dataset.id);
-        state.movingId = state.selectedId;
-        state.ghostPos = svgPoint(evt);
-        document.getElementById('canvas-status').textContent = 'Pick a new position — click anywhere to drop (Esc to cancel)';
-        render();
-        renderParams();
-        return;
-      }
-      // Click on empty / link — just select
-      state.selectedId = target ? Number(target.dataset.id) : null;
-      state.cableFrom = null;
-      render();
-      renderParams();
-    } else if (state.tool === 'cable') {
-      // Click 2 nodes to draw cable between them
-      if (!target || target.dataset.type === 'link') return;
-      const id = Number(target.dataset.id);
-      if (!state.cableFrom) {
-        state.cableFrom = id;
-        document.getElementById('canvas-status').textContent = 'Cable: pick second node';
-        return;
-      }
-      if (id === state.cableFrom) return;
-      const linkId = -state.nextId++;   // negative ids for links to keep separate
-      state.schema.links.push({ id: linkId, from: state.cableFrom, to: id });
-      state.cableFrom = null;
-      document.getElementById('canvas-status').textContent = 'Cable added';
-      autosave();
-      render();
-    } else {
-      // Place new element at click point
-      if (target) return;   // don't place on existing element
-      const p = svgPoint(evt);
-      const el = { id: state.nextId++, type: state.tool, x: p.x, y: p.y, name: '', params: {} };
-      state.schema.elements.push(el);
-      state.selectedId = el.id;
-      autosave();
-      render();
-      renderParams();
+      return;
     }
+
+    if (tool === 'select') {
+      // Click on a wire — select it
+      if (wireEl) {
+        state.selectedId = wireEl.dataset.id;     // 'C'+id string
+        state.movingId = null; state.ghostPos = null;
+        render(); renderParams(); return;
+      }
+      if (state.movingId != null) {
+        // Drop
+        const p = svgPoint(evt);
+        const node = state.schema.nodes[state.movingId];
+        if (node) { node.x = p.x; node.y = p.y; }
+        state.movingId = null; state.ghostPos = null;
+        setStatus('Moved.');
+        autosave(); render(); renderParams();
+        return;
+      }
+      if (nodeG && nodeG.dataset.id) {
+        // Pick up
+        const nid = Number(nodeG.dataset.id);
+        state.selectedId = nid;
+        state.movingId   = nid;
+        state.ghostPos   = svgPoint(evt);
+        setStatus('Pick a new position — click anywhere to drop (R to rotate, Esc to cancel)');
+        render(); renderParams();
+        return;
+      }
+      // Click on empty
+      state.selectedId = null;
+      render(); renderParams();
+      return;
+    }
+
+    // Else — symbol placement tool
+    if (!COMP[tool]) return;
+    if (nodeG || portEl) return;        // don't place on top of existing node
+    const p = svgPoint(evt);
+    const nid = state.nextId++;
+    state.schema.nodes[nid] = {
+      id: nid, type: tool, x: p.x, y: p.y, rot: 0,
+      name: '', params: { ...COMP[tool].defaults },
+    };
+    state.selectedId = nid;
+    autosave(); render(); renderParams();
+    setStatus(`Placed ${COMP[tool].label}. Tool armed — click again to place another (Esc to exit).`);
   });
 
   // ── Parameters panel ──────────────────────────────────────────────
-  const PARAMS = {
-    bus:   [['name','Bus name','text','B1'], ['voltage','Voltage U, kV','number','0.4'], ['frequency','Frequency, Hz','number','50']],
-    cable: [['name','Cable tag','text','CAB-1'], ['length','Length, m','number','100'], ['section','Cross-section, mm²','number','95'], ['material','Material','select','Cu|Cu Al']],
-    tx:    [['name','Transformer name','text','T1'], ['rating','Rated S, kVA','number','1000'], ['hv','HV, kV','number','20'], ['lv','LV, kV','number','0.4'], ['z_pu','%Z','number','6']],
-    load:  [['name','Load name','text','L1'], ['p_kw','P, kW','number','100'], ['cos_phi','cosφ','number','0.9']],
-    gen:   [['name','Generator name','text','G1'], ['rating','S, kVA','number','500'], ['voltage','U, kV','number','0.4'], ['x_d_pu','X″d, p.u.','number','0.18']],
-  };
+  // Now schema-driven: take field list from COMP[type].defaults instead
+  // of a separate PARAMS table. Field labels are auto-prettified from
+  // the key.
+  function prettyLabel(key) {
+    const map = {
+      U:'Voltage U, kV', freq:'Frequency, Hz',
+      length:'Length, m', section:'Cross-section, mm²', material:'Material (Cu/Al)',
+      In:'Rated current In, A', Icu:'Icu, kA', Ir:'Pickup setting, p.u.',
+      S:'Rated power S, kVA', HV:'HV, kV', MV:'MV, kV', LV:'LV, kV', uk:'%uk',
+      uk_HM:'%uk H-M', uk_ML:'%uk M-L', uk_HL:'%uk H-L',
+      Sk:'Sk", MVA', X_R:'X/R',
+      xdpu:'X″d, p.u.',
+      P:'P, kW', cosphi:'cosφ', eta:'Efficiency η',
+      Q:'Q, kVAr',
+    };
+    return map[key] || key;
+  }
 
   function renderParams() {
     const body = document.getElementById('params-body');
     const calcList = body.querySelector('.ed-calc-list').outerHTML;
-    if (!state.selectedId) {
-      body.innerHTML = '<div class="nosel">No element selected.<br><br>Pick a tool from the left and click on the canvas to place a node, or click an existing element to edit.</div>' + calcList;
+    if (state.selectedId == null) {
+      body.innerHTML = '<div class="nosel">No element selected.<br><br>Pick a symbol from the left palette and click on the canvas to place it. Use WIRE to connect port to port. Press R to rotate selected, Esc to cancel, Del to remove.</div>' + calcList;
       bindCalcList();
       return;
     }
-    const el = state.schema.elements.find(e => e.id === state.selectedId) || state.schema.links.find(l => l.id === state.selectedId);
-    if (!el) {
-      body.innerHTML = '<div class="nosel">Element not found.</div>' + calcList;
+    // Wire selected?
+    if (typeof state.selectedId === 'string' && state.selectedId[0] === 'C') {
+      const cid = Number(state.selectedId.slice(1));
+      const c = state.schema.conns.find(cc => cc.id === cid);
+      if (!c) { body.innerHTML = '<div class="nosel">Wire not found.</div>' + calcList; bindCalcList(); return; }
+      document.getElementById('params-title').textContent = '/ WIRE #' + c.id;
+      const a = state.schema.nodes[c.from], b = state.schema.nodes[c.to];
+      body.innerHTML =
+        `<div class="ed-field"><label>From</label><input type="text" disabled value="${esc((a?.name||a?.type||'?') + ':' + c.fp)}"></div>`
+        + `<div class="ed-field"><label>To</label><input type="text" disabled value="${esc((b?.name||b?.type||'?') + ':' + c.tp)}"></div>`
+        + `<button class="ed-report-btn" id="btn-del" style="background:#A30E18">DELETE WIRE</button>`
+        + calcList;
+      document.getElementById('btn-del').addEventListener('click', () => {
+        state.schema.conns = state.schema.conns.filter(cc => cc.id !== c.id);
+        state.selectedId = null;
+        autosave(); render(); renderParams();
+      });
       bindCalcList();
       return;
     }
-    const isLink = el.from !== undefined;
-    const type = isLink ? 'cable' : el.type;
-    document.getElementById('params-title').textContent = '/ ' + type.toUpperCase() + ' #' + el.id;
-    const defs = PARAMS[type] || [];
-    const fields = defs.map(([key, label, kind, def]) => {
-      const val = el.params && el.params[key] != null ? el.params[key] : (key === 'name' ? (el.name || '') : def);
-      if (kind === 'select') {
-        const opts = def.split('|').map(o => `<option value="${esc(o)}"${o===val?' selected':''}>${esc(o)}</option>`).join('');
-        return `<div class="ed-field"><label>${esc(label)}</label><select data-key="${esc(key)}">${opts}</select></div>`;
-      }
-      return `<div class="ed-field"><label>${esc(label)}</label><input type="${kind}" data-key="${esc(key)}" value="${esc(val)}"></div>`;
-    }).join('');
+    // Node selected
+    const node = state.schema.nodes[state.selectedId];
+    if (!node) { body.innerHTML = '<div class="nosel">Element not found.</div>' + calcList; bindCalcList(); return; }
+    const comp = COMP[node.type] || { label: node.type, defaults: {} };
+    document.getElementById('params-title').textContent = '/ ' + comp.label.toUpperCase() + ' #' + node.id;
+    let fields = `<div class="ed-field"><label>Tag / name</label><input type="text" data-key="__name" value="${esc(node.name||'')}"></div>`;
+    for (const key of Object.keys(comp.defaults)) {
+      const val = node.params && node.params[key] != null ? node.params[key] : comp.defaults[key];
+      fields += `<div class="ed-field"><label>${esc(prettyLabel(key))}</label><input type="text" data-key="${esc(key)}" value="${esc(val)}"></div>`;
+    }
+    fields += `<div class="ed-field"><label>Rotation</label><select data-key="__rot">`
+      + [0,1,2,3].map(r => `<option value="${r}"${(node.rot||0)===r?' selected':''}>${r*90}°</option>`).join('')
+      + `</select></div>`;
     body.innerHTML = fields
       + '<button class="ed-report-btn" id="btn-del" style="background:#A30E18">DELETE ELEMENT</button>'
       + calcList;
     body.querySelectorAll('[data-key]').forEach(inp => inp.addEventListener('input', () => {
       const k = inp.dataset.key;
-      if (k === 'name') { el.name = inp.value; }
-      else { el.params = el.params || {}; el.params[k] = inp.value; }
+      if (k === '__name') { node.name = inp.value; }
+      else if (k === '__rot') { node.rot = Number(inp.value)||0; }
+      else { node.params = node.params || {}; node.params[k] = inp.value; }
       autosave();
       render();
     }));
     document.getElementById('btn-del').addEventListener('click', () => {
-      if (isLink) state.schema.links = state.schema.links.filter(l => l.id !== el.id);
-      else {
-        state.schema.elements = state.schema.elements.filter(e => e.id !== el.id);
-        state.schema.links = state.schema.links.filter(l => l.from !== el.id && l.to !== el.id);
-      }
+      delete state.schema.nodes[node.id];
+      state.schema.conns = state.schema.conns.filter(c => c.from !== node.id && c.to !== node.id);
       state.selectedId = null;
-      autosave();
-      render();
-      renderParams();
+      autosave(); render(); renderParams();
     });
     bindCalcList();
   }
@@ -874,89 +1443,66 @@
   }
 
   // ── Calc engine (voltage drop, Phase 1) ───────────────────────────
-  // Build cable→cable→load graph from current schema and compute ΔU% per cable.
-  // Formula (IEC 60364-5-52 simplified):
+  // IEC 60364-5-52 simplified:
   //   ΔU = √3 · I · L · (R·cosφ + X·sinφ) / U
-  //   I = P_load / (√3 · U · cosφ)
+  //   I  = P_load / (√3 · U · cosφ)
+  // Schema is now v2 (nodes/conns). The graph is built over `conns`,
+  // treating each conn as a potential cable run; cables that are
+  // explicit "cable" nodes inserted between two ports carry their own
+  // R/X/L, all other wires are modelled as zero-impedance bus links.
   function calcVoltageDrop() {
     const result = { perElement: {}, summary: {}, warnings: [] };
-    // Need a source bus to compute from. Pick first bus.
-    const buses = state.schema.elements.filter(e => e.type === 'bus');
-    if (!buses.length) { result.warnings.push('Add at least one busbar with voltage to compute.'); return result; }
+    const nodes = state.schema.nodes;
+    const buses = Object.values(nodes).filter(n => n.type === 'bus');
+    if (!buses.length) { result.warnings.push('Add at least one busbar to compute.'); return result; }
     const source = buses[0];
-    const U_kV = parseFloat((source.params && source.params.voltage) || 0.4) || 0.4;
+    const U_kV = parseFloat((source.params && source.params.U) || 0.4) || 0.4;
 
-    // Walk graph from source: for each cable, compute its load = sum of loads downstream
-    // Simple BFS from source via links
-    const links = state.schema.links;
-    const elById = {};
-    for (const e of state.schema.elements) elById[e.id] = e;
-
+    // adjacency: { nodeId: [{ to, via:connId }] }
     const adj = {};
-    for (const l of links) {
-      adj[l.from] = adj[l.from] || [];
-      adj[l.to] = adj[l.to] || [];
-      adj[l.from].push({ via: l.id, to: l.to });
-      adj[l.to].push({ via: l.id, to: l.from });
+    for (const c of state.schema.conns) {
+      (adj[c.from] = adj[c.from] || []).push({ to: c.to, via: c.id });
+      (adj[c.to]   = adj[c.to]   || []).push({ to: c.from, via: c.id });
     }
 
+    // BFS parents from source
+    const parent = { [source.id]: null };
     const visited = new Set([source.id]);
-    const queue = [source.id];
-    while (queue.length) {
-      const cur = queue.shift();
-      for (const next of (adj[cur] || [])) {
-        if (visited.has(next.to)) continue;
-        visited.add(next.to);
-        queue.push(next.to);
+    const q = [source.id];
+    while (q.length) {
+      const cur = q.shift();
+      for (const nx of (adj[cur] || [])) {
+        if (visited.has(nx.to)) continue;
+        visited.add(nx.to);
+        parent[nx.to] = { from: cur, via: nx.via };
+        q.push(nx.to);
       }
     }
 
-    // For each load, find path from source via BFS parents
-    const parent = {};
-    parent[source.id] = null;
-    visited.clear(); visited.add(source.id);
-    const q2 = [source.id];
-    while (q2.length) {
-      const cur = q2.shift();
-      for (const next of (adj[cur] || [])) {
-        if (visited.has(next.to)) continue;
-        visited.add(next.to);
-        parent[next.to] = { from: cur, via: next.via };
-        q2.push(next.to);
-      }
+    function cableRX(node) {
+      if (!node || node.type !== 'cable') return null;
+      const p = node.params || {};
+      const S = parseFloat(p.section || 95);
+      const rho = (p.material === 'Al') ? 36 : 22.5;
+      return { R: rho/S, X: 0.08, L_m: parseFloat(p.length || 100) };
     }
 
-    // Cable params: R(Ω/km) ≈ 22.5/S (Cu) ; X(Ω/km) ≈ 0.08
-    function cableRX(linkId) {
-      // Find the link's stored cable params if any (links don't have type, treat as cable)
-      // For Phase 1 default to Cu 95 mm² — admin/per-cable params are TODO
-      const linkObj = links.find(l => l.id === linkId);
-      const params = (linkObj && linkObj.params) || {};
-      const S = parseFloat(params.section || 95);
-      const material = params.material || 'Cu';
-      const rho = material === 'Al' ? 36 : 22.5; // mΩ·mm²/m at 70°C
-      const R = (rho / S);  // Ω/km
-      const X = 0.08;       // typical reactance for LV cables
-      const L_m = parseFloat(params.length || 100);
-      return { R, X, L_m };
-    }
-
-    for (const load of state.schema.elements.filter(e => e.type === 'load')) {
-      const P_kW = parseFloat((load.params && load.params.p_kw) || 100);
-      const cosphi = parseFloat((load.params && load.params.cos_phi) || 0.9);
+    for (const load of Object.values(nodes).filter(n => n.type === 'load' || n.type === 'mot')) {
+      const lp = load.params || {};
+      const P_kW = parseFloat(load.type === 'mot' ? (lp.P || 55) : (lp.P || 100));
+      const cosphi = parseFloat(lp.cosphi || 0.9);
       const sinphi = Math.sqrt(Math.max(0, 1 - cosphi*cosphi));
-      const I = (P_kW * 1000) / (Math.sqrt(3) * U_kV * 1000 * cosphi);   // A
+      const I = (P_kW * 1000) / (Math.sqrt(3) * U_kV * 1000 * cosphi);
 
-      // Walk parent chain to source, summing ΔU per cable hop
       let totalDU_V = 0;
-      let chain = [];
       let cur = load.id;
       while (parent[cur]) {
-        const linkId = parent[cur].via;
-        const { R, X, L_m } = cableRX(linkId);
-        const dU = Math.sqrt(3) * I * (L_m / 1000) * (R * cosphi + X * sinphi);
-        totalDU_V += dU;
-        chain.push({ linkId, dU });
+        const fromNode = nodes[parent[cur].from];
+        const curNode  = nodes[cur];
+        const seg = cableRX(curNode) || cableRX(fromNode);
+        if (seg) {
+          totalDU_V += Math.sqrt(3) * I * (seg.L_m / 1000) * (seg.R * cosphi + seg.X * sinphi);
+        }
         cur = parent[cur].from;
       }
       const dU_pct = (totalDU_V / (U_kV * 1000)) * 100;
@@ -966,12 +1512,8 @@
         dU_pct: dU_pct.toFixed(2),
         verdict: dU_pct > 5 ? 'FAIL (>5%)' : dU_pct > 3 ? 'BORDERLINE' : 'PASS',
       };
-      for (const seg of chain) {
-        result.perElement[seg.linkId] = result.perElement[seg.linkId] || { dU_V: 0 };
-        result.perElement[seg.linkId].dU_V = (parseFloat(result.perElement[seg.linkId].dU_V) + seg.dU).toFixed(2);
-      }
     }
-    result.summary = { source: source.name || ('B' + source.id), U_kV };
+    result.summary = { source: source.name || ('BUS#' + source.id), U_kV };
     return result;
   }
 
@@ -995,7 +1537,7 @@
       }
       if (res.perElement) {
         const rows = Object.entries(res.perElement).map(([id, r]) => {
-          const el = state.schema.elements.find(e => e.id === Number(id));
+          const el = state.schema.nodes[Number(id)];
           if (!el) return '';
           const verdict = r.verdict || '';
           const vcolor = verdict.startsWith('FAIL') ? 'color:#A30E18'
