@@ -234,6 +234,13 @@ async function dispatch(req, env, ctx, url, path) {
   if ((m = path.match(/^\/networks\/(\d+)\/calculate$/)) && method === "POST") return calculateNetwork(req, env, Number(m[1]));
   if ((m = path.match(/^\/networks\/(\d+)\/reports$/)) && method === "GET")    return listNetworkReports(req, env, Number(m[1]));
 
+  // ── Regimes (calc cases hung off a network's base model) ───────────────
+  if ((m = path.match(/^\/networks\/(\d+)\/regimes$/))  && method === "GET")  return listRegimes(req, env, Number(m[1]));
+  if ((m = path.match(/^\/networks\/(\d+)\/regimes$/))  && method === "POST") return createRegime(req, env, Number(m[1]));
+  if ((m = path.match(/^\/regimes\/(\d+)$/)) && method === "GET")    return getRegime(req, env, Number(m[1]));
+  if ((m = path.match(/^\/regimes\/(\d+)$/)) && method === "PUT")    return updateRegime(req, env, Number(m[1]));
+  if ((m = path.match(/^\/regimes\/(\d+)$/)) && method === "DELETE") return deleteRegime(req, env, Number(m[1]));
+
   // ── Site settings ──────────────────────────────────────────────────────
   if (path === "/settings/public" && method === "GET") return publicSettings(env);
 
@@ -1461,6 +1468,71 @@ async function deleteNetwork(req, env, id) {
   if (!user) return err("auth required", 401);
   if (!(await ownsScheme(env, user.id, id))) return err("forbidden", 403);
   await env.DB.prepare("DELETE FROM network_schemes WHERE id = ?").bind(id).run();
+  return json({ ok: true });
+}
+
+// ── Regimes ────────────────────────────────────────────────────────────
+async function ownsRegime(env, userId, regimeId) {
+  const row = await env.DB.prepare(`
+    SELECT 1 FROM regimes r
+    JOIN network_schemes ns ON ns.id = r.network_id
+    JOIN projects p ON p.id = ns.project_id
+    WHERE r.id = ? AND p.user_id = ?
+  `).bind(regimeId, userId).first();
+  return !!row;
+}
+async function listRegimes(req, env, networkId) {
+  const user = await getSessionUser(req, env);
+  if (!user) return err("auth required", 401);
+  if (!(await ownsScheme(env, user.id, networkId))) return err("forbidden", 403);
+  const { results } = await env.DB.prepare(
+    "SELECT id, name, delta_json, last_calc_json, created_at, updated_at FROM regimes WHERE network_id = ? ORDER BY created_at"
+  ).bind(networkId).all();
+  return json({ regimes: results || [] });
+}
+async function createRegime(req, env, networkId) {
+  const user = await getSessionUser(req, env);
+  if (!user) return err("auth required", 401);
+  if (!(await ownsScheme(env, user.id, networkId))) return err("forbidden", 403);
+  const { name } = await req.json();
+  if (!name || !String(name).trim()) return err("name required");
+  const t = now();
+  const r = await env.DB.prepare(
+    "INSERT INTO regimes (network_id, name, delta_json, created_at, updated_at) VALUES (?, ?, '{}', ?, ?)"
+  ).bind(networkId, String(name).trim().slice(0, 80), t, t).run();
+  return json({ id: r.meta.last_row_id, name: String(name).trim() });
+}
+async function getRegime(req, env, regimeId) {
+  const user = await getSessionUser(req, env);
+  if (!user) return err("auth required", 401);
+  if (!(await ownsRegime(env, user.id, regimeId))) return err("forbidden", 403);
+  const r = await env.DB.prepare(
+    "SELECT id, network_id, name, delta_json, last_calc_json, created_at, updated_at FROM regimes WHERE id = ?"
+  ).bind(regimeId).first();
+  if (!r) return err("not found", 404);
+  return json({ regime: r });
+}
+async function updateRegime(req, env, regimeId) {
+  const user = await getSessionUser(req, env);
+  if (!user) return err("auth required", 401);
+  if (!(await ownsRegime(env, user.id, regimeId))) return err("forbidden", 403);
+  const body = await req.json();
+  const sets = [];
+  const vals = [];
+  if (body.name != null) { sets.push("name = ?"); vals.push(String(body.name).trim().slice(0, 80)); }
+  if (body.delta_json != null) { sets.push("delta_json = ?"); vals.push(String(body.delta_json)); }
+  if (body.last_calc_json != null) { sets.push("last_calc_json = ?"); vals.push(String(body.last_calc_json)); }
+  if (!sets.length) return err("nothing to update");
+  sets.push("updated_at = ?"); vals.push(now());
+  vals.push(regimeId);
+  await env.DB.prepare(`UPDATE regimes SET ${sets.join(", ")} WHERE id = ?`).bind(...vals).run();
+  return json({ ok: true });
+}
+async function deleteRegime(req, env, regimeId) {
+  const user = await getSessionUser(req, env);
+  if (!user) return err("auth required", 401);
+  if (!(await ownsRegime(env, user.id, regimeId))) return err("forbidden", 403);
+  await env.DB.prepare("DELETE FROM regimes WHERE id = ?").bind(regimeId).run();
   return json({ ok: true });
 }
 

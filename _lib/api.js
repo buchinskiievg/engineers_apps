@@ -87,6 +87,12 @@
     deleteNetwork:  (id)                     => request("/networks/" + id, { method:"DELETE" }),
     calculateNetwork:(id, calcs)             => request("/networks/" + id + "/calculate", { method:"POST", body:{ calcs } }),
     networkReports: (id)                     => request("/networks/" + id + "/reports"),
+    // Regimes (calc cases hung off a network's base model)
+    listRegimes:    (netId)                  => request("/networks/" + netId + "/regimes"),
+    createRegime:   (netId, name)            => request("/networks/" + netId + "/regimes", { method:"POST", body:{ name } }),
+    getRegime:      (id)                     => request("/regimes/" + id),
+    updateRegime:   (id, body)               => request("/regimes/" + id, { method:"PUT", body }),
+    deleteRegime:   (id)                     => request("/regimes/" + id, { method:"DELETE" }),
     publicSettings: ()                       => request("/settings/public"),
     voteReply:       (id, dir)                => request("/forum/replies/" + id + "/vote", { method: "POST", body: { direction: dir } }),
   };
