@@ -1717,10 +1717,16 @@ async function listEqItems(req, env, libId) {
   const q = (url.searchParams.get('q') || '').trim();
   const wantCount = url.searchParams.get('count') === '1';
   const wantFacets = url.searchParams.get('facets') === '1';
-  let limit = Number(url.searchParams.get('limit') || 500);
+  // When no limit is given, return EVERY row of the library — the
+  // engineer wants the full catalog (filter chips and tree counts only
+  // make sense when they see the whole picture).  An explicit ?limit=
+  // is still honoured.  The hard cap is 100 000 which is well above
+  // anything we'd realistically pack into one library.
+  const limitParam = url.searchParams.get('limit');
+  let limit = limitParam == null ? 100000 : Number(limitParam);
   let offset = Number(url.searchParams.get('offset') || 0);
-  if (!Number.isFinite(limit) || limit <= 0) limit = 500;
-  if (limit > 5000) limit = 5000;
+  if (!Number.isFinite(limit) || limit <= 0) limit = 100000;
+  if (limit > 100000) limit = 100000;
   if (!Number.isFinite(offset) || offset < 0) offset = 0;
 
   const wheres = ['library_id = ?'];

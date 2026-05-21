@@ -1344,7 +1344,7 @@
   </div>
 </div>
 
-<script src="/_lib/api.js?v=ui61"></script>
+<script src="/_lib/api.js?v=ui62"></script>
 <script src="/_lib/chrome.js"></script>
 <script src="/_lib/auth-ui.js"></script>
 <script>
@@ -5097,49 +5097,20 @@
     _eqState.verifiedOnly = !!(lib && lib.visibility === 'global');
     const vo = document.getElementById('eq-verified-only');
     if (vo) vo.checked = _eqState.verifiedOnly;
-    // Server-side pagination: the Global library now has ~23k rows; we
-    // never want to fetch them all at once.  First call fetches facets
-    // (category counts for the left-hand tree) plus an initial page.
-    // When the engineer drills into a category via the tree we refetch
-    // with ?category= to pull every row of that one category.
+    // Fetch the whole library — the engineer wants to see every row
+    // and have the tree counts / chip filters work against the full
+    // dataset.  For the 23k-row Global library this is a one-off
+    // ~10 MB fetch on modal open; the DOM is virtualised on render
+    // so even that many rows stay smooth.
     _eqStatus('Loading…');
     try {
-      const resp = await window.IecApi.listEqItems(libId, { limit: 500, facets: 1 });
+      const resp = await window.IecApi.listEqItems(libId);
       _eqState.items = resp.items || [];
-      _eqState.facets = resp.facets || { categories: [], manufacturers: [] };
-      _eqState.serverLibId = libId;       // remember which lib we paged
-      _eqState.serverCategory = null;     // no category filter yet
+      _eqState.totalRows = _eqState.items.length;
       _refreshEqAll();
-      // If the library has more rows than we fetched, get the true total
-      // so the row count shown to the user is honest.
-      try {
-        const c = await window.IecApi.listEqItems(libId, { count: 1 });
-        _eqState.totalRows = c.count || _eqState.items.length;
-      } catch (_) { _eqState.totalRows = _eqState.items.length; }
       _eqStatus('');
-      _renderEqTable();
     } catch (e) {
       _eqStatus('Failed to load items: ' + (e.message || e));
-    }
-  }
-  // Called by the tree's category-click handler — re-fetches all rows
-  // of one category from the server (up to 5000) so the chip filters
-  // and table see the full set instead of just the initial page.
-  async function _reloadEqForCategory(category) {
-    if (_eqState.serverLibId !== _eqState.libId) return;
-    if (_eqState.serverCategory === category) return;      // already loaded
-    _eqStatus('Loading ' + (category || 'all') + '…');
-    try {
-      const opts = { limit: 5000 };
-      if (category) opts.category = category;
-      const resp = await window.IecApi.listEqItems(_eqState.libId, opts);
-      _eqState.items = resp.items || [];
-      _eqState.serverCategory = category;
-      _resetEqChips();
-      _refreshEqAll();
-      _eqStatus('');
-    } catch (e) {
-      _eqStatus('Failed to load: ' + (e.message || e));
     }
   }
   // Re-render every pane after any state change.
@@ -5215,22 +5186,14 @@
         if (ds.treeAll) {
           _resetEqChips();
           _eqState.treeFilter = null;
-          // "All" view goes back to the initial page (server doesn't
-          // dump every row — we never wanted that to begin with).
-          _reloadEqForCategory(null);
         } else if (ds.treeKindName) {
           _resetEqChips();
           _eqState.treeFilter = { kind: 'kind', value: ds.treeKindName };
-          // Kind-level view: still client-side, but the chips computed
-          // from the current page are good enough for browsing.
-          _refreshEqAll();
         } else if (ds.treeCat) {
           _resetEqChips();
           _eqState.treeFilter = { kind: 'cat', value: ds.treeCat };
-          // Category drill-down: server-side fetch so chips see ALL rows
-          // of this category (not just the 500-row initial page).
-          _reloadEqForCategory(ds.treeCat);
         } else { return; }
+        _refreshEqAll();
       });
     });
   }
@@ -5500,46 +5463,111 @@
     }));
     const items = _filteredEqItems();
     const cnt = document.getElementById('eq-count');
-    if (cnt) {
-      // Pagination-aware count: when the library is bigger than the
-      // initial page we tell the engineer how much of the catalog they
-      // are seeing — otherwise they might assume "47 items" means the
-      // library only has 47, when really it has 20 743 PV modules.
-      const loaded = _eqState.items.length;
-      const total  = _eqState.totalRows || loaded;
-      let line = items.length + ' / ' + loaded + ' shown';
-      if (total > loaded) {
-        line += '  ·  ' + total + ' total in library' +
-                (_eqState.serverCategory ? '' : ' (drill into a category in the tree to load more)');
-      }
-      cnt.textContent = line;
+    if (cnt) cnt.textContent = items.length + ' / ' + _eqState.items.length + ' items';
+    // Virtualised rendering — at 23k+ rows we can't put the whole list
+    // into the DOM, so we render only the slice currently in view (plus
+    // a 10-row buffer above and below) and use spacer <tr>s above and
+    // below to preserve the correct scrollbar size.  Row height is
+    // measured once from the first rendered row and assumed uniform.
+    _eqState._filtered = items;
+    _eqState._cols     = cols;
+    _renderEqVirtualSlice();
+    _updateApplyBtn();
+  }
+  // Build the HTML for one row.  Pulled out of _renderEqVirtualSlice
+  // so it can also be used to (re)measure row height on the first
+  // paint.
+  function _eqRowHTML(it, cols) {
+    const spec = _itemSpec(it);
+    const sel = (it.id === _eqState.selectedItemId) ? ' is-on' : '';
+    return `<tr class="${sel}" data-item-id="${it.id}">` + cols.map(c => {
+      let v;
+      if (c.isParam) v = spec.raw[c.key];
+      else if (c.key === 'U_kV' || c.key === 'I_A' || c.key === 'S_kVA') v = spec[c.key];
+      else v = it[c.key];
+      let display = c.fmt ? c.fmt(v) :
+        (v == null ? '—' : (typeof v === 'number' ? (Number.isInteger(v) ? v : v.toFixed(2).replace(/\.?0+$/, '')) : esc(String(v))));
+      const tdCls = (c.align === 'right' ? 'right' : '') + (c.cls ? ' ' + c.cls : '');
+      return `<td class="${tdCls.trim()}">${display}</td>`;
+    }).join('') + '</tr>';
+  }
+  // Render the slice of `_eqState._filtered` currently in view.  Two
+  // spacer rows above and below preserve the scroll height, so the
+  // browser thinks it's painting all 23k rows even though only the
+  // visible window is in the DOM.
+  function _renderEqVirtualSlice() {
+    const wrap  = document.querySelector('.eq-table-wrap');
+    const table = document.getElementById('eq-table');
+    if (!wrap || !table) return;
+    const tbody = table.querySelector('tbody');
+    const items = _eqState._filtered || [];
+    const cols  = _eqState._cols || _eqColumns();
+    const rowH  = _eqState._rowH || 26;       // measured below
+    // Small lists — skip virtualisation, render everything.
+    if (items.length <= 200) {
+      tbody.innerHTML = items.map(it => _eqRowHTML(it, cols)).join('');
+      _bindEqRowHandlers(tbody);
+      return;
     }
-    tbody.innerHTML = items.map(it => {
-      const spec = _itemSpec(it);
-      const sel = (it.id === _eqState.selectedItemId) ? ' is-on' : '';
-      return `<tr class="${sel}" data-item-id="${it.id}">` + cols.map(c => {
-        let v;
-        if (c.isParam) v = spec.raw[c.key];
-        else if (c.key === 'U_kV' || c.key === 'I_A' || c.key === 'S_kVA') v = spec[c.key];
-        else v = it[c.key];
-        let display = c.fmt ? c.fmt(v) :
-          (v == null ? '—' : (typeof v === 'number' ? (Number.isInteger(v) ? v : v.toFixed(2).replace(/\.?0+$/, '')) : esc(String(v))));
-        const tdCls = (c.align === 'right' ? 'right' : '') + (c.cls ? ' ' + c.cls : '');
-        return `<td class="${tdCls.trim()}">${display}</td>`;
-      }).join('') + '</tr>';
-    }).join('');
+    const viewH = wrap.clientHeight || 600;
+    const scroll = wrap.scrollTop;
+    const buffer = 10;
+    let startIdx = Math.max(0, Math.floor(scroll / rowH) - buffer);
+    let endIdx   = Math.min(items.length, Math.ceil((scroll + viewH) / rowH) + buffer);
+    const sliceCount = endIdx - startIdx;
+    const padTop    = startIdx * rowH;
+    const padBot    = (items.length - endIdx) * rowH;
+    // <tr> with a single colspan-spanning <td> won't take height
+    // reliably; setting height via inline style on a tall TR works.
+    let html = '';
+    if (padTop > 0) html += `<tr class="eq-vpad" style="height:${padTop}px"><td colspan="${cols.length}"></td></tr>`;
+    for (let i = startIdx; i < endIdx; i++) html += _eqRowHTML(items[i], cols);
+    if (padBot > 0) html += `<tr class="eq-vpad" style="height:${padBot}px"><td colspan="${cols.length}"></td></tr>`;
+    tbody.innerHTML = html;
+    _bindEqRowHandlers(tbody);
+    // Measure actual row height from the first real row so the math
+    // stays correct even if CSS changes (e.g. 2-line "Name" cells).
+    if (sliceCount > 0 && !_eqState._rowHMeasured) {
+      const firstReal = tbody.querySelector('tr[data-item-id]');
+      if (firstReal) {
+        const h = firstReal.getBoundingClientRect().height;
+        if (h && h > 10 && Math.abs(h - rowH) > 2) {
+          _eqState._rowH = h;
+          _eqState._rowHMeasured = true;
+          _renderEqVirtualSlice();           // one repaint with correct h
+        } else {
+          _eqState._rowHMeasured = true;
+        }
+      }
+    }
+  }
+  function _bindEqRowHandlers(tbody) {
     tbody.querySelectorAll('tr[data-item-id]').forEach(tr => {
       tr.addEventListener('click', () => {
         _eqState.selectedItemId = Number(tr.dataset.itemId);
-        _renderEqTable();
+        _renderEqVirtualSlice();
       });
       tr.addEventListener('dblclick', () => {
         _eqState.selectedItemId = Number(tr.dataset.itemId);
         _applyEqSelected();
       });
     });
-    _updateApplyBtn();
   }
+  // Wire scroll events once — re-render the visible slice as the
+  // engineer scrolls through the catalog.
+  (function _bindEqScroll(){
+    const wrap = document.querySelector('.eq-table-wrap');
+    if (!wrap) return;
+    let pending = false;
+    wrap.addEventListener('scroll', () => {
+      if (pending) return;
+      pending = true;
+      requestAnimationFrame(() => {
+        pending = false;
+        if (_eqState._filtered) _renderEqVirtualSlice();
+      });
+    }, { passive: true });
+  })();
   function _updateApplyBtn() {
     const btn = document.getElementById('eq-item-apply');
     if (!btn) return;
