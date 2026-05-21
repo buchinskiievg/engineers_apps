@@ -1357,7 +1357,7 @@
   </div>
 </div>
 
-<script src="/_lib/api.js?v=ui64"></script>
+<script src="/_lib/api.js?v=ui65"></script>
 <script src="/_lib/chrome.js"></script>
 <script src="/_lib/auth-ui.js"></script>
 <script>
@@ -1840,15 +1840,21 @@
                               <circle class="el-body" cx="20" cy="38" r="10" fill="none" stroke="${col}" stroke-width="2"/>
                               <line x1="20" y1="48" x2="20" y2="60" stroke="${col}" stroke-width="2"/>`,
     },
-    bess: {             // Battery rack (DC)
+    bess: {             // Battery rack (DC) — port on NORTH side because
+                        // in a typical SLD the battery sits BELOW the PCS
+                        // (bess_inv) and its DC cable runs UP to the PCS.
+                        // Body therefore extends DOWN from the click, the
+                        // same direction as gen/mot — so when the engineer
+                        // clicks just below the bus, the rack hangs below
+                        // it instead of jumping above the sheet boundary.
       w: 30, h: 50,
-      ports: [ { id:'DC', x:15, y:50, side:'S' } ],
-      draw: (p, col, rot) => `<rect class="el-body" x="2" y="2" width="26" height="38" fill="var(--paper)" stroke="${col}" stroke-width="2"/>
-                              <line x1="8"  y1="14" x2="22" y2="14" stroke="${col}" stroke-width="1.4"/>
-                              <line x1="8"  y1="22" x2="22" y2="22" stroke="${col}" stroke-width="1.4"/>
-                              <line x1="8"  y1="30" x2="22" y2="30" stroke="${col}" stroke-width="1.4"/>
-                              <text x="15" y="9" text-anchor="middle" font-size="7" font-weight="800" fill="${col}">BESS</text>
-                              <line x1="15" y1="40" x2="15" y2="50" stroke="${col}" stroke-width="2"/>`,
+      ports: [ { id:'DC', x:15, y:0, side:'N' } ],
+      draw: (p, col, rot) => `<line x1="15" y1="0"  x2="15" y2="10" stroke="${col}" stroke-width="2"/>
+                              <rect class="el-body" x="2" y="10" width="26" height="38" fill="var(--paper)" stroke="${col}" stroke-width="2"/>
+                              <text x="15" y="20" text-anchor="middle" font-size="7" font-weight="800" fill="${col}">BESS</text>
+                              <line x1="8"  y1="26" x2="22" y2="26" stroke="${col}" stroke-width="1.4"/>
+                              <line x1="8"  y1="34" x2="22" y2="34" stroke="${col}" stroke-width="1.4"/>
+                              <line x1="8"  y1="42" x2="22" y2="42" stroke="${col}" stroke-width="1.4"/>`,
     },
     bess_inv: {         // BESS bidirectional inverter (PCS)
       w: 40, h: 50,
@@ -3382,6 +3388,23 @@
       // Already v2 — just normalise
       if (Array.isArray(s.nodes)) {
         const obj = {}; for (const n of s.nodes) obj[n.id] = n; s.nodes = obj;
+      }
+      // ── BESS port flip migration ──
+      // In ui64 the BESS battery-rack symbol was re-anchored: its DC
+      // port moved from the SOUTH side (y=50) to the NORTH side (y=0)
+      // so the body grows DOWN from the click and stays inside the
+      // sheet boundary.  Existing nodes saved under the old layout
+      // would otherwise jump 50 px upward (the world-coordinate of
+      // the port stayed the same, but the body that used to be above
+      // it is now drawn below it — net shift of the visible block by
+      // -50 px).  Shift node.y down by 50 px so the port lands where
+      // it used to live, leaving every connected wire visually intact.
+      if (!s._bessFlipMigrated) {
+        for (const id in s.nodes) {
+          const n = s.nodes[id];
+          if (n && n.type === 'bess') n.y = (n.y | 0) + 50;
+        }
+        s._bessFlipMigrated = true;
       }
       return s;
     }
