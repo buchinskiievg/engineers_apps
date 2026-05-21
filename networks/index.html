@@ -717,6 +717,16 @@
   #scc-popup td { padding: 4px; border-bottom: 1px solid var(--line-soft); }
   #scc-popup tfoot td { border-bottom: 0; border-top: 2px solid var(--ink); padding-top: 6px; }
   #scc-popup .close { position: absolute; top: 4px; right: 6px; background: transparent; border: 0; cursor: pointer; font: 900 16px var(--display); color: var(--ink-3); padding: 4px 6px; }
+  /* Phasor-diagram card sits right after the meta line, before the tables. */
+  #scc-popup .scc-phasor-card {
+    display: flex; justify-content: center; align-items: center;
+    margin: 4px 0 8px;
+    padding: 6px;
+    background: #fdfcf8;
+    border: 1px solid var(--line);
+    box-shadow: 2px 2px 0 rgba(0,0,0,0.06);
+  }
+  #scc-popup .scc-phasor-card svg { display: block; max-width: 100%; height: auto; }
   #scc-popup .close:hover { color: var(--red); }
 
   /* Per-segment diamond handles — draggable.  Visible when the wire
@@ -1347,7 +1357,7 @@
   </div>
 </div>
 
-<script src="/_lib/api.js?v=ui63"></script>
+<script src="/_lib/api.js?v=ui64"></script>
 <script src="/_lib/chrome.js"></script>
 <script src="/_lib/auth-ui.js"></script>
 <script>
@@ -7350,10 +7360,25 @@
     const node = state.schema.nodes[nid];
     const R = r.R_ohm != null ? r.R_ohm : '?';
     const X = r.X_ohm != null ? r.X_ohm : '?';
+    // Build the phasor-diagram payload — every value the SVG needs.
+    const phasorPayload = {
+      elName: (node?.name || node?.type || ('#'+nid)),
+      kind:   (r.kind || r.fault_type || '3ph'),
+      U_V:    Number(r.U) || null,
+      Ik3: Number(r.Ik3_kA), Ik2: Number(r.Ik2_kA),
+      Ik1: Number(r.Ik1_kA), Ik2E: Number(r.Ik2E_kA),
+      ip:  Number(r.ip_kA),  kappa: Number(r.kappa),
+    };
+    const phasorSvg = (typeof window.__iec_sccPhasorSvg === 'function')
+      ? window.__iec_sccPhasorSvg(phasorPayload)
+      : '';
     pop.innerHTML =
       `<button class="close" type="button" onclick="document.getElementById('scc-popup').style.display='none'">×</button>`
       + `<div class="hd">SCC at ${esc(node?.name || node?.type || '#'+nid)}</div>`
       + `<div class="meta">Selected fault kind: <b>${esc(r.kind || r.fault_type || '3ph')}</b> · I = <b>${esc(Ik)} kA</b> · i_p = ${esc(r.ip_kA || '—')} kA · κ = ${esc(r.kappa || '—')}</div>`
+      // Phasor diagram of the fault currents (textbook IEC 60909 layout
+      // for the selected kind, with sequence components in the corner).
+      + (phasorSvg ? `<div class="scc-phasor-card">${phasorSvg}</div>` : '')
       + `<div class="tablehd">All fault types (IEC 60909-0)</div>`
       + `<table><thead><tr><th>Type</th><th>Formula</th><th style="text-align:right">I″k, kA</th></tr></thead><tbody>`
       +   `<tr><td>3-phase</td><td>c·U / (√3·|Z1+Rf|)</td><td style="text-align:right"><b>${esc(r.Ik3_kA || '—')}</b></td></tr>`
@@ -9321,6 +9346,9 @@
   // Expose for the run button (inside bindCalcList scope above)
   window.__iec_runCalcs = runCalcs;
   window.__iec_showResults = showResults;
+  // Expose the phasor-diagram builder so the bus-click popup
+  // (showSccPopup in the outer scope) can also render the same SVG.
+  window.__iec_sccPhasorSvg = _makeSccPhasorSvg;
 })();
 </script>
 </body>
