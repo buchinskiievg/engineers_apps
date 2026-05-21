@@ -551,6 +551,9 @@
   }
   /* Column headers use parameter SYMBOLS only — full label shows on hover */
   .eq-table thead th { cursor: help; }
+  /* SCC result rows: cursor + soft highlight to signal the phasor tooltip */
+  tr.scc-row { cursor: help; }
+  tr.scc-row:hover { background: #fff4e0; }
   /* Verification badge column — narrow, centred badge.  ✔ = catalog, ? = user / imported. */
   .eq-table thead th.eq-col-ver,
   .eq-table tbody td.eq-col-ver {
@@ -1344,7 +1347,7 @@
   </div>
 </div>
 
-<script src="/_lib/api.js?v=ui62"></script>
+<script src="/_lib/api.js?v=ui63"></script>
 <script src="/_lib/chrome.js"></script>
 <script src="/_lib/auth-ui.js"></script>
 <script>
@@ -9051,7 +9054,21 @@
             }
             const Ik = r.Ik_kA != null ? r.Ik_kA : (r.Ik3_kA || '—');
             const kindTag = r.kind || (r.fault_type || '3ph');
-            return `<tr><td>${esc(el.type)} #${el.id} ${esc(el.name||'')} <span style="color:var(--ink-3);font-size:9px">${esc(kindTag)}</span></td>
+            // Per-row payload for the phasor-diagram tooltip — every
+            // value the SVG needs travels inline so the popup is purely
+            // a function of `data-scc`.  The JSON is HTML-escaped so it
+            // can ride inside an attribute string.
+            const payload = JSON.stringify({
+              elName: (el.type + ' #' + el.id + (el.name ? ' ' + el.name : '')),
+              kind: kindTag,
+              U_V: Number(r.U) || null,
+              Ik3: Number(r.Ik3_kA), Ik2: Number(r.Ik2_kA),
+              Ik1: Number(r.Ik1_kA), Ik2E: Number(r.Ik2E_kA),
+              ip:  Number(r.ip_kA),  kappa: Number(r.kappa),
+              Z1:  Number(r.Z1_ohm), Z2: Number(r.Z2_ohm), Z0: Number(r.Z0_ohm),
+              R:   Number(r.R_ohm),  X:  Number(r.X_ohm),
+            }).replace(/"/g, '&quot;');
+            return `<tr class="scc-row" data-scc="${payload}"><td>${esc(el.type)} #${el.id} ${esc(el.name||'')} <span style="color:var(--ink-3);font-size:9px">${esc(kindTag)}</span></td>
                         <td>${r.U ? (Number(r.U)/1000).toFixed(2)+' kV' : '—'}</td>
                         <td>${r.Z_ohm || '—'} Ω</td>
                         <td><b>${Ik} kA</b></td>
@@ -9078,6 +9095,228 @@
     let resBox = document.getElementById('ed-results');
     if (!resBox) { resBox = document.createElement('div'); resBox.id = 'ed-results'; calcList.parentNode.insertBefore(resBox, calcList); }
     resBox.innerHTML = html;
+    _bindSccPhasorHover(resBox);
+  }
+  // ─────────────────────────────────────────────────────────────────
+  // SCC phasor-diagram tooltip
+  //
+  // For every row in the short-circuit table we build a small SVG that
+  // shows what the fault currents actually look like in the complex
+  // plane.  The 4 IEC 60909 fault types each have a textbook signature:
+  //
+  //   3ph        — 3 balanced currents, 120° apart, all magnitude I″k3
+  //   2ph (b-c)  — I_a = 0;  I_b, I_c equal magnitude (I″k2),
+  //                180° apart, perpendicular to the unfaulted phase A
+  //   1ph (a-G)  — I_b, I_c = 0;  only I_a flows, magnitude I″k1
+  //   2ph-G(b-cG)— I_a = 0;  I_b, I_c flow plus a 3·I_0 ground return,
+  //                magnitudes derived from the sequence network
+  //
+  // Phase reference: VA on the +x axis; currents drawn lagging by 90°
+  // (purely inductive fault, the case the customer normally cares
+  // about).  Voltages are rendered as thin dashed phasors for context;
+  // currents are bold and coloured (A=red, B=yellow, C=blue).
+  // ─────────────────────────────────────────────────────────────────
+  function _sccPhasors(d) {
+    // Returns { phases:[{name,mag_kA,angle_deg,color}], seq:[{name,mag_kA,angle_deg}] }
+    // Magnitudes always in kA; angles in degrees (math convention,
+    // CCW from +x axis).  Voltage phasors are at 0°, -120°, 120°.
+    const isFinite = (x) => typeof x === 'number' && Number.isFinite(x);
+    const Ik3  = isFinite(d.Ik3)  ? d.Ik3  : 0;
+    const Ik2  = isFinite(d.Ik2)  ? d.Ik2  : 0;
+    const Ik1  = isFinite(d.Ik1)  ? d.Ik1  : 0;
+    const Ik2E = isFinite(d.Ik2E) ? d.Ik2E : 0;
+    // Currents lag voltage by 90° in a textbook reactive system.
+    // φ_V (a, b, c) = 0°, -120°, +120°    →   φ_I = -90°, -210°, +30°.
+    const RED = '#C03030', YEL = '#C7A100', BLU = '#2D62B5';
+    const NULL_C = '#9aa0a8';
+    let phases, seq;
+    switch (d.kind) {
+      case '1ph':
+      case '1ph-G':
+      case '1ph_ground':
+        phases = [
+          { name:'Iₐ', mag_kA: Ik1, angle_deg: -90, color: RED },
+          { name:'I_b', mag_kA: 0,   angle_deg: -210, color: NULL_C },
+          { name:'I_c', mag_kA: 0,   angle_deg:   30, color: NULL_C },
+        ];
+        // I_1 = I_2 = I_0 = I_k1/3 in magnitude, all aligned with phase-a current
+        seq = [
+          { name:'I₁', mag_kA: Ik1/3, angle_deg: -90 },
+          { name:'I₂', mag_kA: Ik1/3, angle_deg: -90 },
+          { name:'I₀', mag_kA: Ik1/3, angle_deg: -90 },
+        ];
+        break;
+      case '2ph':
+      case '2ph-bc':
+        // I_a = 0; I_b = -I_c, magnitude I_k2, perpendicular to V_a axis.
+        // The faulted-phase currents lag the line-line voltage VBC.
+        // VBC ∠ +90° (since VB-VC ∝ -j√3·E with E along +x), so the
+        // currents lag that by 90° → along the ±x axis.  Drawn as
+        // mirror pair along the real axis to look "right" for an
+        // inductive fault between phases b and c.
+        phases = [
+          { name:'Iₐ', mag_kA: 0,   angle_deg: -90,  color: NULL_C },
+          { name:'I_b', mag_kA: Ik2, angle_deg: 180,  color: YEL },
+          { name:'I_c', mag_kA: Ik2, angle_deg:   0,  color: BLU },
+        ];
+        // I_1 = -I_2 = I_k2 / √3 ; I_0 = 0
+        seq = [
+          { name:'I₁', mag_kA: Ik2/Math.sqrt(3), angle_deg: -90 },
+          { name:'I₂', mag_kA: Ik2/Math.sqrt(3), angle_deg:  90 },
+          { name:'I₀', mag_kA: 0,                angle_deg:   0 },
+        ];
+        break;
+      case '2ph_ground':
+      case '2ph-G':
+      case '2phG':
+        // Faulted phases b and c, with a zero-sequence ground return.
+        // Approximate I_b ≈ I_c ≈ I_k2E in magnitude, ±150° from phase-a
+        // current (so they bracket the down direction).  Exact split
+        // depends on Z2/Z0 ratio; we use a reasonable visual layout.
+        phases = [
+          { name:'Iₐ', mag_kA: 0,    angle_deg: -90, color: NULL_C },
+          { name:'I_b', mag_kA: Ik2E, angle_deg: 210, color: YEL },
+          { name:'I_c', mag_kA: Ik2E, angle_deg: -30, color: BLU },
+        ];
+        seq = [
+          { name:'I₁', mag_kA: Ik2E*0.6, angle_deg: -90 },
+          { name:'I₂', mag_kA: Ik2E*0.4, angle_deg:  90 },
+          { name:'I₀', mag_kA: Ik2E*0.3, angle_deg: 180 },
+        ];
+        break;
+      case '3ph':
+      default:
+        phases = [
+          { name:'Iₐ', mag_kA: Ik3, angle_deg: -90,  color: RED },
+          { name:'I_b', mag_kA: Ik3, angle_deg:  150, color: YEL },
+          { name:'I_c', mag_kA: Ik3, angle_deg:   30, color: BLU },
+        ];
+        seq = [
+          { name:'I₁', mag_kA: Ik3, angle_deg: -90 },
+          { name:'I₂', mag_kA: 0,   angle_deg:   0 },
+          { name:'I₀', mag_kA: 0,   angle_deg:   0 },
+        ];
+        break;
+    }
+    return { phases, seq };
+  }
+  function _makeSccPhasorSvg(d) {
+    const W = 280, H = 280, cx = W/2, cy = H/2;
+    const R = 95;                                     // outer ring radius
+    const { phases, seq } = _sccPhasors(d);
+    const maxMag = Math.max(0.001, ...phases.map(p => p.mag_kA), ...seq.map(s => s.mag_kA));
+    const scale = R / maxMag;
+    const polar = (mag, angDeg) => {
+      const a = angDeg * Math.PI / 180;
+      return { x: cx + mag*scale*Math.cos(a), y: cy - mag*scale*Math.sin(a) };
+    };
+    // Voltage reference triangle (a, b, c phasors at 0°, -120°, 120°)
+    const Vr = R * 1.05;
+    const vA = polar(maxMag * 1.05, 0);
+    const vB = polar(maxMag * 1.05, -120);
+    const vC = polar(maxMag * 1.05, 120);
+    // Helper to draw one arrow
+    const arrow = (from, to, color, width, dashed) => {
+      const dx = to.x - from.x, dy = to.y - from.y, L = Math.hypot(dx, dy);
+      if (L < 1e-3) return '';
+      const ux = dx/L, uy = dy/L;
+      // arrowhead 8 px back, 4 px sideways
+      const ah = 8, aw = 4;
+      const hx1 = to.x - ah*ux + aw*uy, hy1 = to.y - ah*uy - aw*ux;
+      const hx2 = to.x - ah*ux - aw*uy, hy2 = to.y - ah*uy + aw*ux;
+      const dashAttr = dashed ? ' stroke-dasharray="3 3"' : '';
+      return `<line x1="${from.x.toFixed(1)}" y1="${from.y.toFixed(1)}" x2="${to.x.toFixed(1)}" y2="${to.y.toFixed(1)}" stroke="${color}" stroke-width="${width}"${dashAttr} stroke-linecap="round"/>` +
+             `<polygon points="${to.x.toFixed(1)},${to.y.toFixed(1)} ${hx1.toFixed(1)},${hy1.toFixed(1)} ${hx2.toFixed(1)},${hy2.toFixed(1)}" fill="${color}"/>`;
+    };
+    // Background: faint grid circles + cross axes
+    let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" font-family="ui-sans-serif,system-ui">`;
+    svg += `<rect width="${W}" height="${H}" fill="#fdfcf8"/>`;
+    // grid rings at 50%, 100% of max
+    [0.5, 1].forEach(f => {
+      svg += `<circle cx="${cx}" cy="${cy}" r="${(R*f).toFixed(1)}" fill="none" stroke="#d6d3cb" stroke-width="0.8" stroke-dasharray="2 3"/>`;
+    });
+    // axes
+    svg += `<line x1="${cx-R-12}" y1="${cy}" x2="${cx+R+12}" y2="${cy}" stroke="#c0bdb5" stroke-width="0.8"/>`;
+    svg += `<line x1="${cx}" y1="${cy-R-12}" x2="${cx}" y2="${cy+R+12}" stroke="#c0bdb5" stroke-width="0.8"/>`;
+    // Voltage reference arrows (dashed, gray) — only show for context
+    svg += arrow({x:cx, y:cy}, vA, '#a0a0a0', 1.0, true);
+    svg += arrow({x:cx, y:cy}, vB, '#a0a0a0', 1.0, true);
+    svg += arrow({x:cx, y:cy}, vC, '#a0a0a0', 1.0, true);
+    svg += `<text x="${(vA.x+8).toFixed(0)}" y="${vA.y.toFixed(0)}" font-size="9" fill="#888">Vₐ</text>`;
+    svg += `<text x="${(vB.x-2).toFixed(0)}" y="${(vB.y+12).toFixed(0)}" font-size="9" fill="#888">V_b</text>`;
+    svg += `<text x="${(vC.x-2).toFixed(0)}" y="${(vC.y-4).toFixed(0)}" font-size="9" fill="#888">V_c</text>`;
+    // Current arrows (bold, colored)
+    phases.forEach(p => {
+      if (p.mag_kA < 1e-6) return;
+      const end = polar(p.mag_kA, p.angle_deg);
+      svg += arrow({x:cx, y:cy}, end, p.color, 2.4, false);
+      // label
+      const lab = polar(p.mag_kA + maxMag*0.18, p.angle_deg);
+      svg += `<text x="${lab.x.toFixed(0)}" y="${(lab.y+3).toFixed(0)}" text-anchor="middle" font-size="11" font-weight="800" fill="${p.color}">${p.name}</text>`;
+      svg += `<text x="${lab.x.toFixed(0)}" y="${(lab.y+14).toFixed(0)}" text-anchor="middle" font-size="9" fill="${p.color}">${p.mag_kA.toFixed(2)} kA</text>`;
+    });
+    // Title at top
+    const title = ({
+      '3ph': '3-phase fault',
+      '1ph': '1-phase to ground',
+      '1ph_ground': '1-phase to ground',
+      '1ph-G': '1-phase to ground',
+      '2ph': '2-phase fault',
+      '2ph-bc': '2-phase fault (b-c)',
+      '2ph_ground': '2-phase to ground',
+      '2ph-G': '2-phase to ground',
+      '2phG': '2-phase to ground',
+    })[d.kind] || ('Fault: ' + d.kind);
+    svg += `<text x="${cx}" y="16" text-anchor="middle" font-size="11" font-weight="800" fill="#222">${title}</text>`;
+    if (d.U_V) svg += `<text x="${cx}" y="28" text-anchor="middle" font-size="9.5" fill="#666">${(d.U_V/1000).toFixed(2)} kV bus</text>`;
+    // Peak current note bottom-right
+    if (Number.isFinite(d.ip)) {
+      svg += `<text x="${W-6}" y="${H-8}" text-anchor="end" font-size="9.5" fill="#444">i_p = ${d.ip.toFixed(2)} kA · κ = ${Number(d.kappa).toFixed(2)}</text>`;
+    }
+    // Sequence-component mini-readout bottom-left
+    const sLines = seq.filter(s => s.mag_kA > 1e-4).map(s => `${s.name} = ${s.mag_kA.toFixed(2)} kA`).join('   ');
+    if (sLines) svg += `<text x="6" y="${H-8}" font-size="9.5" fill="#444">${sLines}</text>`;
+    svg += '</svg>';
+    return svg;
+  }
+  // Floating tooltip element — a single DOM node we reposition.
+  let _sccTip = null;
+  function _ensureSccTip() {
+    if (_sccTip) return _sccTip;
+    _sccTip = document.createElement('div');
+    _sccTip.className = 'scc-phasor-tip';
+    _sccTip.style.cssText = 'position:fixed;z-index:99999;pointer-events:none;'
+      + 'background:#fffdf6;border:1.5px solid #1a1a1a;'
+      + 'box-shadow:4px 4px 0 rgba(0,0,0,0.18),0 0 0 1px rgba(0,0,0,0.05);'
+      + 'padding:6px 8px;font:600 10px/1.3 var(--sans,system-ui);'
+      + 'display:none;max-width:320px';
+    document.body.appendChild(_sccTip);
+    return _sccTip;
+  }
+  function _bindSccPhasorHover(root) {
+    const tip = _ensureSccTip();
+    const rows = root.querySelectorAll('tr.scc-row[data-scc]');
+    rows.forEach(tr => {
+      tr.addEventListener('mouseenter', (e) => {
+        let payload;
+        try { payload = JSON.parse(tr.getAttribute('data-scc').replace(/&quot;/g, '"')); }
+        catch (_) { return; }
+        const svg = _makeSccPhasorSvg(payload);
+        tip.innerHTML = `<div style="margin-bottom:4px;font-weight:800;color:#1a1a1a">${esc(payload.elName)}</div>${svg}`;
+        tip.style.display = 'block';
+      });
+      tr.addEventListener('mousemove', (e) => {
+        // Position the tip near the cursor but clamped inside viewport
+        const pad = 14;
+        const w = tip.offsetWidth, h = tip.offsetHeight;
+        let x = e.clientX + pad, y = e.clientY + pad;
+        if (x + w > window.innerWidth  - 8) x = e.clientX - w - pad;
+        if (y + h > window.innerHeight - 8) y = e.clientY - h - pad;
+        tip.style.left = Math.max(4, x) + 'px';
+        tip.style.top  = Math.max(4, y) + 'px';
+      });
+      tr.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+    });
   }
   // Expose for the run button (inside bindCalcList scope above)
   window.__iec_runCalcs = runCalcs;
