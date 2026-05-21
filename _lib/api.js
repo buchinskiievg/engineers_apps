@@ -95,6 +95,37 @@
     deleteRegime:   (id)                     => request("/regimes/" + id, { method:"DELETE" }),
     publicSettings: ()                       => request("/settings/public"),
     voteReply:       (id, dir)                => request("/forum/replies/" + id + "/vote", { method: "POST", body: { direction: dir } }),
+
+    // ── Equipment libraries ────────────────────────────────────────
+    // listEqLibraries() → { libraries: [{id, name, visibility, item_count, mine, writable, ...}] }
+    listEqLibraries:  ()                       => request("/equipment/libraries"),
+    createEqLibrary:  (name, visibility, description) =>
+      request("/equipment/libraries", { method: "POST", body: { name, visibility, description } }),
+    getEqLibrary:     (id)                     => request("/equipment/libraries/" + id),
+    updateEqLibrary:  (id, body)               => request("/equipment/libraries/" + id, { method: "PUT", body }),
+    deleteEqLibrary:  (id)                     => request("/equipment/libraries/" + id, { method: "DELETE" }),
+    listEqItems:      (libId)                  => request("/equipment/libraries/" + libId + "/items"),
+    createEqItem:     (libId, body)            => request("/equipment/libraries/" + libId + "/items", { method: "POST", body }),
+    getEqItem:        (id)                     => request("/equipment/items/" + id),
+    updateEqItem:     (id, body)               => request("/equipment/items/" + id, { method: "PUT", body }),
+    deleteEqItem:     (id)                     => request("/equipment/items/" + id, { method: "DELETE" }),
+    // KEY: copyEqItem clones an item into the caller's library (default
+    // if toLibId is omitted).  Schemas reference the LOCAL copy so they
+    // stay functional even if the source library later disappears.
+    copyEqItem:       (id, toLibId)            => request("/equipment/items/" + id + "/copy",
+                                                          { method: "POST", body: { toLibId } }),
+    // Admin-only: promote/demote verification status.
+    // body { verified: 'catalog'|'user' } — 'catalog' requires source_ref on the item.
+    verifyEqItem:     (id, verified)           => request("/equipment/items/" + id + "/verify",
+                                                          { method: "POST", body: { verified } }),
+    // Bulk import — CSV / JSON / URL parser.
+    importEqCSV:      (csv, libraryId)         => request("/equipment/import/csv",
+                                                          { method: "POST", body: { csv, libraryId } }),
+    importEqJSON:     (items, libraryId)       => request("/equipment/import/json",
+                                                          { method: "POST", body: { items, libraryId } }),
+    importEqURL:      (url, category, manufacturer, libraryId) => request("/equipment/import/url",
+                                                          { method: "POST", body: { url, category, manufacturer, libraryId } }),
+    eqTemplateURL:    API_BASE + "/equipment/template.csv",
   };
 
   window.IecApi = Api;

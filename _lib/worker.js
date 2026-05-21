@@ -241,6 +241,31 @@ async function dispatch(req, env, ctx, url, path) {
   if ((m = path.match(/^\/regimes\/(\d+)$/)) && method === "PUT")    return updateRegime(req, env, Number(m[1]));
   if ((m = path.match(/^\/regimes\/(\d+)$/)) && method === "DELETE") return deleteRegime(req, env, Number(m[1]));
 
+  // ── Equipment libraries / items ────────────────────────────────────────
+  if (path === "/equipment/libraries" && method === "GET")  return listEqLibraries(req, env);
+  if (path === "/equipment/libraries" && method === "POST") return createEqLibrary(req, env);
+  if ((m = path.match(/^\/equipment\/libraries\/(\d+)$/)) && method === "GET")    return getEqLibrary(req, env, Number(m[1]));
+  if ((m = path.match(/^\/equipment\/libraries\/(\d+)$/)) && method === "PUT")    return updateEqLibrary(req, env, Number(m[1]));
+  if ((m = path.match(/^\/equipment\/libraries\/(\d+)$/)) && method === "DELETE") return deleteEqLibrary(req, env, Number(m[1]));
+  if ((m = path.match(/^\/equipment\/libraries\/(\d+)\/items$/)) && method === "GET")  return listEqItems(req, env, Number(m[1]));
+  if ((m = path.match(/^\/equipment\/libraries\/(\d+)\/items$/)) && method === "POST") return createEqItem(req, env, Number(m[1]));
+  if ((m = path.match(/^\/equipment\/items\/(\d+)$/)) && method === "GET")    return getEqItem(req, env, Number(m[1]));
+  if ((m = path.match(/^\/equipment\/items\/(\d+)$/)) && method === "PUT")    return updateEqItem(req, env, Number(m[1]));
+  if ((m = path.match(/^\/equipment\/items\/(\d+)$/)) && method === "DELETE") return deleteEqItem(req, env, Number(m[1]));
+  // The KEY "apply" endpoint — clones an item INTO the caller's library
+  // (default unless toLibId is specified).  Schemas reference the LOCAL
+  // copy thereafter, so the external library can disappear with no harm.
+  if ((m = path.match(/^\/equipment\/items\/(\d+)\/copy$/)) && method === "POST") return copyEqItem(req, env, Number(m[1]));
+  // Admin-only: mark an item as catalog-verified (or revoke).
+  if ((m = path.match(/^\/equipment\/items\/(\d+)\/verify$/)) && method === "POST") return verifyEqItem(req, env, Number(m[1]));
+  // Bulk import paths — CSV/JSON take structured data and bulk-insert.
+  // URL parser tries an HTTP fetch + regex extraction for cataloguesthat aren't behind CDN walls.  Template returns a CSV header for
+  // engineers to fill out manually.
+  if (path === "/equipment/import/csv"      && method === "POST") return importEqCSV(req, env);
+  if (path === "/equipment/import/json"     && method === "POST") return importEqJSON(req, env);
+  if (path === "/equipment/import/url"      && method === "POST") return importEqURL(req, env);
+  if (path === "/equipment/template.csv"    && method === "GET")  return eqCsvTemplate();
+
   // ── Site settings ──────────────────────────────────────────────────────
   if (path === "/settings/public" && method === "GET") return publicSettings(env);
 
@@ -1534,6 +1559,601 @@ async function deleteRegime(req, env, regimeId) {
   if (!(await ownsRegime(env, user.id, regimeId))) return err("forbidden", 403);
   await env.DB.prepare("DELETE FROM regimes WHERE id = ?").bind(regimeId).run();
   return json({ ok: true });
+}
+
+// ── Equipment libraries ─────────────────────────────────────────────────
+//
+// Ownership rules:
+//   • global libs (owner_id IS NULL)  — anyone may READ, only ADMIN may WRITE.
+//   • public user libs                — anyone authenticated may READ,
+//                                       only the owner may WRITE.
+//   • private user libs               — only the owner may READ or WRITE.
+//
+// COPY-ON-USE: when a user "applies" an item from a library they don't
+// own, the client should call /equipment/items/:id/copy first, which
+// clones the item into the caller's DEFAULT library and returns the
+// new id.  Their schema then references that local copy, so deleting
+// the source library can't strand the schema.
+async function ensureDefaultEqLibrary(env, userId) {
+  const t = now();
+  const existing = await env.DB.prepare(
+    "SELECT id FROM equipment_libraries WHERE owner_id = ? AND is_default = 1 LIMIT 1"
+  ).bind(userId).first();
+  if (existing) return existing.id;
+  const r = await env.DB.prepare(
+    "INSERT INTO equipment_libraries (owner_id, name, description, visibility, is_default, created_at, updated_at) " +
+    "VALUES (?, 'My Library', 'Equipment copied from external libraries lands here.', 'private', 1, ?, ?)"
+  ).bind(userId, t, t).run();
+  return r.meta.last_row_id;
+}
+async function _isAdmin(env, user) {
+  if (!user) return false;
+  const row = await env.DB.prepare("SELECT 1 FROM admin_users WHERE email = ?").bind(user.email).first();
+  return !!row;
+}
+async function canReadEqLibrary(env, userId, libId) {
+  const lib = await env.DB.prepare(
+    "SELECT owner_id, visibility FROM equipment_libraries WHERE id = ?"
+  ).bind(libId).first();
+  if (!lib) return null;
+  if (lib.visibility === "global" || lib.visibility === "public") return lib;
+  if (lib.owner_id === userId) return lib;
+  return null;
+}
+async function canWriteEqLibrary(env, user, libId) {
+  const lib = await env.DB.prepare(
+    "SELECT owner_id, visibility FROM equipment_libraries WHERE id = ?"
+  ).bind(libId).first();
+  if (!lib) return null;
+  if (lib.visibility === "global") {
+    return (await _isAdmin(env, user)) ? lib : null;
+  }
+  if (lib.owner_id === user.id) return lib;
+  return null;
+}
+async function listEqLibraries(req, env) {
+  const user = await getSessionUser(req, env);
+  if (!user) return err("auth required", 401);
+  await ensureDefaultEqLibrary(env, user.id);
+  const isAdmin = await _isAdmin(env, user);
+  const { results } = await env.DB.prepare(`
+    SELECT id, owner_id, name, description, visibility, is_default, created_at, updated_at,
+           (SELECT COUNT(*) FROM equipment_items WHERE library_id = equipment_libraries.id) AS item_count
+    FROM equipment_libraries
+    WHERE visibility = 'global'
+       OR owner_id = ?
+       OR visibility = 'public'
+    ORDER BY (owner_id IS NULL) DESC, (owner_id = ?) DESC, is_default DESC, name
+  `).bind(user.id, user.id).all();
+  const libs = (results || []).map(r => ({
+    ...r,
+    mine: r.owner_id === user.id,
+    writable: r.owner_id === user.id || (r.visibility === "global" && isAdmin),
+  }));
+  return json({ libraries: libs });
+}
+async function createEqLibrary(req, env) {
+  const user = await getSessionUser(req, env);
+  if (!user) return err("auth required", 401);
+  const body = await req.json().catch(() => ({}));
+  const name = String(body.name || "").trim().slice(0, 80);
+  if (!name) return err("name required");
+  const visibility = body.visibility === "public" ? "public" : "private";
+  const description = String(body.description || "").slice(0, 500);
+  const t = now();
+  const r = await env.DB.prepare(
+    "INSERT INTO equipment_libraries (owner_id, name, description, visibility, is_default, created_at, updated_at) " +
+    "VALUES (?, ?, ?, ?, 0, ?, ?)"
+  ).bind(user.id, name, description, visibility, t, t).run();
+  return json({ id: r.meta.last_row_id, name, visibility, description });
+}
+async function getEqLibrary(req, env, libId) {
+  const user = await getSessionUser(req, env);
+  if (!user) return err("auth required", 401);
+  const lib = await canReadEqLibrary(env, user.id, libId);
+  if (!lib) return err("not found", 404);
+  const full = await env.DB.prepare(
+    "SELECT id, owner_id, name, description, visibility, is_default, created_at, updated_at FROM equipment_libraries WHERE id = ?"
+  ).bind(libId).first();
+  const isAdmin = await _isAdmin(env, user);
+  return json({
+    library: {
+      ...full,
+      mine: full.owner_id === user.id,
+      writable: full.owner_id === user.id || (full.visibility === "global" && isAdmin),
+    },
+  });
+}
+async function updateEqLibrary(req, env, libId) {
+  const user = await getSessionUser(req, env);
+  if (!user) return err("auth required", 401);
+  const lib = await canWriteEqLibrary(env, user, libId);
+  if (!lib) return err("forbidden", 403);
+  const body = await req.json().catch(() => ({}));
+  const sets = [], vals = [];
+  if (body.name != null) { sets.push("name = ?"); vals.push(String(body.name).trim().slice(0, 80)); }
+  if (body.description != null) { sets.push("description = ?"); vals.push(String(body.description).slice(0, 500)); }
+  if (body.visibility != null && lib.visibility !== "global") {
+    // Global libs can't be flipped to public/private via this endpoint.
+    const v = body.visibility === "public" ? "public" : "private";
+    sets.push("visibility = ?"); vals.push(v);
+  }
+  if (!sets.length) return err("nothing to update");
+  sets.push("updated_at = ?"); vals.push(now());
+  vals.push(libId);
+  await env.DB.prepare("UPDATE equipment_libraries SET " + sets.join(", ") + " WHERE id = ?").bind(...vals).run();
+  return json({ ok: true });
+}
+async function deleteEqLibrary(req, env, libId) {
+  const user = await getSessionUser(req, env);
+  if (!user) return err("auth required", 401);
+  const lib = await canWriteEqLibrary(env, user, libId);
+  if (!lib) return err("forbidden", 403);
+  // Don't allow deleting your own default lib — keep at least one home
+  // for copy-on-use targets.
+  const row = await env.DB.prepare("SELECT is_default FROM equipment_libraries WHERE id = ?").bind(libId).first();
+  if (row && row.is_default) return err("cannot delete the default library");
+  await env.DB.prepare("DELETE FROM equipment_libraries WHERE id = ?").bind(libId).run();
+  return json({ ok: true });
+}
+async function listEqItems(req, env, libId) {
+  const user = await getSessionUser(req, env);
+  if (!user) return err("auth required", 401);
+  const lib = await canReadEqLibrary(env, user.id, libId);
+  if (!lib) return err("not found", 404);
+  const { results } = await env.DB.prepare(
+    "SELECT id, library_id, category, type_code, manufacturer, model, display_name, params_json, source_ref, " +
+    "       verified, verified_at, verified_by, created_at, updated_at " +
+    "FROM equipment_items WHERE library_id = ? ORDER BY category, display_name"
+  ).bind(libId).all();
+  return json({ items: results || [] });
+}
+async function createEqItem(req, env, libId) {
+  const user = await getSessionUser(req, env);
+  if (!user) return err("auth required", 401);
+  const lib = await canWriteEqLibrary(env, user, libId);
+  if (!lib) return err("forbidden", 403);
+  const body = await req.json().catch(() => ({}));
+  const category = String(body.category || "").trim();
+  const displayName = String(body.display_name || "").trim().slice(0, 120);
+  if (!category) return err("category required");
+  if (!displayName) return err("display_name required");
+  const params = body.params_json && typeof body.params_json === "string"
+    ? body.params_json
+    : JSON.stringify(body.params || {});
+  const sourceRef = body.source_ref ? String(body.source_ref).slice(0, 200) : null;
+  // Verification policy:
+  //   • Caller may request verified='catalog' only if they are admin AND
+  //     supplied a source_ref pointing at the manufacturer catalog PDF.
+  //   • Writes to the Global library are admin-only (canWriteEqLibrary)
+  //     AND MUST come in as verified='catalog' with a source_ref — the
+  //     Global library is reserved for catalog-verified items only.
+  const isAdmin = await _isAdmin(env, user);
+  let verified = 'user';
+  if (body.verified === 'catalog') {
+    if (!isAdmin)   return err("only admins may mark items as 'catalog'-verified", 403);
+    if (!sourceRef) return err("'catalog'-verified items require a source_ref URL pointing at the manufacturer PDF");
+    verified = 'catalog';
+  }
+  if (lib.visibility === 'global' && verified !== 'catalog') {
+    return err("the Global library only accepts catalog-verified entries — set verified='catalog' with a source_ref", 422);
+  }
+  const t = now();
+  const r = await env.DB.prepare(
+    "INSERT INTO equipment_items (library_id, category, type_code, manufacturer, model, display_name, params_json, source_ref, verified, verified_at, verified_by, created_at, updated_at) " +
+    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+  ).bind(
+    libId, category,
+    body.type_code   ? String(body.type_code).slice(0, 60)   : null,
+    body.manufacturer ? String(body.manufacturer).slice(0, 80) : null,
+    body.model       ? String(body.model).slice(0, 80)       : null,
+    displayName, params,
+    sourceRef,
+    verified,
+    verified === 'catalog' ? t : null,
+    verified === 'catalog' ? user.id : null,
+    t, t
+  ).run();
+  return json({ id: r.meta.last_row_id, verified });
+}
+async function getEqItem(req, env, itemId) {
+  const user = await getSessionUser(req, env);
+  if (!user) return err("auth required", 401);
+  const it = await env.DB.prepare(
+    "SELECT id, library_id, category, type_code, manufacturer, model, display_name, params_json, source_ref, " +
+    "       verified, verified_at, verified_by, created_at, updated_at FROM equipment_items WHERE id = ?"
+  ).bind(itemId).first();
+  if (!it) return err("not found", 404);
+  if (!(await canReadEqLibrary(env, user.id, it.library_id))) return err("not found", 404);
+  return json({ item: it });
+}
+async function updateEqItem(req, env, itemId) {
+  const user = await getSessionUser(req, env);
+  if (!user) return err("auth required", 401);
+  const it = await env.DB.prepare("SELECT library_id FROM equipment_items WHERE id = ?").bind(itemId).first();
+  if (!it) return err("not found", 404);
+  if (!(await canWriteEqLibrary(env, user, it.library_id))) return err("forbidden", 403);
+  const body = await req.json().catch(() => ({}));
+  const sets = [], vals = [];
+  for (const k of ["category", "type_code", "manufacturer", "model", "display_name"]) {
+    if (body[k] != null) { sets.push(k + " = ?"); vals.push(String(body[k]).slice(0, 120)); }
+  }
+  if (body.params != null) { sets.push("params_json = ?"); vals.push(JSON.stringify(body.params)); }
+  else if (body.params_json != null) { sets.push("params_json = ?"); vals.push(String(body.params_json)); }
+  if (!sets.length) return err("nothing to update");
+  sets.push("updated_at = ?"); vals.push(now());
+  vals.push(itemId);
+  await env.DB.prepare("UPDATE equipment_items SET " + sets.join(", ") + " WHERE id = ?").bind(...vals).run();
+  return json({ ok: true });
+}
+async function deleteEqItem(req, env, itemId) {
+  const user = await getSessionUser(req, env);
+  if (!user) return err("auth required", 401);
+  const it = await env.DB.prepare("SELECT library_id FROM equipment_items WHERE id = ?").bind(itemId).first();
+  if (!it) return err("not found", 404);
+  if (!(await canWriteEqLibrary(env, user, it.library_id))) return err("forbidden", 403);
+  await env.DB.prepare("DELETE FROM equipment_items WHERE id = ?").bind(itemId).run();
+  return json({ ok: true });
+}
+async function copyEqItem(req, env, itemId) {
+  const user = await getSessionUser(req, env);
+  if (!user) return err("auth required", 401);
+  const src = await env.DB.prepare(
+    "SELECT id, library_id, category, type_code, manufacturer, model, display_name, params_json, verified FROM equipment_items WHERE id = ?"
+  ).bind(itemId).first();
+  if (!src) return err("not found", 404);
+  if (!(await canReadEqLibrary(env, user.id, src.library_id))) return err("not found", 404);
+  const body = await req.json().catch(() => ({}));
+  let toLibId = body.toLibId != null ? Number(body.toLibId) : null;
+  if (!toLibId) {
+    toLibId = await ensureDefaultEqLibrary(env, user.id);
+  } else {
+    if (!(await canWriteEqLibrary(env, user, toLibId))) return err("forbidden", 403);
+  }
+  // Don't double-copy: if this same source already exists in the
+  // target, return the existing one.
+  const sourceRef = "lib:" + src.library_id + "/item:" + src.id;
+  const dup = await env.DB.prepare(
+    "SELECT id FROM equipment_items WHERE library_id = ? AND source_ref = ? LIMIT 1"
+  ).bind(toLibId, sourceRef).first();
+  if (dup) return json({ id: dup.id, library_id: toLibId, already_present: true });
+  const t = now();
+  // Preserve the source's verification badge in the copy — if the source
+  // was catalog-verified the user's local copy stays catalog-verified
+  // (parameters are byte-identical), with a back-pointer in source_ref.
+  const carried = src.verified === 'catalog' ? 'catalog' : 'user';
+  const r = await env.DB.prepare(
+    "INSERT INTO equipment_items (library_id, category, type_code, manufacturer, model, display_name, params_json, source_ref, verified, verified_at, verified_by, created_at, updated_at) " +
+    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+  ).bind(
+    toLibId, src.category, src.type_code, src.manufacturer, src.model,
+    src.display_name, src.params_json, sourceRef,
+    carried,
+    carried === 'catalog' ? t : null,
+    carried === 'catalog' ? user.id : null,
+    t, t
+  ).run();
+  return json({ id: r.meta.last_row_id, library_id: toLibId, copied: true, verified: carried });
+}
+
+// Admin-only.  Promote/demote an item's verification status.  This is
+// how curated catalog data enters the Global library — only admins
+// can flip the 'catalog' bit.  Body: { verified: 'catalog'|'user',
+// require_source?: true } — when set to 'catalog' the item MUST have a
+// non-empty source_ref pointing at the manufacturer's PDF.
+async function verifyEqItem(req, env, itemId) {
+  const user = await getSessionUser(req, env);
+  if (!user) return err("auth required", 401);
+  if (!(await _isAdmin(env, user))) return err("admin only", 403);
+  const it = await env.DB.prepare(
+    "SELECT id, library_id, source_ref FROM equipment_items WHERE id = ?"
+  ).bind(itemId).first();
+  if (!it) return err("not found", 404);
+  const body = await req.json().catch(() => ({}));
+  const status = body.verified === 'catalog' ? 'catalog'
+               : body.verified === 'user'    ? 'user'
+               : null;
+  if (!status) return err("verified must be 'catalog' or 'user'");
+  if (status === 'catalog' && !it.source_ref) {
+    return err("an item cannot be marked 'catalog' without a source_ref URL");
+  }
+  await env.DB.prepare(
+    "UPDATE equipment_items SET verified = ?, verified_at = ?, verified_by = ? WHERE id = ?"
+  ).bind(status, now(), user.id, itemId).run();
+  return json({ ok: true, verified: status });
+}
+
+// ── Equipment library — bulk import helpers ───────────────────────────────
+//
+// Two flavours plus a URL parser:
+//   • importEqCSV    — engineer pastes / uploads a CSV body (RFC 4180-ish).
+//                       First row = header; columns map to equipment_items.
+//   • importEqJSON   — engineer hands us an array of pre-built item objects.
+//   • importEqURL    — admin pastes a manufacturer catalog page URL; we
+//                       fetch it (HTML or PDF text), run regex heuristics
+//                       for kVA / kV / kA tables, and return CANDIDATES
+//                       (no auto-insert — admin reviews + applies).
+
+// Minimal RFC-4180 line splitter: handles quoted fields with commas.
+function _parseCsvLine(line) {
+  const out = [];
+  let cur = '', q = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (q) {
+      if (c === '"' && line[i+1] === '"') { cur += '"'; i++; continue; }
+      if (c === '"') { q = false; continue; }
+      cur += c;
+    } else {
+      if (c === ',') { out.push(cur); cur = ''; continue; }
+      if (c === '"' && cur === '') { q = true; continue; }
+      cur += c;
+    }
+  }
+  out.push(cur);
+  return out;
+}
+
+// Resolve target library + permission.  If libraryId omitted, falls
+// back to the caller's default library.  Returns { libId } or throws.
+async function _eqTargetLib(env, user, body) {
+  let libId = body.libraryId != null ? Number(body.libraryId) : null;
+  if (!libId) libId = await ensureDefaultEqLibrary(env, user.id);
+  const lib = await canWriteEqLibrary(env, user, libId);
+  if (!lib) {
+    const e = new Error("forbidden");
+    e.status = 403;
+    throw e;
+  }
+  return { libId, lib };
+}
+
+async function importEqCSV(req, env) {
+  const user = await getSessionUser(req, env);
+  if (!user) return err("auth required", 401);
+  const body = await req.json().catch(() => ({}));
+  const csv  = String(body.csv || '');
+  if (!csv.trim()) return err("empty CSV");
+  let libId, lib;
+  try { ({ libId, lib } = await _eqTargetLib(env, user, body)); }
+  catch (e) { return err(e.message, e.status || 400); }
+  const isAdmin = await _isAdmin(env, user);
+  const isGlobal = lib && lib.visibility === 'global';
+  const lines = csv.split(/\r?\n/).filter(l => l.trim().length);
+  if (lines.length < 2) return err("CSV must have a header + at least one row");
+  const header = _parseCsvLine(lines[0]).map(h => h.trim());
+  // Required columns
+  if (!header.includes('category'))     return err('CSV header missing "category"');
+  if (!header.includes('display_name')) return err('CSV header missing "display_name"');
+  const t = now();
+  let inserted = 0;
+  const errors = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cells = _parseCsvLine(lines[i]);
+    const obj = {};
+    for (let j = 0; j < header.length; j++) obj[header[j]] = (cells[j] || '').trim();
+    if (!obj.category || !obj.display_name) {
+      errors.push({ row: i + 1, error: "missing category / display_name" });
+      continue;
+    }
+    let params_json = obj.params_json || '{}';
+    try { JSON.parse(params_json); } catch (e) {
+      errors.push({ row: i + 1, error: "invalid params_json" });
+      continue;
+    }
+    const sourceRef = obj.source_ref || null;
+    // Per-row verified column (optional).  Default for imports is
+    // 'imported' — flagged as pending admin review.
+    let verified = (obj.verified || '').toLowerCase();
+    if (verified === 'catalog') {
+      if (!isAdmin)   { errors.push({ row: i + 1, error: "'catalog' verification is admin-only" }); continue; }
+      if (!sourceRef) { errors.push({ row: i + 1, error: "'catalog' requires source_ref" }); continue; }
+    } else {
+      verified = 'imported';
+    }
+    if (isGlobal && verified !== 'catalog') {
+      errors.push({ row: i + 1, error: "Global library only accepts catalog-verified rows (set verified=catalog + source_ref)" });
+      continue;
+    }
+    await env.DB.prepare(
+      "INSERT INTO equipment_items (library_id, category, type_code, manufacturer, model, display_name, params_json, source_ref, verified, verified_at, verified_by, created_at, updated_at) " +
+      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    ).bind(
+      libId, obj.category,
+      obj.type_code    || null,
+      obj.manufacturer || null,
+      obj.model        || null,
+      String(obj.display_name).slice(0, 120),
+      params_json,
+      sourceRef,
+      verified,
+      verified === 'catalog' ? t : null,
+      verified === 'catalog' ? user.id : null,
+      t, t
+    ).run();
+    inserted++;
+  }
+  return json({ inserted, errors, libraryId: libId });
+}
+
+async function importEqJSON(req, env) {
+  const user = await getSessionUser(req, env);
+  if (!user) return err("auth required", 401);
+  const body = await req.json().catch(() => ({}));
+  const items = Array.isArray(body.items) ? body.items : [];
+  if (!items.length) return err("items array empty");
+  let libId, lib;
+  try { ({ libId, lib } = await _eqTargetLib(env, user, body)); }
+  catch (e) { return err(e.message, e.status || 400); }
+  const isAdmin = await _isAdmin(env, user);
+  const isGlobal = lib && lib.visibility === 'global';
+  const t = now();
+  let inserted = 0;
+  const errors = [];
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i];
+    if (!it || !it.category || !it.display_name) {
+      errors.push({ row: i, error: "missing category / display_name" });
+      continue;
+    }
+    const params = it.params || it.params_json || {};
+    const params_json = typeof params === "string" ? params : JSON.stringify(params);
+    try { JSON.parse(params_json); } catch (e) {
+      errors.push({ row: i, error: "invalid params" });
+      continue;
+    }
+    const sourceRef = it.source_ref || null;
+    let verified = String(it.verified || '').toLowerCase();
+    if (verified === 'catalog') {
+      if (!isAdmin)   { errors.push({ row: i, error: "'catalog' verification is admin-only" }); continue; }
+      if (!sourceRef) { errors.push({ row: i, error: "'catalog' requires source_ref" }); continue; }
+    } else {
+      verified = 'imported';
+    }
+    if (isGlobal && verified !== 'catalog') {
+      errors.push({ row: i, error: "Global library only accepts catalog-verified entries" });
+      continue;
+    }
+    await env.DB.prepare(
+      "INSERT INTO equipment_items (library_id, category, type_code, manufacturer, model, display_name, params_json, source_ref, verified, verified_at, verified_by, created_at, updated_at) " +
+      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    ).bind(
+      libId, String(it.category),
+      it.type_code    || null,
+      it.manufacturer || null,
+      it.model        || null,
+      String(it.display_name).slice(0, 120),
+      params_json,
+      sourceRef,
+      verified,
+      verified === 'catalog' ? t : null,
+      verified === 'catalog' ? user.id : null,
+      t, t
+    ).run();
+    inserted++;
+  }
+  return json({ inserted, errors, libraryId: libId });
+}
+
+// URL parser — fetches the page, extracts text, and runs regex heuristics
+// looking for rating-table rows.  Returns CANDIDATE items the admin can
+// review (no auto-insert).  This is intentionally conservative: it only
+// surfaces rows where it can confidently parse both a power AND a
+// voltage (or current) in standard units.  Most manufacturer PDFs
+// behind CDNs will return 403/404 here — for those, fall back to CSV.
+async function importEqURL(req, env) {
+  const user = await getSessionUser(req, env);
+  if (!user) return err("auth required", 401);
+  const body = await req.json().catch(() => ({}));
+  const url  = String(body.url || '').trim();
+  const category = String(body.category || '').trim() || 'tx2';
+  const manufacturer = String(body.manufacturer || '').trim() || 'unknown';
+  if (!url) return err("url required");
+  let resp;
+  try {
+    resp = await fetch(url, {
+      method: "GET",
+      headers: { "User-Agent": "ieccalc/1.0 (+https://ieccalc.com)", "Accept": "text/html,application/pdf,*/*" },
+      // Honour redirects, but bail on auth-walls (most CDNs return 403).
+      redirect: "follow",
+    });
+  } catch (e) {
+    return err("fetch failed: " + e.message, 502);
+  }
+  if (!resp.ok) {
+    return json({ candidates: [], note: `Catalog returned HTTP ${resp.status}; URL likely behind a CDN. Use CSV upload instead.` });
+  }
+  const ct  = resp.headers.get("content-type") || "";
+  let text;
+  if (ct.includes("text") || ct.includes("html") || ct.includes("json")) {
+    text = await resp.text();
+    // Strip HTML tags down to plain text — preserves whitespace + numbers
+    text = text.replace(/<script[\s\S]*?<\/script>/g, ' ')
+               .replace(/<style[\s\S]*?<\/style>/g, ' ')
+               .replace(/<[^>]+>/g, ' ')
+               .replace(/&nbsp;/g, ' ')
+               .replace(/&amp;/g, '&')
+               .replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+  } else {
+    // PDF or binary — we don't have a PDF text extractor in the worker
+    return json({ candidates: [], note: "Binary / PDF content cannot be auto-parsed without an external OCR/extract service. Use CSV upload instead." });
+  }
+  // Heuristic patterns by category.  Tx-class: look for "<S> kVA … <U> kV"
+  // tuples.  CB-class: look for "<In> A … <Icu> kA".
+  const candidates = [];
+  const numRe = '(\\d+(?:\\.\\d+)?)';
+  if (category === 'tx2' || category === 'tx3' || category === 'atx' || category === 'atx3' || category === 'wt_tx' || category === 'pst' || category === 'tx2_split') {
+    const re = new RegExp(numRe + '\\s*kVA[\\s\\S]{0,200}?' + numRe + '\\s*kV[\\s\\S]{0,40}?(?:' + numRe + '\\s*%)?', 'g');
+    let m;
+    while ((m = re.exec(text)) && candidates.length < 100) {
+      const Sr = Number(m[1]) * 1000;
+      const Upri = Number(m[2]) * 1000;
+      const ukr = m[3] ? Number(m[3]) : null;
+      if (Sr < 10000 || Sr > 2e9) continue;
+      candidates.push({
+        category, manufacturer,
+        display_name: `${manufacturer} ${m[1]} kVA, ${m[2]} kV (auto)`,
+        type_code: null,
+        model: `${m[1]}kVA ${m[2]}kV`,
+        params: Object.assign({ Sr_kVA: Sr/1000, U_pri_V: Upri }, ukr != null ? { ukr_pct: ukr } : {}),
+        source_ref: url,
+      });
+    }
+  } else if (category === 'cb_lv' || category === 'cb_mv' || category === 'fuse') {
+    const re = new RegExp(numRe + '\\s*A[\\s\\S]{0,80}?' + numRe + '\\s*kA', 'g');
+    let m;
+    while ((m = re.exec(text)) && candidates.length < 100) {
+      const In = Number(m[1]); const Icu = Number(m[2]);
+      if (In < 10 || In > 6300) continue;
+      if (Icu < 1 || Icu > 200) continue;
+      candidates.push({
+        category, manufacturer,
+        display_name: `${manufacturer} ${In} A, ${Icu} kA (auto)`,
+        type_code: null,
+        model: `${In}A ${Icu}kA`,
+        params: { In_A: In, Icu_kA: Icu, Un_V: category === 'cb_lv' ? 400 : 12000 },
+        source_ref: url,
+      });
+    }
+  } else if (category === 'cable') {
+    const re = new RegExp(numRe + '\\s*mm[2²][\\s\\S]{0,80}?' + numRe + '\\s*kV', 'g');
+    let m;
+    while ((m = re.exec(text)) && candidates.length < 100) {
+      const S = Number(m[1]); const U = Number(m[2]);
+      if (S < 1 || S > 1000) continue;
+      candidates.push({
+        category, manufacturer,
+        display_name: `${manufacturer} ${U} kV, ${S} mm² (auto)`,
+        type_code: null,
+        model: `${U}kV ${S}mm²`,
+        params: { S_mm2: S, Un_V: U*1000, L_m: 100 },
+        source_ref: url,
+      });
+    }
+  }
+  return json({
+    candidates,
+    note: candidates.length
+      ? `Extracted ${candidates.length} candidate(s) — REVIEW before importing. Heuristic parser; numbers may be cross-table contamination.`
+      : "No matches.  Try a different URL, or use CSV upload.",
+  });
+}
+
+// CSV template for download — column order matches the importer's parser.
+function eqCsvTemplate() {
+  const body = [
+    "category,manufacturer,model,type_code,display_name,params_json,source_ref",
+    'tx2,Schneider Electric,Trihal 1000,T1000-20-0.4,"Schneider Trihal 1000 kVA 20/0.4 kV","{""Sr_kVA"":1000,""U_pri_V"":20000,""U_sec_V"":400,""ukr_pct"":6.0,""PkCu_kW"":9.0,""P0_kW"":1.8,""I0_pct"":0.8,""vg"":""Dyn11"",""Un_V"":20000}",https://www.example.com/catalog.pdf',
+    'cb_lv,ABB,Tmax XT2N 160,XT2N160,"ABB Tmax XT2N 160A, 36 kA","{""In_A"":160,""Icu_kA"":36,""Un_V"":400,""Ir_pu"":1.0}",https://library.e.abb.com/...',
+    'cable,Polycab,33kV 240 Al XLPE,POLY-33-240Al,"Polycab 33 kV 240 mm² Al XLPE","{""series"":""MV_Cu_XLPE"",""S_mm2"":240,""L_m"":100,""material"":""Al"",""R_km"":0.162,""X_km"":0.14,""Un_V"":33000}",https://cms.polycab.com/...',
+  ].join("\n");
+  return new Response(body, {
+    headers: {
+      "Content-Type": "text/csv; charset=utf-8",
+      "Content-Disposition": 'attachment; filename="equipment-template.csv"',
+      "Cache-Control": "no-store",
+    },
+  });
 }
 
 async function calculateNetwork(req, env, id) {
