@@ -1701,12 +1701,66 @@ async function listEqItems(req, env, libId) {
   if (!user) return err("auth required", 401);
   const lib = await canReadEqLibrary(env, user.id, libId);
   if (!lib) return err("not found", 404);
-  const { results } = await env.DB.prepare(
-    "SELECT id, library_id, category, type_code, manufacturer, model, display_name, params_json, source_ref, " +
-    "       verified, verified_at, verified_by, created_at, updated_at " +
-    "FROM equipment_items WHERE library_id = ? ORDER BY category, display_name"
-  ).bind(libId).all();
-  return json({ items: results || [] });
+  // Pagination + filtering — needed so a 23k-row global library doesn't
+  // dump every row into the browser at once.  All params are optional:
+  //   ?category=tx2          — restrict to one COMP category
+  //   ?verified=catalog      — restrict by verification status
+  //   ?q=BHEL                — case-insensitive substring on
+  //                            display_name / manufacturer / model / type_code
+  //   ?limit=N (default 500, max 5000)
+  //   ?offset=N
+  //   ?count=1               — instead of items, just return total row count
+  //   ?facets=1              — also return distinct categories + manufacturers
+  const url = new URL(req.url);
+  const category = url.searchParams.get('category');
+  const verifiedFilter = url.searchParams.get('verified');
+  const q = (url.searchParams.get('q') || '').trim();
+  const wantCount = url.searchParams.get('count') === '1';
+  const wantFacets = url.searchParams.get('facets') === '1';
+  let limit = Number(url.searchParams.get('limit') || 500);
+  let offset = Number(url.searchParams.get('offset') || 0);
+  if (!Number.isFinite(limit) || limit <= 0) limit = 500;
+  if (limit > 5000) limit = 5000;
+  if (!Number.isFinite(offset) || offset < 0) offset = 0;
+
+  const wheres = ['library_id = ?'];
+  const params  = [libId];
+  if (category)        { wheres.push('category = ?');  params.push(category); }
+  if (verifiedFilter)  { wheres.push('verified = ?');  params.push(verifiedFilter); }
+  if (q) {
+    wheres.push('(LOWER(display_name) LIKE ? OR LOWER(manufacturer) LIKE ? OR LOWER(model) LIKE ? OR LOWER(type_code) LIKE ?)');
+    const like = '%' + q.toLowerCase() + '%';
+    params.push(like, like, like, like);
+  }
+  const whereSQL = wheres.join(' AND ');
+
+  if (wantCount) {
+    const row = await env.DB.prepare(
+      "SELECT COUNT(*) AS n FROM equipment_items WHERE " + whereSQL
+    ).bind(...params).first();
+    return json({ count: row ? row.n : 0 });
+  }
+
+  const sql = "SELECT id, library_id, category, type_code, manufacturer, model, display_name, params_json, source_ref, " +
+              "       verified, verified_at, verified_by, created_at, updated_at " +
+              "FROM equipment_items WHERE " + whereSQL +
+              " ORDER BY category, display_name LIMIT ? OFFSET ?";
+  const { results } = await env.DB.prepare(sql).bind(...params, limit, offset).all();
+
+  const out = { items: results || [], limit, offset };
+  if (wantFacets) {
+    const cats = await env.DB.prepare(
+      "SELECT category, COUNT(*) AS n FROM equipment_items WHERE library_id = ? GROUP BY category ORDER BY n DESC"
+    ).bind(libId).all();
+    const mfrs = await env.DB.prepare(
+      "SELECT manufacturer, COUNT(*) AS n FROM equipment_items WHERE library_id = ? AND manufacturer IS NOT NULL GROUP BY manufacturer ORDER BY n DESC LIMIT 200"
+    ).bind(libId).all();
+    out.facets = {
+      categories:   cats.results || [],
+      manufacturers: mfrs.results || [],
+    };
+  }
+  return json(out);
 }
 async function createEqItem(req, env, libId) {
   const user = await getSessionUser(req, env);

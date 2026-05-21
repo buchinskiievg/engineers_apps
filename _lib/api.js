@@ -104,7 +104,20 @@
     getEqLibrary:     (id)                     => request("/equipment/libraries/" + id),
     updateEqLibrary:  (id, body)               => request("/equipment/libraries/" + id, { method: "PUT", body }),
     deleteEqLibrary:  (id)                     => request("/equipment/libraries/" + id, { method: "DELETE" }),
-    listEqItems:      (libId)                  => request("/equipment/libraries/" + libId + "/items"),
+    // listEqItems supports optional query params {category, verified, q,
+    // limit, offset, count, facets} for server-side filtering — needed
+    // for the 23k-row global library so the browser doesn't choke.
+    listEqItems:      (libId, opts)            => {
+      let qs = '';
+      if (opts && typeof opts === 'object') {
+        const parts = [];
+        for (const k of ['category','verified','q','limit','offset','count','facets']) {
+          if (opts[k] != null && opts[k] !== '') parts.push(k + '=' + encodeURIComponent(opts[k]));
+        }
+        if (parts.length) qs = '?' + parts.join('&');
+      }
+      return request("/equipment/libraries/" + libId + "/items" + qs);
+    },
     createEqItem:     (libId, body)            => request("/equipment/libraries/" + libId + "/items", { method: "POST", body }),
     getEqItem:        (id)                     => request("/equipment/items/" + id),
     updateEqItem:     (id, body)               => request("/equipment/items/" + id, { method: "PUT", body }),

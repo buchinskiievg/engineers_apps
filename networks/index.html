@@ -1344,7 +1344,7 @@
   </div>
 </div>
 
-<script src="/_lib/api.js?v=ui60"></script>
+<script src="/_lib/api.js?v=ui61"></script>
 <script src="/_lib/chrome.js"></script>
 <script src="/_lib/auth-ui.js"></script>
 <script>
@@ -5097,12 +5097,49 @@
     _eqState.verifiedOnly = !!(lib && lib.visibility === 'global');
     const vo = document.getElementById('eq-verified-only');
     if (vo) vo.checked = _eqState.verifiedOnly;
+    // Server-side pagination: the Global library now has ~23k rows; we
+    // never want to fetch them all at once.  First call fetches facets
+    // (category counts for the left-hand tree) plus an initial page.
+    // When the engineer drills into a category via the tree we refetch
+    // with ?category= to pull every row of that one category.
+    _eqStatus('Loading…');
     try {
-      const { items } = await window.IecApi.listEqItems(libId);
-      _eqState.items = items || [];
+      const resp = await window.IecApi.listEqItems(libId, { limit: 500, facets: 1 });
+      _eqState.items = resp.items || [];
+      _eqState.facets = resp.facets || { categories: [], manufacturers: [] };
+      _eqState.serverLibId = libId;       // remember which lib we paged
+      _eqState.serverCategory = null;     // no category filter yet
       _refreshEqAll();
+      // If the library has more rows than we fetched, get the true total
+      // so the row count shown to the user is honest.
+      try {
+        const c = await window.IecApi.listEqItems(libId, { count: 1 });
+        _eqState.totalRows = c.count || _eqState.items.length;
+      } catch (_) { _eqState.totalRows = _eqState.items.length; }
+      _eqStatus('');
+      _renderEqTable();
     } catch (e) {
       _eqStatus('Failed to load items: ' + (e.message || e));
+    }
+  }
+  // Called by the tree's category-click handler — re-fetches all rows
+  // of one category from the server (up to 5000) so the chip filters
+  // and table see the full set instead of just the initial page.
+  async function _reloadEqForCategory(category) {
+    if (_eqState.serverLibId !== _eqState.libId) return;
+    if (_eqState.serverCategory === category) return;      // already loaded
+    _eqStatus('Loading ' + (category || 'all') + '…');
+    try {
+      const opts = { limit: 5000 };
+      if (category) opts.category = category;
+      const resp = await window.IecApi.listEqItems(_eqState.libId, opts);
+      _eqState.items = resp.items || [];
+      _eqState.serverCategory = category;
+      _resetEqChips();
+      _refreshEqAll();
+      _eqStatus('');
+    } catch (e) {
+      _eqStatus('Failed to load: ' + (e.message || e));
     }
   }
   // Re-render every pane after any state change.
@@ -5178,14 +5215,22 @@
         if (ds.treeAll) {
           _resetEqChips();
           _eqState.treeFilter = null;
+          // "All" view goes back to the initial page (server doesn't
+          // dump every row — we never wanted that to begin with).
+          _reloadEqForCategory(null);
         } else if (ds.treeKindName) {
           _resetEqChips();
           _eqState.treeFilter = { kind: 'kind', value: ds.treeKindName };
+          // Kind-level view: still client-side, but the chips computed
+          // from the current page are good enough for browsing.
+          _refreshEqAll();
         } else if (ds.treeCat) {
           _resetEqChips();
           _eqState.treeFilter = { kind: 'cat', value: ds.treeCat };
+          // Category drill-down: server-side fetch so chips see ALL rows
+          // of this category (not just the 500-row initial page).
+          _reloadEqForCategory(ds.treeCat);
         } else { return; }
-        _refreshEqAll();
       });
     });
   }
@@ -5455,7 +5500,20 @@
     }));
     const items = _filteredEqItems();
     const cnt = document.getElementById('eq-count');
-    if (cnt) cnt.textContent = items.length + ' / ' + _eqState.items.length + ' items';
+    if (cnt) {
+      // Pagination-aware count: when the library is bigger than the
+      // initial page we tell the engineer how much of the catalog they
+      // are seeing — otherwise they might assume "47 items" means the
+      // library only has 47, when really it has 20 743 PV modules.
+      const loaded = _eqState.items.length;
+      const total  = _eqState.totalRows || loaded;
+      let line = items.length + ' / ' + loaded + ' shown';
+      if (total > loaded) {
+        line += '  ·  ' + total + ' total in library' +
+                (_eqState.serverCategory ? '' : ' (drill into a category in the tree to load more)');
+      }
+      cnt.textContent = line;
+    }
     tbody.innerHTML = items.map(it => {
       const spec = _itemSpec(it);
       const sel = (it.id === _eqState.selectedItemId) ? ' is-on' : '';
