@@ -201,6 +201,22 @@
     </a>
   </div>
 
+  <a href="/005/" class="industry-tile" style="display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:18px;margin:14px 0;text-decoration:none">
+    <div class="ind-icon" style="margin:0">
+      <svg width="56" height="56" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="square" aria-hidden="true">
+        <path d="M14 8 H38 L50 20 V56 H14 Z"/>
+        <path d="M38 8 V20 H50"/>
+        <path d="M22 30 H42 M22 38 H42 M22 46 H36"/>
+      </svg>
+    </div>
+    <div>
+      <span class="ind-eyebrow">04 / DOCUMENTS</span>
+      <h3 style="margin-bottom:5px">Engineering Document Studio</h3>
+      <p style="margin:0">DWG layout preflight and preview, Word/PDF conversion, page reordering, merge, rotate and engineering submission PDF assembly.</p>
+    </div>
+    <span class="ind-cta" style="white-space:nowrap">OPEN STUDIO &rarr;</span>
+  </a>
+
   <h2 class="pro-tools-sep"><span>STANDALONE CALCULATORS</span></h2>
 
   <div class="va-cubes" id="cubes-pro"><div class="cubes-loading">Loading&hellip;</div></div>
@@ -314,15 +330,16 @@
   'use strict';
   function esc(s) { return String(s||'').replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
 
-  const ICON_BY_SLUG = { '001':'drop', '002':'bolt', '003':'earth', '004':'cable' };
-  const STAT_BY_SLUG = { '001':{v:'ΔU',u:'%'}, '002':{v:'I″k',u:'kA'}, '003':{v:'R_g',u:'Ω'}, '004':{v:'I_z',u:'A'} };
-  const GROUP_BY_SLUG = { '001':'CABLES', '002':'FAULTS & PROTECTION', '003':'EARTHING', '004':'CABLES' };
+  const ICON_BY_SLUG = { '001':'drop', '002':'bolt', '003':'earth', '004':'cable', '005':'document' };
+  const STAT_BY_SLUG = { '001':{v:'ΔU',u:'%'}, '002':{v:'I″k',u:'kA'}, '003':{v:'R_g',u:'Ω'}, '004':{v:'I_z',u:'A'}, '005':{v:'PDF',u:'STUDIO'} };
+  const GROUP_BY_SLUG = { '001':'CABLES', '002':'FAULTS & PROTECTION', '003':'EARTHING', '004':'CABLES', '005':'DOCUMENTS' };
 
   const ICONS = {
     bolt:  '<path d="M13 2 L4 14 H11 L9 22 L20 9 H13 L15 2 Z" fill="currentColor" stroke="none"/>',
     cable: '<path d="M3 9 q 4.5 -6 9 0 t 9 0"/><path d="M3 16 q 4.5 -6 9 0 t 9 0"/>',
     drop:  '<path d="M12 2 L6 12 a 6 6 0 1 0 12 0 Z"/>',
     earth: '<path d="M12 2 V14"/><path d="M5 14 H19"/><path d="M7 17 H17"/><path d="M9 20 H15"/>',
+    document: '<path d="M5 3 H14 L19 8 V21 H5 Z"/><path d="M14 3 V8 H19"/><path d="M8 12 H16 M8 16 H16"/>',
     cube:  '<path d="M4 7 L12 3 L20 7 V17 L12 21 L4 17 Z"/><path d="M4 7 L12 11 L20 7 M12 11 V21"/>',
     arrowne: '<path d="M6 18 L18 6 M8 6 H18 V16"/>',
   };
