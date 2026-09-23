@@ -2,11 +2,18 @@
 // Uses GNU LibreDWG WebAssembly in the browser. No paid API, no DWG upload.
 import { Dwg_File_Type, LibreDwg } from "https://cdn.jsdelivr.net/npm/@mlightcad/libredwg-web@0.7.14/dist/libredwg-web.js";
 
-const WASM = new URL("./", import.meta.url).href;
+const WASM = new URL(".", import.meta.url).href.replace(/\\/$/, "");
 let enginePromise;
 
-function getEngine() {
-  if (!enginePromise) enginePromise = LibreDwg.create(WASM);
+async function getEngine() {
+  if (!enginePromise) {
+    enginePromise = (async () => {
+      const wasmUrl = WASM + "/libredwg-web.wasm";
+      const probe = await fetch(wasmUrl, { method: "GET", cache: "no-store" });
+      if (!probe.ok) throw new Error("LibreDWG WASM not available: HTTP " + probe.status + " at " + wasmUrl);
+      return LibreDwg.create(WASM);
+    })();
+  }
   return enginePromise;
 }
 function svgUrl(svg) {
