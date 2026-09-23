@@ -1,0 +1,30 @@
+name: Deploy IECCalc API Worker
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "_lib/worker.js"
+      - "wrangler.toml"
+      - ".github/workflows/deploy-api-worker.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ieccalc-api-worker
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy Cloudflare Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CF_PAGES_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: e5d02013758955380085433a5a0b24ed
+          command: deploy
