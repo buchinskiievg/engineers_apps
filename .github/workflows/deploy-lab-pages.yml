@@ -1,14 +1,13 @@
 name: Deploy IECCalc LAB to Cloudflare Pages
 
+# Manual only. DO NOT put a push trigger back.
+# This job deploys the WHOLE git tree to the production Pages project, and the
+# git tree is not the site: the live site is deployed by hand from
+# _v2_staging/redesign/engineers_apps. On 2026-09-23 the push trigger replaced
+# the whole site with the stale git tree (design.css metal10 instead of metal36),
+# which broke the header, the home page and the admin, until it was redeployed
+# from the redesign folder.
 on:
-  push:
-    branches: [main]
-    paths:
-      - "lab/**"
-      - "_redirects"
-      - "_lib/chrome.js"
-      - "index.html"
-      - ".github/workflows/deploy-lab-pages.yml"
   workflow_dispatch:
 
 concurrency:

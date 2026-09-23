@@ -1,12 +1,12 @@
 name: Deploy IECCalc API Worker
 
+# Manual only. DO NOT put a push trigger back.
+# _lib/worker.js in git is not the live worker: the live one is deployed by
+# hand from _v2_staging/redesign/engineers_apps. On 2026-09-23 the push trigger
+# deployed the stale git copy, which crashes on every route but /health
+# ("Cannot access 'm' before initialization"), so nobody could sign in.
+# It was rolled back to version 2a6867ca (2026-09-17).
 on:
-  push:
-    branches: [main]
-    paths:
-      - "_lib/worker.js"
-      - "wrangler.toml"
-      - ".github/workflows/deploy-api-worker.yml"
   workflow_dispatch:
 
 concurrency:
