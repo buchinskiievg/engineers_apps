@@ -24,6 +24,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install LibreDWG browser runtime
+        shell: bash
+        run: |
+          npm install --no-save @mlightcad/libredwg-web@0.7.14
+          WASM_FILE="$(find node_modules/@mlightcad/libredwg-web -type f -name 'libredwg.wasm' | head -n 1)"
+          if [ -z "$WASM_FILE" ]; then
+            echo "libredwg.wasm not found in npm package"
+            find node_modules/@mlightcad/libredwg-web -maxdepth 3 -type f | sort
+            exit 1
+          fi
+          cp "$WASM_FILE" lab/document-studio/libredwg.wasm
+          ls -lh lab/document-studio/libredwg.wasm
+
       - name: Deploy site to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
