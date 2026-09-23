@@ -776,12 +776,12 @@ export function makeRenderer(db) {
   };
 }
 
-/* Line weights on screen. A plotted 0.25 mm is a quarter of a pixel on an
-   A1 sheet shown 1000 px wide, so on screen each weight is drawn at its
-   width on paper for the zoom it is seen at — --ds-pxmm, screen pixels per
-   paper millimetre, which the page sets on the sheet — but never under 0.7
-   px. The PDF drops this style and plots the widths as written. */
+/* Line weights on screen, as AutoCAD shows them: in pixels, the same at
+   every zoom — 0.25 mm and under is 1 px, heavier weights about 4 px per mm —
+   so zooming in brings detail, not fatter lines. Widths that are geometry
+   (a polyline with width, a bus drawn wide) scale with the drawing as they
+   should. The PDF drops this style and plots the widths in millimetres. */
 const SCREEN_W = [4, 5, 9, 13, 15, 18, 20, 25, 30, 35, 40, 50, 53, 60, 70, 80, 90, 100, 106, 120, 140, 158, 200, 211];
 export const SCREEN_STYLE = '<style id="ds-screen">' +
-  SCREEN_W.map(n => ".dsw" + n + "{vector-effect:non-scaling-stroke;stroke-width:max(.7px,calc(var(--ds-pxmm,1.4px)*" + (n / 100) + "))}").join("") +
+  SCREEN_W.map(n => ".dsw" + n + "{vector-effect:non-scaling-stroke;stroke-width:" + Math.max(1, +(n / 100 * 4).toFixed(2)) + "px}").join("") +
   "</style>";

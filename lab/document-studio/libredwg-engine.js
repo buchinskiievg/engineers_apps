@@ -24,7 +24,7 @@
 // turned a 3.8 km route plan into a single pixel.
 
 import { Dwg_File_Type, LibreDwg } from "https://cdn.jsdelivr.net/npm/@mlightcad/libredwg-web@0.7.14/dist/libredwg-web.js";
-import { makeRenderer, SCREEN_STYLE, setShxEm } from "./dwg-render.js?v=r2c";
+import { makeRenderer, SCREEN_STYLE, setShxEm } from "./dwg-render.js?v=r2d";
 
 // The folder this module lives in, without its trailing slash. (The first
 // version had a doubled backslash in this regular expression; the engine read
@@ -821,6 +821,21 @@ function parseRendered(db) {
       const s2 = assemble(rr.defs, rr.body, win, kk);
       Object.assign(lay, { svg: s2, previewUrl: svgUrl(s2), ext: { ...win }, unitMm: kk, sheet, framed: true, ...meta(s2) });
       return true;
+    };
+    /* A new sheet cut out of Model Space: a window picked by two corners, on a
+       paper size, drawn at that sheet's scale — one per frame of a drawing
+       that keeps several sheets side by side in the model. */
+    let cut = 0;
+    lay.makeSheet = (win, sheet = "A1") => {
+      const w = win.maxX - win.minX, h = win.maxY - win.minY;
+      if (!(w > 0 && h > 0)) return null;
+      const [a, b] = SHEET_SIZES[sheet] || SHEET_SIZES.A1, page = w >= h ? [a, b] : [b, a];
+      const kk = Math.min(page[0] / w, page[1] / h);
+      cut++;
+      const rr = R.render(modelEnts, { s: kk, ltK: 1, idp: "w" + cut + "_", window: [win.minX, win.minY, win.maxX, win.maxY] });
+      const s2 = assemble(rr.defs, rr.body, win, kk);
+      return { id: "model-sheet-" + cut, name: "Model sheet " + cut, isModel: true, selected: true, empty: false, entityCount: n, skippedTables: 0,
+               recordName: model.name, svg: s2, previewUrl: svgUrl(s2), paper: "Model Space · window", ext: { ...win }, unitMm: kk, sheet, framed: true, ...meta(s2) };
     };
     lay.resetFrame = () => { const r0 = R.render(modelEnts, { s: k, ltK: 1, idp: "m" }); Object.assign(lay, { svg: assemble(r0.defs, r0.body, ext, k), ext, unitMm: k, sheet: "A1", framed: false }); lay.previewUrl = svgUrl(lay.svg); Object.assign(lay, meta(lay.svg)); return true; };
     layouts.push(lay);
