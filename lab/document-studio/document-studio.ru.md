@@ -9,16 +9,29 @@
 | файл | что делает |
 |------|------------|
 | `index.html` | страница: панель инструментов с дроп-зоной, три колонки (файлы → листы → превью), лента страниц PDF, экспорт |
-| `libredwg-engine.js` | DWG → SVG-листы: `parseDwg(file)` и `svgToPng(svg)` |
-| `libredwg-web.wasm` | не в git. CI (`.github/workflows/deploy-lab-pages.yml`) ставит `@mlightcad/libredwg-web@0.7.14` и кладёт WASM рядом при каждом деплое |
+| `libredwg-engine.js` | DWG → SVG-листы: `parseDwg(file)`, `svgToPng(svg)`, `sheetsPdf(layouts)` |
+| `dwg-render.js` | свой рендерер сущностей DWG → SVG (r2) |
+| `canvas-view.js` | превью листа на canvas: `compile(svg)` → сцена, `draw(ctx, scene, view, …)` (r2e) |
+| `fonts/` | встроенные шрифты (Arimo, Tinos, Cousine, osifont, URW Gothic) + LICENSES.txt |
+| `libredwg-web.wasm` | не в git; лежит в staging-копии прода и выкладывается вместе с папкой |
 
-Импорт движка в `index.html` идёт с ключом кэша `?v=wasmN`. **Любая правка движка — бампать N.**
+Импорты в `index.html` идут с ключом кэша `?v=…` (сейчас движок `r2d`, canvas-view `r2e`).
+**Любая правка файла — бампать его ключ.**
 
 ## Выкладка
 
-Выкладка идёт через push в `main` репозитория `buchinskiievg/engineers_apps`, дальше GitHub
-Actions запускает `wrangler pages deploy`. Работа ведётся в отдельном worktree. Коммит
-fast-forward'ится в клон GitHub Desktop, и пользователь жмёт Fetch → Push.
+Выкладка ручная, CI-воркфлоу только по кнопке (workflow_dispatch), git-дерево на прод не
+выкладывается.
+1. Работа идёт в `_v2_staging/redesign/engineers_apps/lab/document-studio`. В redesign лежат
+   чужие правки (lab/003, lab/index.html), поэтому выкладывается staging-копия прода
+   `scratchpad/deploy`, в которой заменена только папка `lab/document-studio`.
+2. Перед выкладкой: `wrangler pages deployment list`, чтобы последний деплой был наш; сверка
+   sha staging-копии с ним (`cmp.js`) — отличаться должны только файлы document-studio.
+   На ieccalc.com ещё отличаются about/account/sdk из-за email-обфускации Cloudflare — это норма.
+3. `npx wrangler pages deploy . --project-name=engineers-apps --branch=main --commit-dirty=true`,
+   затем сверка с новым деплоем (0 отличий).
+4. Папку копируют в клон `Documents/GitHub/engineers_apps` и коммитят (wasm не в git).
+Тестовые DWG заказчика (`redesign/_t`) — только локально, удалять до выкладки.
 
 ## Модель данных libredwg-web 0.7.14 (то, что читает движок)
 
@@ -176,12 +189,39 @@ C107 совпадает по положению до 0,1 мм, у FEWA A1 и C20
   - размер PDF в 1,5–2 раза больше, чем у AutoCAD (C107: 2,5 МБ против 1,6; FEWA: 1,5
     против 2,0); оптимизация отдельно.
 
-## Окно превью и листы из модели (23.09.2026, r2d)
+## Окно превью и листы из модели (23.09.2026, r2d → r2e)
 
 r2c (CSS-трансформация всего листа) пользователь отверг: тормозило, при зуме линии
 толстели, картинка растровая. В r2d сделан векторный вьюпорт.
 
-- **Векторный вьюпорт** (`view={s,x,y,cs,cx,cy,fit,pageId}`, `host`):
+- **r2e — лист DWG рисуется на canvas** (`canvas-view.js`, `sceneHost`). r2d с SVG в DOM
+  пользователь назвал «очень тормозит». Замер в headless Chrome на реальном GPU (Iris Xe),
+  Senan SLD, 30 щелчков колеса: r2d — 7–14 с, кадры p95 217–383 мс; r2e — 1,6 с (это
+  накладные стенда), p95 17 мс (60 fps). Senan Layout_v2 (DWG 109 МБ) и C107 тоже p95 17 мс.
+  - Причина тормозов SVG: при каждой смене `viewBox` Chrome заново раскладывает весь
+    SVG-текст (перешейпинг на новом масштабе) и все фигуры с `non-scaling-stroke`,
+    100–600 мс на шаг, в главном потоке. CSS-настройками не лечится.
+  - `compile(svg)`: DOMParser → сцена из узлов `g` (transform, clip-path) / `u` (use,
+    общий блок) / `p` (Path2D) / `t` (текст из runs) / `i` (картинка), у каждого bbox.
+    Понимает только подмножество, которое пишет `dwg-render.js`; иначе `null` и откат на
+    `svgHost` (SVG в DOM). Подряд идущие одинаковые штрихи склеиваются в один Path2D
+    (`merge`, до 256), заливки не склеиваются (правила заполнения).
+  - `draw`: отсечение по bbox в пикселях экрана (+ bbox клипа вьюпорта), блоки и тексты
+    меньше 0,5 px пропускаются, текст ниже 1 px — полупрозрачная полоска, иначе `fillText`
+    на 100 px со scale (мелкие размеры не округляются). `dswNN` → ширина
+    max(1, NN/100×4) px экрана; геометрические ширины — в единицах чертежа.
+  - Пунктир теперь в единицах чертежа, как в PDF-печати и в AutoCAD. В SVG с
+    non-scaling-stroke он был экранным и при зуме мельчал.
+  - Кадр рисуется на каждый шаг колеса через rAF. Если интервал кадров > 45 мс дважды
+    подряд (тяжёлый лист на слабом GPU), остаток жеста двигает последний кадр
+    CSS-трансформом, а вектор дорисовывается через 110 мс после остановки.
+  - Расхождение с SVG-отрисовкой по пикселям ≤1,3% (сглаживание) на Senan, C107, C204,
+    Aux, FEWA — все листы идут через canvas.
+  - `?svgview=1` в адресе включает прежнее SVG-превью (для сравнения).
+  - Замер: скрипты `scratchpad/perf/*.js` (Playwright из `nodus-newengine/node_modules`,
+    `channel:'chrome'`); замеры в скрытой панели браузера Claude недостоверны (rAF стоит).
+    Первые ~10 с после загрузки идёт фоновая генерация миниатюр — её не мерить как зум.
+- **Прежний SVG-вьюпорт (r2d, теперь откат)** (`view={s,x,y,cs,cx,cy,fit,pageId}`, `host`):
   - SVG заполняет окно (`preserveAspectRatio="none"`), зум и панорама меняют только
     `viewBox` (`draw`); белая бумага — вставленный `rect`;
   - во время жеста — лёгкий CSS-transform относительно последнего кадра
@@ -194,7 +234,10 @@ r2c (CSS-трансформация всего листа) пользовате�
 - **Экранные толщины** — фиксированные пиксели, как в AutoCAD, от зума не зависят:
   `.dswNN{vector-effect:non-scaling-stroke;stroke-width:max(1, NN/100×4)px}`. В печати
   экранный стиль убирается, там толщины в мм.
-- **SHEET BY 2 CORNERS** (только на странице Model; `setFraming`, `addSheet`):
+- **SHEET BY 2 CORNERS** (`setFraming`, `addSheet`, `modelPageOf`):
+  - кнопка видна на любом листе DWG, у которого есть Model Space. С листа layout клик
+    сначала открывает Model и включает режим. В r2d кнопка была только на Model, а та
+    лежит в «NOT IN THE PDF», и пользователь её не нашёл;
   - два клика по углам (или протяжка), резиновая рамка `.frame-box`, Esc выходит;
   - координаты `viewBox` → чертёж: y меняет знак (`minY = -max(a.y,b.y)`);
   - `layout.makeSheet(win, sheet)` рендерит модель в окне на масштаб выбранного A0–A4

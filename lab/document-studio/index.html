@@ -430,6 +430,7 @@ window.DOC_STUDIO_CONFIG = {
 <script type="module">
 import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs";
 import { parseDwg, svgToPng, sheetsPdf } from "./libredwg-engine.js?v=r2d";
+import * as CV from "./canvas-view.js?v=r2e";
 pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs";
 
 const $ = s => document.querySelector(s);
@@ -930,14 +931,17 @@ $("#mergeOk").onclick=()=>{
 })();
 
 /* ── preview ─────────────────────────────────────────────────────────────
-   A viewport, as in CAD, and a vector one: a DWG sheet is an SVG the size of
-   the pane whose viewBox is the view — every zoom and pan is drawn again as
-   vectors by the browser, lines stay one or a few pixels wide as in AutoCAD
-   (SCREEN_STYLE), detail sharpens as you zoom in. While the wheel turns the
-   last frame is moved by a transform, which is instant; ~0.1 s after the
-   movement stops the viewBox is set and the vectors are redrawn. A PDF page is
-   rendered by pdf.js for exactly the part in view at the resolution shown; an
-   image is drawn onto a canvas the same way.
+   A viewport, as in CAD, and a vector one. A DWG sheet is compiled once into
+   a scene (canvas-view.js) and every frame is drawn from it onto a canvas for
+   exactly the view: only what is in view, lines one or a few pixels wide as
+   in AutoCAD, detail sharpening as you zoom in. Frames that take a few ms are
+   drawn on every wheel step; if a sheet is so heavy that a frame is slow, the
+   last frame is moved by a transform while the wheel turns and the vectors are
+   drawn ~0.1 s after it stops. (The SVG in the DOM, kept as the fallback, is
+   laid out again by the browser at each zoom: text and non-scaling strokes
+   made that 0.1-0.6 s a step on the Senan sheets.) A PDF page is rendered by
+   pdf.js for exactly the part in view at the resolution shown; an image is
+   drawn onto a canvas the same way.
    Wheel = zoom at the cursor, drag = pan, double-click / FIT = fit the sheet. */
 let previewToken=0;
 const view={s:1,x:0,y:0, cs:1,cx:0,cy:0, page:null, pageId:null, kind:null};   // s = px per unit, x,y = top-left in units; c* = committed
@@ -963,7 +967,25 @@ function commit(){
   if(r&&r.then) r.then(done); else done(true);
   $("#previewZoomLabel").textContent=Math.round(view.s/view.fit*100)+"%";
 }
-function changed(){ liveTransform(); scheduleCommit(); $("#previewZoomLabel").textContent=Math.round(view.s/view.fit*100)+"%"; }
+/* a canvas sheet is drawn again on every step while frames come quickly; when
+   they do not (a heavy sheet on a slow GPU: the frame interval, not only the
+   script time, is watched), the rest of that gesture moves the last frame and
+   the vectors follow when the wheel stops */
+let rafQ=0, lastFrame=0, slowFrames=0, gestureSlow=false, idleT=0;
+function changed(){
+  $("#previewZoomLabel").textContent=Math.round(view.s/view.fit*100)+"%";
+  clearTimeout(idleT); idleT=setTimeout(()=>{ gestureSlow=false; slowFrames=0; lastFrame=0; },350);
+  if(host&&host.kind==="scene"&&!gestureSlow&&host.lastMs<40){
+    clearTimeout(commitT);
+    if(!rafQ) rafQ=requestAnimationFrame(now=>{
+      rafQ=0;
+      if(lastFrame&&now-lastFrame>45){ if(++slowFrames>=2){ gestureSlow=true; liveTransform(); scheduleCommit(); return; } } else slowFrames=0;
+      lastFrame=now; commit();
+    });
+    return;
+  }
+  liveTransform(); scheduleCommit();
+}
 function fitView(){
   if(!host) return;
   const [W,H]=stageSize(), [px,py,pw,ph]=host.page, pad=24;
@@ -992,6 +1014,26 @@ function svgHost(svgText){
   const first=[...sv.children].find(c=>c.tagName!=="style"&&c.tagName!=="defs"); sv.insertBefore(paper,first||null);
   return { kind:"svg", el:sv, page:vb, draw(t){ const [W,H]=stageSize(); sv.setAttribute("viewBox",t.x+" "+t.y+" "+(W/t.s)+" "+(H/t.s)); return true; } };
 }
+/* the DWG sheet as a scene drawn on a canvas (canvas-view.js) */
+function sceneHost(scene){
+  const st=stage(); st.innerHTML=""; const cv=document.createElement("canvas"); cv.className="pv-el"; st.appendChild(cv);
+  const ctx=cv.getContext("2d",{alpha:false});
+  const h={ kind:"scene", el:cv, scene, page:scene.page, lastMs:0, draw(t){
+    const [W,H]=stageSize(), dpr=window.devicePixelRatio||1, bw=Math.round(W*dpr), bh=Math.round(H*dpr);
+    if(cv.width!==bw||cv.height!==bh){ cv.width=bw; cv.height=bh; }
+    cv.style.width=W+"px"; cv.style.height=H+"px";
+    h.lastMs=CV.draw(ctx,scene,t,W,H,dpr).ms; return true;
+  }};
+  scene.ready.then(()=>{ if(host===h) commit(); });        // pictures decoded
+  return h;
+}
+const FORCE_SVG=/[?&]svgview=1(?:&|$)/.test(location.search);    // the SVG preview, for comparison
+function sceneOf(o){
+  if(o._sceneFor!==o.svg){ o._sceneFor=o.svg; try{ o._scene=CV.compile(o.svg); }catch(e){ console.error(e); o._scene=null; } }
+  return o._scene;
+}
+// fonts arriving late change text widths
+document.fonts?.addEventListener?.("loadingdone",()=>{ if(host?.kind==="scene"){ CV.remeasure(host.scene); commit(); } });
 /* a PDF page or an image: a canvas the size of the pane, drawn for the view */
 function canvasHost(pageW,pageH,paint){
   const st=stage(); st.innerHTML=""; const cv=document.createElement("canvas"); cv.className="pv-el"; st.appendChild(cv);
@@ -1016,11 +1058,20 @@ function renderPreviewMeta(){
   $("#previewTitle").textContent=p.label;
   $("#previewMeta").textContent=[n?"page "+n+" of "+d.pages.length+" · "+d.name:"not in the PDF",l?.paper,l?.framed?(l.sheet||"A1"):null,l?.empty?"empty layout":null,p.rotation?"rotated "+p.rotation+"°":null].filter(Boolean).join(" · ");
 }
-/* cutting sheets out of Model Space belongs to the Model page only */
+/* sheets are cut out of Model Space: the tool shows on every page of a DWG
+   that has one, and from a layout page it goes to the Model page first */
+function modelPageOf(p){
+  const o=p&&(p.orig||p), src=o&&source(o.sourceId); if(!src||src.type!=="dwg") return null;
+  if(o.layout?.isModel&&o.layout.makeSheet) return p;
+  return (src.pageIds||[]).map(page).find(x=>x&&(x.orig||x).layout?.isModel&&(x.orig||x).layout.makeSheet)||null;
+}
 function syncFrameTools(){
-  const p=page(state.activePageId), l=p&&(p.orig||p).layout, on=!!(l&&l.isModel&&l.makeSheet&&!p.rotation);
-  $("#frameTools").hidden=!on;
-  if(!on&&framing) setFraming(false);
+  const p=page(state.activePageId), m=modelPageOf(p);
+  $("#frameTools").hidden=!m;
+  const onModel=!!(m&&m===p&&!p.rotation);
+  $("#frameBtn").title=onModel?"Cut a sheet out of Model Space: click two corners of its frame (Esc to stop)"
+                              :"Opens Model Space, then click two corners of the sheet's frame (Esc to stop)";
+  if(!onModel&&framing) setFraming(false);
 }
 async function renderPreview(){
   const p=page(state.activePageId), st=stage(), token=++previewToken;
@@ -1048,7 +1099,7 @@ async function renderPreview(){
     }catch(e){console.error(e);}
   }
   if(p.sourceType==="dwg-svg"&&o.svg&&!p.rotation&&/data-ds="r2"/.test(o.svg.slice(0,400))){
-    host=svgHost(o.svg); place(); return;
+    const sc=FORCE_SVG?null:sceneOf(o); host=sc?sceneHost(sc):svgHost(o.svg); place(); return;
   }
   // an image, or a rotated sheet: a bitmap drawn for the view
   const url=p.sourceType==="image"?baseThumb(p):o.svg?svgUrl(p):null;
@@ -1091,7 +1142,12 @@ async function addSheet(a,b){
   const msg=$("#frameMsg"); msg.textContent="+ "+lay.name+" · "+lay.sheet+" → page "+(d.pages.indexOf(np)+1); msg.hidden=false; clearTimeout(msg._t); msg._t=setTimeout(()=>{msg.hidden=true;},4000);
   queueThumbs(async()=>{ try{ np.thumb=await svgToPng(np.svg,420); }catch{} updateCard(np); });
 }
-$("#frameBtn").onclick=()=>setFraming(!framing);
+$("#frameBtn").onclick=async()=>{
+  if(framing) return setFraming(false);
+  const p=page(state.activePageId), m=modelPageOf(p); if(!m) return;
+  if(m!==p){ state.activePageId=m.id; syncMarks(); await renderPreview(); }
+  setFraming(true);
+};
 
 (function viewport(){
   const st=stage();
