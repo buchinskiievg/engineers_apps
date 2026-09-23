@@ -28,14 +28,19 @@
   .studio-toolbar button, .studio-toolbar label.btn { min-height:32px; display:inline-flex; align-items:center; gap:6px; }
   .file-input { display:none; }
 
+  /* The drop zone lives in the toolbar row, in the space that was empty, at
+     the height of the buttons beside it. A separate panel under the toolbar
+     took 120 px of screen for one sentence. */
   .dropzone {
-    border:2px dashed var(--line); background:var(--panel); min-height:96px; padding:16px;
-    display:flex; align-items:center; justify-content:center; text-align:center; margin-bottom:12px;
+    flex:1 1 320px; min-width:0; min-height:32px; margin:0; padding:4px 12px;
+    border:1px dashed var(--border, #BAB3A4); background:var(--surface, #F4F1EA);
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap; cursor:pointer;
     transition:.15s border-color,.15s background;
   }
-  .dropzone.drag { border-color:var(--red); background:#f8e7e5; }
-  .dropzone strong { display:block; font-size:15px; margin-bottom:3px; }
-  .dropzone span { font-size:12px; color:var(--muted); }
+  .dropzone:hover, .dropzone:focus-visible { border-color:var(--ink, #2E2B25); outline:none; }
+  .dropzone.drag { border:1px solid var(--red); background:#f8e7e5; }
+  .dropzone strong { font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; white-space:nowrap; }
+  .dropzone span { font-size:11.5px; color:var(--muted); min-width:0; }
 
   .workspace { display:grid; grid-template-columns:340px minmax(0,1fr); gap:12px; align-items:start; }
   .side, .mainpanel { border:1px solid var(--line); background:var(--panel); }
@@ -225,7 +230,7 @@
   .preview-toolbar-v2 .grow { flex:1; }
   .preview-stage { flex:1; min-height:520px; overflow:auto; background:#aaa69d; padding:22px; display:flex; justify-content:center; align-items:flex-start; }
   .preview-paper { position:relative; background:#fff; box-shadow:0 5px 22px rgba(0,0,0,.24); max-width:100%; transform-origin:top center; }
-  .preview-paper canvas,.preview-paper img { display:block; max-width:100%; height:auto; }
+  .preview-paper canvas,.preview-paper img,.preview-paper svg { display:block; max-width:100%; height:auto; }
   .preview-empty { color:#55514a; text-align:center; padding:100px 20px; }
   .boundary { position:absolute; inset:3.5%; border:2px dashed var(--red); pointer-events:none; display:none; }
   .boundary.on { display:block; }
@@ -277,13 +282,9 @@
     <input id="fileInput" class="file-input" type="file" multiple accept=".pdf,.dwg,.doc,.docx,.png,.jpg,.jpeg" />
     <button id="clearBtn" class="btn btn-ghost">CLEAR</button>
     <span class="tool-sep"></span>
-    <span class="grow"></span>
-  </div>
-
-  <div id="dropzone" class="dropzone">
-    <div>
-      <strong>DROP PROJECT FILES HERE</strong>
-      <span>PDF · DWG · DOC/DOCX · JPG/PNG · DWG is processed locally in your browser</span>
+    <div id="dropzone" class="dropzone" role="button" tabindex="0" aria-label="Drop files here or click to choose them">
+      <strong>Drop files here or click</strong>
+      <span>PDF · DWG · DOCX · JPG/PNG — PDF, DWG and images never leave your browser</span>
     </div>
   </div>
 
@@ -358,13 +359,31 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs" type="module"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 <script>
+/* If the studio module fails to load — a syntax error in it or in anything it
+   imports — the page used to stay on screen looking perfectly alive while no
+   button did anything. This guard turns that into a message the user can read
+   and report. The module sets window.__docStudioReady as its last line. */
+(function () {
+  function banner(msg) {
+    if (window.__docStudioReady || document.getElementById("dsFail")) return;
+    var b = document.createElement("div");
+    b.id = "dsFail";
+    b.setAttribute("role", "alert");
+    b.style.cssText = "margin:10px 0;padding:10px 14px;border:1px solid #A30E18;background:#F8D9DB;color:#A30E18;font:600 12px/1.45 var(--sans,sans-serif)";
+    b.textContent = "Document Studio failed to start" + (msg ? ": " + msg : ".") + " Files cannot be added until this is fixed.";
+    var host = document.querySelector(".container") || document.body;
+    host.insertBefore(b, host.firstChild);
+  }
+  window.addEventListener("error", function (e) { if (!window.__docStudioReady) banner(e.message); });
+  window.addEventListener("load", function () { setTimeout(function () { if (!window.__docStudioReady) banner("the page script did not finish loading"); }, 8000); });
+})();
 window.DOC_STUDIO_CONFIG = {
   officeConvertUrl: "https://api.ieccalc.com/document-studio/office/convert"
 };
 </script>
 <script type="module">
 import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs";
-import { parseDwg, svgToPng } from "./libredwg-engine.js?v=wasm3";
+import { parseDwg, svgToPng } from "./libredwg-engine.js?v=wasm5";
 pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs";
 
 const $ = s => document.querySelector(s);
@@ -451,16 +470,24 @@ async function ingestDwg(file){
   try{
     const result=await parseDwg(file);
     src.layouts=result.layouts||[];
+    src.modelOnly=!!result.modelOnly;
     src.pageIds=[];
     state.pages=state.pages.filter(p=>p.sourceId!==src.id);
-    for(const l of src.layouts.filter(x=>!x.isModel)){
+    /* Everything in Model Space and every paper layout empty — a route plan, a
+       proposal layout — would otherwise open as an empty page. Model is switched
+       on for such a drawing, and the status line says why. */
+    if(src.modelOnly) $("#includeModel").checked=true;
+    for(const l of src.layouts.filter(x=>x.selected)){
       const p={id:uid("page"),sourceId:src.id,sourceType:"dwg-svg",sourcePage:src.pageIds.length,label:src.name+" — "+l.name,rotation:0,thumb:l.previewUrl,layout:l,svg:l.svg,pngDataUrl:null};
       state.pages.push(p);src.pageIds.push(p.id);
     }
-    const first=src.layouts.find(x=>!x.isModel)||src.layouts[0];
+    const first=src.layouts.find(x=>x.selected)||src.layouts[0];
     state.activeLayoutId=first?.id||null;
     state.activePageId=state.pages.find(p=>p.sourceId===src.id&&p.layout?.id===state.activeLayoutId)?.id||null;
-    setStatus(src,"ready","LibreDWG · "+src.layouts.filter(x=>!x.isModel).length+" layouts");
+    const paperN=src.layouts.filter(x=>!x.isModel).length, emptyN=src.layouts.filter(x=>!x.isModel&&x.empty).length;
+    setStatus(src,"ready", src.modelOnly
+      ? "LibreDWG · Model Space only — "+(paperN?paperN+" paper layout"+(paperN>1?"s are":" is")+" empty, ":"no paper layouts, ")+"Model included"
+      : "LibreDWG · "+(paperN-emptyN)+" layout"+(paperN-emptyN===1?"":"s")+(emptyN?" · "+emptyN+" empty skipped":""));
   }catch(err){
     console.error(err);
     src.engineError=err?.message||String(err);
@@ -475,7 +502,7 @@ async function rebuildDwgOutput(){
   state.pages=state.pages.filter(p=>p.sourceId!==src.id);
   src.pageIds=[];
   const includeModel=$("#includeModel").checked;
-  for(const l of src.layouts.filter(x=>!x.isModel||includeModel)){
+  for(const l of src.layouts.filter(x=>x.isModel?includeModel:!x.empty)){
     const p={id:uid("page"),sourceId:src.id,sourceType:"dwg-svg",sourcePage:src.pageIds.length,label:src.name+" — "+l.name,rotation:0,thumb:l.previewUrl,layout:l,svg:l.svg,pngDataUrl:null};
     state.pages.push(p);src.pageIds.push(p.id);
   }
@@ -623,7 +650,7 @@ async function exportPdf(){
         const ab=await p.imageFile.arrayBuffer(), im=ext(p.imageFile.name)==="png"?await out.embedPng(ab):await out.embedJpg(ab);
         const w=im.width*.75,h=im.height*.75,pg=out.addPage([w,h]);pg.drawImage(im,{x:0,y:0,width:w,height:h});
       }else if(p.sourceType==="dwg-svg"&&p.svg){
-        if(!p.pngDataUrl)p.pngDataUrl=await svgToPng(p.svg,2.5);
+        if(!p.pngDataUrl)p.pngDataUrl=await svgToPng(p.svg);
         const png=await fetch(p.pngDataUrl).then(r=>r.arrayBuffer());
         const im=await out.embedPng(png);
         const landscape=(p.layout?.orientation||"landscape")==="landscape";
@@ -641,7 +668,17 @@ async function exportPdf(){
 $("#fileInput").onchange=e=>{acceptFiles(e.target.files);e.target.value="";};
 const dz=$("#dropzone");["dragenter","dragover"].forEach(n=>dz.addEventListener(n,e=>{e.preventDefault();dz.classList.add("drag")}));
 ["dragleave","drop"].forEach(n=>dz.addEventListener(n,e=>{e.preventDefault();dz.classList.remove("drag")}));
-dz.ondrop=e=>acceptFiles(e.dataTransfer.files);dz.onclick=()=>$("#fileInput").click();
+dz.ondrop=e=>{e.stopPropagation();acceptFiles(e.dataTransfer.files);};dz.onclick=()=>$("#fileInput").click();
+dz.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();$("#fileInput").click();}};
+/* A file dropped anywhere else on the page used to be opened by the browser in
+   place of the studio, and everything loaded so far was lost. The whole page
+   takes it now, and the zone lights up while a file is being dragged over it. */
+let dragDepth=0;
+const hasFiles=e=>[...(e.dataTransfer?.types||[])].includes("Files");
+document.addEventListener("dragenter",e=>{if(!hasFiles(e))return;dragDepth++;dz.classList.add("drag");});
+document.addEventListener("dragleave",e=>{if(!hasFiles(e))return;dragDepth=Math.max(0,dragDepth-1);if(!dragDepth)dz.classList.remove("drag");});
+document.addEventListener("dragover",e=>{if(hasFiles(e))e.preventDefault();});
+document.addEventListener("drop",e=>{if(!hasFiles(e))return;e.preventDefault();dragDepth=0;dz.classList.remove("drag");if(e.dataTransfer.files.length)acceptFiles(e.dataTransfer.files);});
 $("#clearBtn").onclick=()=>{state.sources.clear();state.pages=[];state.selected.clear();state.activeSourceId=null;state.activePageId=null;renderAll();};
 $("#includeModel").onchange=rebuildDwgOutput;
 $("#previewZoomIn").onclick=()=>{state.previewZoom=Math.min(1.8,state.previewZoom+.1);$("#previewZoomLabel").textContent=Math.round(state.previewZoom*100)+"%";renderPreview();};
@@ -655,6 +692,8 @@ $("#selectAllBtn").onclick=()=>{state.pages.forEach(p=>state.selected.add(p.id))
 $("#deselectBtn").onclick=()=>{state.selected.clear();renderOutput();};
 $("#exportBtn").onclick=exportPdf;
 renderAll();
+window.__docStudioReady=true;
+document.getElementById("dsFail")?.remove();
 </script>
 <script src="/_lib/api.js"></script>
 <script src="/_lib/chrome.js"></script>
