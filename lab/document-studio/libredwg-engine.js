@@ -95,12 +95,107 @@ function withRecords(db, recs) {
    3 084 508 characters of SVG for a layout holding one viewport, against
    3 084 531 for Model). The other spaces are emptied in the block records too.
    Ordinary block definitions stay whole: an INSERT still needs its block. */
-function isolate(db, record) {
+function isolate(db, record, visible) {
   const h = String(record.handle);
+  const keep = visible || (() => true);
   const ents = Array.isArray(db?.entities) ? db.entities : [];
-  const recs = blockRecords(db).map(r =>
-    ((isModel(r) || isPaper(r)) && String(r.handle) !== h) ? { ...r, entities: [] } : r);
-  return withRecords({ ...db, entities: ents.filter(e => ownerOf(e) === h) }, recs);
+  const recs = blockRecords(db).map(r => {
+    if ((isModel(r) || isPaper(r)) && String(r.handle) !== h) return { ...r, entities: [] };
+    if (String(r.handle) === h) return { ...r, entities: (r.entities || []).filter(keep) };
+    return r;
+  });
+  return withRecords({ ...db, entities: ents.filter(e => ownerOf(e) === h && keep(e)) }, recs);
+}
+
+/* What AutoCAD does not plot does not go on the sheet: entities on a layer that
+   is off, frozen, or marked not to plot (Defpoints always is, and drawings mark
+   their own — construction, handrail setting-out, viewport borders). Checked
+   on the entities of the space itself; entities nested inside a block keep the
+   layer rules the block was drawn with. Per-viewport layer freezing cannot be
+   honoured: libredwg-web 0.7.14 does not expose it (frozenLayerIds is empty). */
+function layerFilter(db) {
+  const hidden = new Set();
+  for (const l of (db?.tables?.LAYER?.entries || [])) {
+    if (l.frozen || l.off || l.plotFlag === 0 || l.plotFlag === false) hidden.add(String(l.name).toUpperCase());
+  }
+  return e => !hidden.has(String(e?.layer ?? "0").toUpperCase());
+}
+
+/* ── a paper layout is a sheet with windows onto the model ───────────────
+   LibreDWG draws paper space as it is: the title block, the frame, the
+   viewport rectangles — and nothing inside the rectangles, because what a
+   viewport shows is Model Space seen through it. A layout of nothing but
+   viewports, which is how most engineering sheets are made, therefore came out
+   blank. The sheet is composed here: Model Space is drawn once, and placed into
+   every viewport of the layout at that viewport's scale and twist, clipped to
+   its rectangle.
+
+   The mapping, with y turned over as in every LibreDWG SVG:
+     model view centre  M = targetPoint + displayCenter  (plan view)
+     scale              s = viewport height on paper / viewHeight in the model
+     paper centre       C = viewportCenter
+     SVG transform      translate(Cx, −Cy) scale(s) rotate(twist) translate(−Mx, My)
+   The viewport that is the sheet itself (the layout's own, id 1) is skipped, and
+   so is a viewport switched off (status bit 0x20000). */
+function modelViewports(db, rec, layoutObj) {
+  const h = String(rec.handle), own = String(layoutObj?.viewportId || "");
+  return (db?.entities || []).filter(e =>
+    e?.type === "VIEWPORT" && ownerOf(e) === h &&
+    String(e.handle) !== own && e.viewportId !== 1 &&
+    !((e.statusBitFlags || 0) & 0x20000) &&
+    e.width > 0 && e.height > 0 && e.viewHeight > 0 && e.viewportCenter);
+}
+function innerOf(svg) {
+  const open = svg.search(/<svg\b/);
+  const a = open < 0 ? -1 : svg.indexOf(">", open) + 1, b = svg.lastIndexOf("</svg>");
+  return a > 0 && b > a ? svg.slice(a, b) : "";
+}
+/* The model markup carries its own copy of every block definition, under the
+   same ids as the sheet's. A <use> resolves to the FIRST element with its id,
+   and in the sheet some of those are the emptied copies made by isolate() — so
+   the model's ids are given a prefix of their own before it goes in. */
+function prefixIds(markup, p) {
+  return markup
+    .replace(/\bid="([^"]*)"/g, (m, id) => 'id="' + p + id + '"')
+    .replace(/\b(xlink:href|href)="#([^"]*)"/g, (m, a, id) => a + '="#' + p + id + '"')
+    .replace(/url\(#([^)]*)\)/g, (m, id) => "url(#" + p + id + ")");
+}
+const num = v => (Number.isFinite(v) ? +v.toFixed(6) : 0);
+function composeSheet(paperSvg, modelInner, vps) {
+  if (!vps.length || !modelInner) return paperSvg;
+  let add = "";
+  vps.forEach((v, i) => {
+    const cx = v.viewportCenter.x, cy = v.viewportCenter.y, w = v.width, h = v.height;
+    const mx = (v.targetPoint?.x || 0) + (v.displayCenter?.x || 0);
+    const my = (v.targetPoint?.y || 0) + (v.displayCenter?.y || 0);
+    const s = h / v.viewHeight, deg = (v.viewTwistAngle || 0) * 180 / Math.PI;
+    const id = "ds-vp-" + i;
+    add += '<clipPath id="' + id + '"><rect x="' + num(cx - w / 2) + '" y="' + num(-(cy + h / 2)) +
+           '" width="' + num(w) + '" height="' + num(h) + '"/></clipPath>' +
+           '<g clip-path="url(#' + id + ')"><g transform="translate(' + num(cx) + "," + num(-cy) + ") scale(" + num(s) +
+           ") rotate(" + num(deg) + ") translate(" + num(-mx) + "," + num(my) + ')">' +
+           prefixIds(modelInner, "ds" + i + "-") + "</g></g>";
+  });
+  // under the paper space's own drawing, so the title block and frames sit on top
+  const open = paperSvg.search(/<svg\b/), at = paperSvg.indexOf(">", open) + 1;
+  return paperSvg.slice(0, at) + add + paperSvg.slice(at);
+}
+/* The sheet is framed on the paper — the layout's limits — and only when those
+   are missing on what is drawn: the layout's own extents, then the entities and
+   the viewport rectangles themselves. */
+function sheetExtents(lo, ents, vps) {
+  const box = (a, b) => (a && b && [a.x, a.y, b.x, b.y].every(Number.isFinite) && b.x > a.x && b.y > a.y)
+    ? { minX: a.x, minY: a.y, maxX: b.x, maxY: b.y } : null;
+  const lim = box(lo?.minLimit, lo?.maxLimit);
+  if (lim) return lim;
+  const ex = box(lo?.minExtent, lo?.maxExtent);
+  if (ex) return ex;
+  const e = extentsFor(ents.filter(x => x.type !== "VIEWPORT"), null);
+  const r = vps.reduce((acc, v) => {
+    const x0 = v.viewportCenter.x - v.width / 2, y0 = v.viewportCenter.y - v.height / 2;
+    return { minX: Math.min(acc.minX, x0), minY: Math.min(acc.minY, y0), maxX: Math.max(acc.maxX, x0 + v.width), maxY: Math.max(acc.maxY, y0 + v.height) };
+  }, e || { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity });
+  return Number.isFinite(r.minX) ? r : null;
 }
 
 /* LibreDWG's SVG writer throws on some table objects — an R2000 ACAD_TABLE
@@ -108,7 +203,33 @@ function isolate(db, record) {
    object takes the whole sheet down with it. The sheet is then drawn again
    without the tables, and the count of what was left out goes to the user. */
 const isTable = e => /^(ACAD_TABLE|TABLE)$/i.test(String(e?.type || ""));
+/* LibreDWG writes drawing text into the SVG as it is: "Bopp & Reuther",
+   "Legends & Notes", "R<=2 Ohm". That is not XML, and an SVG that is not XML
+   loads inline in the page (the HTML parser forgives it) but not inside an
+   <img> — so every thumbnail and every raster for the PDF came out blank on
+   practically any real drawing. The text of each <text> element is escaped
+   (the library emits no <tspan>, so a <text> holds plain characters only),
+   then any & left bare elsewhere, and the control characters XML forbids are
+   dropped. */
+const XML_CTRL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g;
+function xmlSafe(svg) {
+  return svg
+    .replace(XML_CTRL, "")
+    .replace(/(<text\b[^>]*>)([\s\S]*?)(<\/text>)/g, (m, open, body, close) =>
+      open + body.replace(/&(?!(?:amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);)/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") + close)
+    .replace(/&(?!(?:amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);)/g, "&amp;");
+}
+/* Colour 7 is "white on a dark screen, black on paper" — AutoCAD plots it
+   black. LibreDWG writes it as white, which on a white sheet is simply gone:
+   title blocks, frames and most of the linework, since colour 7 is the second
+   most common colour on every test drawing. */
+const WHITE = /\b(stroke|fill)(=")rgb\(\s*255\s*,\s*255\s*,\s*255\s*\)"|\b(stroke|fill)(\s*:\s*)rgb\(\s*255\s*,\s*255\s*,\s*255\s*\)/g;
+const onPaper = svg => svg.replace(WHITE, (m, a1, s1, a2, s2) => a1 ? a1 + s1 + 'rgb(0,0,0)"' : a2 + s2 + "rgb(0,0,0)");
 function drawSvg(lib, iso) {
+  const r = drawRaw(lib, iso);
+  return { svg: onPaper(xmlSafe(r.svg)), skippedTables: r.skippedTables };
+}
+function drawRaw(lib, iso) {
   try { return { svg: lib.dwg_to_svg(iso), skippedTables: 0 }; }
   catch (err) {
     const own = (iso.entities || []).filter(isTable).length;
@@ -198,6 +319,36 @@ function frame(svg, ext) {
   return out;
 }
 
+/* What is actually drawn, measured by the browser. Points read off the
+   entities overstate it: an INSERT counts at its insertion point, and a block
+   whose base point is the origin while its geometry sits kilometres away drags
+   the box to the origin — a C107 model 80 units wide came out framed 1 300
+   wide, the drawing a speck in one corner. The drawn box is intersected with
+   the robust one, which keeps what each is good at: the drawn box is tight,
+   the robust box drops strays. Returned in drawing coordinates (y up). */
+function drawnBox(svg) {
+  const host = document.createElement("div");
+  host.style.cssText = "position:absolute;left:-100000px;top:0;width:10px;height:10px;overflow:hidden;visibility:hidden";
+  try {
+    host.innerHTML = svg.replace(/^\s*<\?xml[^>]*>/, "");
+    const root = host.querySelector("svg");
+    if (!root) return null;
+    const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    for (const k of [...root.childNodes]) if (k.nodeName !== "defs") g.appendChild(k);
+    root.appendChild(g);
+    document.body.appendChild(host);
+    const b = g.getBBox();
+    if (!(b.width > 0 || b.height > 0)) return null;
+    return { minX: b.x, maxX: b.x + b.width, minY: -(b.y + b.height), maxY: -b.y };
+  } catch { return null; }
+  finally { host.remove(); }
+}
+function intersect(a, b) {
+  if (!a) return b; if (!b) return a;
+  const r = { minX: Math.max(a.minX, b.minX), minY: Math.max(a.minY, b.minY), maxX: Math.min(a.maxX, b.maxX), maxY: Math.min(a.maxY, b.maxY) };
+  return r.maxX > r.minX && r.maxY > r.minY ? r : b;
+}
+
 function meta(svg) {
   const doc = new DOMParser().parseFromString(svg, "image/svg+xml");
   const el = doc.documentElement;
@@ -227,12 +378,16 @@ export async function parseDwg(file) {
     throw new Error("No Model/Paper Space block records in this DWG (tables found: " + tables + ").");
   }
 
+  const visible = layerFilter(db);
   const layouts = [];
+  // Model Space is drawn once: as its own sheet, and as what every viewport shows
+  let modelInner = "";
   if (model) {
-    const iso = isolate(db, model);
+    const iso = isolate(db, model, visible);
     const n = iso.entities.length;
     const drawn = drawSvg(lib, iso);
-    const svg = frame(drawn.svg, extentsFor(iso.entities, db.header));
+    modelInner = n ? innerOf(drawn.svg) : "";
+    const svg = frame(drawn.svg, n ? intersect(extentsFor(iso.entities, db.header), drawnBox(drawn.svg)) : null);
     layouts.push({ id:"model", name:"Model", isModel:true, selected:false, empty:n===0, entityCount:n, skippedTables:drawn.skippedTables,
                    recordName:model.name, svg, previewUrl:svgUrl(svg), paper:"Model Space", ...meta(svg) });
   }
@@ -240,13 +395,17 @@ export async function parseDwg(file) {
   const papersOrdered = papers.map(br => ({ br, lo: byHandle.get(String(br.layout)) }))
     .sort((a, b) => (a.lo?.tabOrder ?? 999) - (b.lo?.tabOrder ?? 999));
   papersOrdered.forEach(({ br, lo }, i) => {
-    const iso = isolate(db, br);
-    const n = iso.entities.length;
-    // an empty layout still gets a sheet, framed on nothing, so it can be seen as empty
+    const vps = modelViewports(db, br, lo);
+    const iso = isolate(db, br, visible);
+    // a viewport counts as content only when there is a model for it to show
+    const own = iso.entities.filter(e => e.type !== "VIEWPORT").length;
+    const n = own + (modelInner ? vps.length : 0);
     const drawn = drawSvg(lib, iso);
-    const svg = frame(drawn.svg, n ? extentsFor(iso.entities, null) : null);
+    const sheet = composeSheet(drawn.svg, modelInner, vps);
+    // an empty layout still gets a sheet, framed on nothing, so it can be seen as empty
+    const svg = frame(sheet, n ? sheetExtents(lo, iso.entities, vps) : null);
     layouts.push({ id:"layout-"+i, name: lo?.layoutName || lo?.name || ("Layout " + (i + 1)), isModel:false,
-                   selected: n > 0, empty: n === 0, entityCount: n, skippedTables: drawn.skippedTables,
+                   selected: n > 0, empty: n === 0, entityCount: n, viewports: vps.length, skippedTables: drawn.skippedTables,
                    recordName:br.name, svg, previewUrl:svgUrl(svg), paper:"Paper Space", ...meta(svg) });
   });
 

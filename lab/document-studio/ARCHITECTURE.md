@@ -1,5 +1,7 @@
 # IECCalc 005 — Engineering Document Studio
 
+> Current state of the code and of the DWG engine: see `document-studio.ru.md`. This file is the original design brief and is not kept in step with the code.
+
 ## Purpose
 
 A browser-first engineering document composer integrated into IECCalc.

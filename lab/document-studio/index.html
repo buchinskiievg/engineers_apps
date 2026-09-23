@@ -211,9 +211,9 @@
   .thumb-img.landscape { aspect-ratio:1.414/1; }
   .thumb-img img, .thumb-img canvas { width:100%; height:100%; object-fit:contain; display:block; }
   .thumb-n { position:absolute; left:4px; top:4px; background:rgba(42,40,35,.88); color:#fff; padding:2px 5px; font:700 9px var(--mono); }
-  .thumb-info { padding:6px; }
-  .thumb-title { font-size:10.5px; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .thumb-meta { margin-top:2px; font:9px var(--mono); color:var(--muted); }
+  .thumb-pg { height:15px; line-height:15px; text-align:center; font:700 9.5px var(--mono); color:var(--ink); border-top:1px solid var(--line); }
+  .thumb-card.out .thumb-img { opacity:.45; }
+  .thumb-card.out .thumb-pg { color:var(--muted); font-weight:400; }
   .thumb-empty { grid-column:1/-1; padding:40px 12px; text-align:center; color:var(--muted); font-size:11px; }
 
   .source-v2 { border:1px solid var(--line); background:var(--panel-2); padding:9px; cursor:pointer; }
@@ -383,7 +383,7 @@ window.DOC_STUDIO_CONFIG = {
 </script>
 <script type="module">
 import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs";
-import { parseDwg, svgToPng } from "./libredwg-engine.js?v=wasm8";
+import { parseDwg, svgToPng } from "./libredwg-engine.js?v=wasm9";
 pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs";
 
 const $ = s => document.querySelector(s);
@@ -560,11 +560,12 @@ function renderThumbs(){
     const active=p?state.activePageId===p.id:state.activeLayoutId===l.id;
     const thumb=p?.thumb||l?.previewUrl||"";
     const title=p?.label||l?.name||("Page "+(it.index+1));
-    const meta=l?[l.paper,l.orientation].filter(Boolean).join(" · "):"Page "+(it.index+1);
     const landscape=(l?.orientation==="landscape")?" landscape":"";
-    return '<div class="thumb-card '+(active?"active":"")+'" data-kind="'+it.kind+'" data-key="'+(p?.id||l?.id||it.index)+'">'+
-      '<div class="thumb-img'+landscape+'">'+(thumb?'<img src="'+esc(thumb)+'">':'<div style="font-size:10px;color:var(--muted)">Rendering…</div>')+'<span class="thumb-n">'+(it.index+1)+'</span></div>'+
-      '<div class="thumb-info"><div class="thumb-title">'+esc(title)+'</div><div class="thumb-meta">'+esc(meta)+'</div></div></div>';
+    // the one caption a thumbnail carries: which page of the output PDF it is; the name stays as a tooltip
+    const at=p?state.pages.indexOf(p):state.pages.findIndex(x=>x.sourceId===s.id&&x.layout?.id===l.id);
+    return '<div class="thumb-card '+(active?"active":"")+(at<0?" out":"")+'" data-kind="'+it.kind+'" data-key="'+(p?.id||l?.id||it.index)+'" title="'+esc(title)+(at<0?" — not in the PDF":"")+'">'+
+      '<div class="thumb-img'+landscape+'">'+(thumb?'<img src="'+esc(thumb)+'">':'<div style="font-size:10px;color:var(--muted)">Rendering…</div>')+'</div>'+
+      '<div class="thumb-pg">'+(at<0?"—":(at+1))+'</div></div>';
   }).join("");
   root.querySelectorAll(".thumb-card").forEach(el=>{
     el.onclick=()=>{
