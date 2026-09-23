@@ -5,4 +5,4 @@
 /forum/c/:slug               /forum/category.html       200
 /forum/t/:id                 /forum/thread.html         200
 /lab                       /lab/index.html          200
-/lab/005                   /lab/005/index.html      200
+/lab/document-studio       /lab/document-studio/index.html 200
