@@ -2,7 +2,7 @@
 // Uses GNU LibreDWG WebAssembly in the browser. No paid API, no DWG upload.
 import { Dwg_File_Type, LibreDwg } from "https://cdn.jsdelivr.net/npm/@mlightcad/libredwg-web@0.7.14/dist/libredwg-web.js";
 
-const WASM = "https://cdn.jsdelivr.net/npm/@mlightcad/libredwg-web@0.7.14/wasm/";
+const WASM = new URL("./", import.meta.url).href;
 let enginePromise;
 
 function getEngine() {
