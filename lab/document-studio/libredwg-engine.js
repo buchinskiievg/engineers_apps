@@ -94,17 +94,31 @@ function withRecords(db, recs) {
    paper layout came out as the whole of Model Space in another frame (checked:
    3 084 508 characters of SVG for a layout holding one viewport, against
    3 084 531 for Model). The other spaces are emptied in the block records too.
-   Ordinary block definitions stay whole: an INSERT still needs its block. */
+   Ordinary block definitions stay whole: an INSERT still needs its block.
+
+   And dwg_to_svg puts only *Model_Space on the canvas. Every other record,
+   paper spaces included, goes into <defs> as a block definition that nothing
+   uses, so a layout's own drawing — frame, title block, notes — never showed:
+   the sheet came out as its viewports alone (found 23.09.2026, FEWA PIPING-066:
+   0 elements drawn from 148 paper entities). A paper layout is therefore drawn
+   by handing its entities to the *Model_Space record for the call; coordinates
+   are untouched, they are paper coordinates either way. */
 function isolate(db, record, visible) {
   const h = String(record.handle);
   const keep = visible || (() => true);
   const ents = Array.isArray(db?.entities) ? db.entities : [];
-  const recs = blockRecords(db).map(r => {
-    if ((isModel(r) || isPaper(r)) && String(r.handle) !== h) return { ...r, entities: [] };
-    if (String(r.handle) === h) return { ...r, entities: (r.entities || []).filter(keep) };
+  const all = blockRecords(db);
+  const model = all.find(isModel);
+  const asModel = isPaper(record) && model;
+  const own = (record.entities || []).filter(keep);
+  const recs = all.map(r => {
+    if (asModel && r === model) return { ...r, entities: own };
+    if (isModel(r) || isPaper(r)) return String(r.handle) === h && !asModel ? { ...r, entities: own } : { ...r, entities: [] };
     return r;
   });
-  return withRecords({ ...db, entities: ents.filter(e => ownerOf(e) === h && keep(e)) }, recs);
+  let mine = ents.filter(e => ownerOf(e) === h && keep(e));
+  if (asModel) mine = mine.map(e => ({ ...e, ownerBlockRecordSoftId: model.handle }));
+  return withRecords({ ...db, entities: mine }, recs);
 }
 
 /* What AutoCAD does not plot does not go on the sheet: entities on a layer that
@@ -160,6 +174,60 @@ function prefixIds(markup, p) {
     .replace(/\b(xlink:href|href)="#([^"]*)"/g, (m, a, id) => a + '="#' + p + id + '"')
     .replace(/url\(#([^)]*)\)/g, (m, id) => "url(#" + p + id + ")");
 }
+/* dwg_to_svg writes every block of the drawing into <defs>, whether the sheet
+   uses it or not; on the FEWA PIPING-066 sheets 511 of 790 definitions — 74 %
+   of a 6 MB SVG — were never referenced. Everything the browser does with a
+   sheet (thumbnail, preview, the raster for the PDF) parses and rasterises all
+   of it, so the unreferenced ones are dropped: definitions are kept when a
+   <use> outside any <defs> reaches them, directly or through other blocks.
+   A linear scan over the tags, not a DOM parse: LibreDWG's output is regular,
+   and a DOM round trip of 6 MB costs half a second per sheet. */
+const TAG = /<(\/?)([A-Za-z][\w:.-]*)((?:[^>"']|"[^"]*"|'[^']*')*?)(\/?)>/g;
+const HREF = /(?:\bhref="#|url\(#)([^")]+)/g;
+function pruneDefs(svg) {
+  const blocks = [];                // {id, start, end} of every top-level element in a <defs>
+  const regions = [];               // [start, end] of every <defs>…</defs>
+  let from = 0;
+  for (;;) {
+    const a = svg.indexOf("<defs", from); if (a < 0) break;
+    const open = svg.indexOf(">", a); const b = svg.indexOf("</defs>", open); if (open < 0 || b < 0) break;
+    regions.push([a, b + 7]);
+    TAG.lastIndex = open + 1;
+    let depth = 0, cur = null, m;
+    while ((m = TAG.exec(svg)) && m.index < b) {
+      const closing = m[1] === "/", self = m[4] === "/" || /\/\s*$/.test(m[3]);
+      if (!closing && depth === 0) {
+        const id = /\bid="([^"]*)"/.exec(m[3]);
+        cur = { id: id ? id[1] : null, start: m.index, end: 0 };
+        if (self) { cur.end = TAG.lastIndex; blocks.push(cur); cur = null; continue; }
+        depth = 1; continue;
+      }
+      if (self) continue;
+      depth += closing ? -1 : 1;
+      if (depth === 0 && cur) { cur.end = TAG.lastIndex; blocks.push(cur); cur = null; }
+    }
+    from = b + 7;
+  }
+  if (!blocks.length) return svg;
+  const byId = new Map(blocks.filter(x => x.id).map(x => [x.id, x]));
+  // what the drawing itself uses: every href outside the <defs> regions
+  const want = [];
+  let pos = 0;
+  for (const [a, b] of regions) { for (const m of svg.slice(pos, a).matchAll(HREF)) want.push(m[1]); pos = b; }
+  for (const m of svg.slice(pos).matchAll(HREF)) want.push(m[1]);
+  const keep = new Set();
+  while (want.length) {
+    const id = want.pop(); if (keep.has(id)) continue; keep.add(id);
+    const x = byId.get(id); if (!x) continue;
+    for (const m of svg.slice(x.start, x.end).matchAll(HREF)) if (!keep.has(m[1])) want.push(m[1]);
+  }
+  const drop = blocks.filter(x => x.id && !keep.has(x.id)).sort((p, q) => p.start - q.start);
+  if (!drop.length) return svg;
+  let out = "", at = 0;
+  for (const x of drop) { out += svg.slice(at, x.start); at = x.end; }
+  return out + svg.slice(at);
+}
+
 const num = v => (Number.isFinite(v) ? +v.toFixed(6) : 0);
 function composeSheet(paperSvg, modelInner, vps) {
   if (!vps.length || !modelInner) return paperSvg;
@@ -349,12 +417,14 @@ function intersect(a, b) {
   return r.maxX > r.minX && r.maxY > r.minY ? r : b;
 }
 
+/* read off the root tag that frame() wrote — a DOM parse of the whole sheet
+   cost a quarter of a second per sheet for two numbers */
 function meta(svg) {
-  const doc = new DOMParser().parseFromString(svg, "image/svg+xml");
-  const el = doc.documentElement;
-  const vb = (el.getAttribute("viewBox") || "").trim().split(/[ ,]+/).map(Number);
-  const width = parseFloat(el.getAttribute("width") || "") || (vb.length === 4 ? vb[2] : null);
-  const height = parseFloat(el.getAttribute("height") || "") || (vb.length === 4 ? vb[3] : null);
+  const tag = (/<svg\b[^>]*>/.exec(svg) || [""])[0];
+  const attr = n => (new RegExp("\\s" + n + '="([^"]*)"').exec(tag) || [])[1] || "";
+  const vb = attr("viewBox").trim().split(/[ ,]+/).map(Number);
+  const width = parseFloat(attr("width")) || (vb.length === 4 ? vb[2] : null);
+  const height = parseFloat(attr("height")) || (vb.length === 4 ? vb[3] : null);
   return { width, height, orientation: width && height && width < height ? "portrait" : "landscape" };
 }
 
@@ -386,8 +456,9 @@ export async function parseDwg(file) {
     const iso = isolate(db, model, visible);
     const n = iso.entities.length;
     const drawn = drawSvg(lib, iso);
-    modelInner = n ? innerOf(drawn.svg) : "";
-    const svg = frame(drawn.svg, n ? intersect(extentsFor(iso.entities, db.header), drawnBox(drawn.svg)) : null);
+    const lean = pruneDefs(drawn.svg);
+    modelInner = n ? innerOf(lean) : "";
+    const svg = frame(lean, n ? intersect(extentsFor(iso.entities, db.header), drawnBox(lean)) : null);
     layouts.push({ id:"model", name:"Model", isModel:true, selected:false, empty:n===0, entityCount:n, skippedTables:drawn.skippedTables,
                    recordName:model.name, svg, previewUrl:svgUrl(svg), paper:"Model Space", ...meta(svg) });
   }
@@ -401,7 +472,7 @@ export async function parseDwg(file) {
     const own = iso.entities.filter(e => e.type !== "VIEWPORT").length;
     const n = own + (modelInner ? vps.length : 0);
     const drawn = drawSvg(lib, iso);
-    const sheet = composeSheet(drawn.svg, modelInner, vps);
+    const sheet = pruneDefs(composeSheet(drawn.svg, modelInner, vps));
     // an empty layout still gets a sheet, framed on nothing, so it can be seen as empty
     const svg = frame(sheet, n ? sheetExtents(lo, iso.entities, vps) : null);
     layouts.push({ id:"layout-"+i, name: lo?.layoutName || lo?.name || ("Layout " + (i + 1)), isModel:false,

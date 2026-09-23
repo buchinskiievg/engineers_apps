@@ -199,21 +199,84 @@
   }
 
   /* === Document Studio v2: Files -> thumbnails -> preview -> output === */
-  .workspace-v2 { display:grid; grid-template-columns:300px 280px minmax(0,1fr); gap:10px; align-items:stretch; min-height:610px; }
+  .workspace-v2 { display:grid; grid-template-columns:var(--tree-w,420px) 10px minmax(0,1fr); align-items:stretch; min-height:610px; }
+  .splitter { cursor:col-resize; position:relative; touch-action:none; outline:none; }
+  .splitter::before { content:""; position:absolute; top:0; bottom:0; left:4px; width:2px; background:transparent; transition:background .12s; }
+  .splitter:hover::before, .splitter:focus-visible::before, .splitter.on::before { background:var(--red); }
+  .splitter::after { content:""; position:absolute; top:50%; left:3px; width:4px; height:32px; margin-top:-16px; border-left:1px solid var(--muted); border-right:1px solid var(--muted); opacity:.55; }
+  .doc-dl { white-space:nowrap; }
+
+  /* One tree: a file, and under it — opened with + — its pages. The file row is
+     dragged too: onto another file to merge the two, onto its top or bottom
+     quarter to reorder the files. */
+  .tree { padding:8px; display:flex; flex-direction:column; gap:7px; }
+  .doc { border:1px solid var(--line); background:var(--panel-2); }
+  .doc.active { border-left:4px solid var(--red); }
+  .doc-row { display:flex; align-items:flex-start; gap:8px; padding:8px; cursor:grab; user-select:none; -webkit-user-select:none; touch-action:none; }
+  .doc.active .doc-row { padding-left:5px; }
+  .doc-tog { flex:0 0 22px; width:22px; height:22px; min-height:0; padding:0; border:1px solid var(--line); background:#fff; color:var(--ink); font:700 14px/1 var(--mono); cursor:pointer; display:grid; place-items:center; }
+  .doc-tog:hover { background:var(--ink); color:#fff; border-color:var(--ink); }
+  .doc-main { min-width:0; flex:1; }
+  .doc-name { font-size:12px; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .doc-meta { font-size:10px; color:var(--muted); margin-top:2px; }
+  .doc-acts { display:flex; gap:3px; flex-wrap:wrap; justify-content:flex-end; }
+  .doc-acts button { min-height:0; padding:3px 6px; font-size:9.5px; }
+  .doc > .pg-list { border-top:1px solid var(--line); grid-template-columns:repeat(auto-fill,minmax(96px,1fr)); background:var(--panel); }
+  .doc-row.drop-before { box-shadow:inset 0 3px 0 var(--red); }
+  .doc-row.drop-after { box-shadow:inset 0 -3px 0 var(--red); }
+  .doc-row.drop-merge { outline:2px dashed var(--red); outline-offset:-2px; background:rgba(163,14,24,.07); }
+  .doc-row.drop-merge .doc-meta::after { content:"  ⇢ release to merge"; color:var(--red); font-weight:800; }
+  .doc.dragging { opacity:.4; }
+  .doc-ghost { position:fixed; left:0; top:0; z-index:1000; pointer-events:none; background:var(--panel-2); border:1px solid var(--ink); box-shadow:0 10px 26px rgba(0,0,0,.28); opacity:.95; }
+
+  .merge-box { width:min(520px,100%); }
+  .merge-body { padding:14px 16px; display:flex; flex-direction:column; gap:12px; }
+  .merge-note { font-size:11.5px; color:var(--muted); }
+  .merge-list { margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:6px; counter-reset:m; }
+  .merge-list li { counter-increment:m; display:flex; align-items:center; gap:8px; padding:8px 9px; border:1px solid var(--line); background:var(--panel-2); }
+  .merge-list li::before { content:counter(m); font:800 12px var(--mono); color:var(--red); min-width:16px; }
+  .merge-list .m-name { flex:1; min-width:0; font-size:12px; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .merge-list .m-n { font:10px var(--mono); color:var(--muted); }
+  .merge-list button { min-height:0; width:26px; height:24px; padding:0; }
+  .merge-name { display:flex; flex-direction:column; gap:4px; font-size:10.5px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; }
+  .merge-name input { font:600 12.5px var(--sans, sans-serif); text-transform:none; letter-spacing:0; padding:7px 8px; border:1px solid var(--line); background:#fff; }
+  .merge-foot { display:flex; justify-content:flex-end; gap:8px; padding:10px 16px; border-top:1px solid var(--line); }
   .pane { border:1px solid var(--line); background:var(--panel); min-width:0; display:flex; flex-direction:column; }
   .pane-body { min-height:0; flex:1; overflow:auto; }
   .source-list-v2 { padding:8px; display:flex; flex-direction:column; gap:7px; }
-  .thumb-list { padding:8px; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; align-content:start; }
-  .thumb-card { border:1px solid var(--line); background:var(--panel-2); cursor:pointer; min-width:0; }
-  .thumb-card:hover { border-color:var(--ink); }
-  .thumb-card.active { outline:2px solid var(--red); outline-offset:1px; }
-  .thumb-img { aspect-ratio:1/1.414; background:#d7d3ca; display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative; }
-  .thumb-img.landscape { aspect-ratio:1.414/1; }
-  .thumb-img img, .thumb-img canvas { width:100%; height:100%; object-fit:contain; display:block; }
-  .thumb-n { position:absolute; left:4px; top:4px; background:rgba(42,40,35,.88); color:#fff; padding:2px 5px; font:700 9px var(--mono); }
-  .thumb-pg { height:15px; line-height:15px; text-align:center; font:700 9.5px var(--mono); color:var(--ink); border-top:1px solid var(--line); }
-  .thumb-card.out .thumb-img { opacity:.45; }
-  .thumb-card.out .thumb-pg { color:var(--muted); font-weight:400; }
+  /* The pages of the PDF, in order, and everything that is done to them. One
+     panel: the separate output strip under the workspace showed the same pages
+     a second time. Cards are dragged with pointer events, not HTML5 drag and
+     drop — a native drag of an <img> hands the page a file ("download.svg"),
+     which the drop-anywhere handler then opened as a new source. */
+  .pg-list { padding:8px; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; align-content:start; user-select:none; -webkit-user-select:none; }
+  .pg-card { position:relative; border:1px solid var(--line); background:var(--panel-2); min-width:0; cursor:grab; touch-action:none; }
+  .pg-card:hover { border-color:var(--ink); }
+  .pg-card.mine .pg-no { background:var(--bg-soft, #E4E0D6); }
+  .pg-card.active { outline:2px solid var(--red); outline-offset:1px; }
+  .pg-card.selected { box-shadow:inset 0 0 0 2px var(--red); }
+  .pg-card.out { cursor:pointer; }
+  .pg-card.out .pg-img { opacity:.45; }
+  .pg-img { aspect-ratio:1/1.414; background:#fff; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+  .pg-card.landscape .pg-img { aspect-ratio:1.414/1; }
+  .pg-img img { width:100%; height:100%; object-fit:contain; display:block; pointer-events:none; }
+  .pg-wait { font-size:10px; color:var(--muted); }
+  .pg-no { height:15px; line-height:15px; text-align:center; font:700 9.5px var(--mono); color:var(--ink); border-top:1px solid var(--line); }
+  .pg-card.out .pg-no { color:var(--muted); font-weight:400; }
+  .pg-acts { position:absolute; top:3px; right:3px; display:flex; gap:2px; opacity:0; transition:opacity .12s; }
+  .pg-card:hover .pg-acts, .pg-card.selected .pg-acts, .pg-card.out .pg-acts { opacity:1; }
+  @media (hover:none) { .pg-acts { opacity:1; } }
+  .pg-acts button { width:20px; height:20px; min-height:0; padding:0; border:1px solid var(--line); background:rgba(255,255,255,.95); color:var(--ink); font:700 12px/1 var(--mono); cursor:pointer; display:grid; place-items:center; }
+  .pg-acts button:hover { background:var(--ink); border-color:var(--ink); color:#fff; }
+  .pg-acts button[data-act="del"]:hover { background:var(--red); border-color:var(--red); }
+  .pg-sep { grid-column:1/-1; margin-top:4px; padding-top:7px; border-top:1px dashed var(--line); font:700 9px var(--mono); letter-spacing:.06em; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  /* while a card is dragged its own place in the grid is the insertion slot:
+     an empty dashed frame that moves live, the other cards sliding aside */
+  .pg-card.placeholder { border:2px dashed var(--red); background:rgba(163,14,24,.06); outline:none; box-shadow:none; }
+  .pg-card.placeholder > * { visibility:hidden; }
+  .pg-list.sorting .pg-card { cursor:grabbing; }
+  .pg-ghost { position:fixed; left:0; top:0; z-index:1000; pointer-events:none; box-shadow:0 10px 26px rgba(0,0,0,.28); opacity:.94; cursor:grabbing; }
+  .pg-hint { padding:6px 9px; border-bottom:1px solid var(--line); background:var(--panel-2); font-size:9.5px; line-height:1.4; color:var(--muted); }
   .thumb-empty { grid-column:1/-1; padding:40px 12px; text-align:center; color:var(--muted); font-size:11px; }
 
   .source-v2 { border:1px solid var(--line); background:var(--panel-2); padding:9px; cursor:pointer; }
@@ -221,10 +284,6 @@
   .source-v2:hover { border-color:var(--ink); }
   .source-v2 .source-actions { margin-top:7px; }
 
-  .thumb-options { padding:8px 9px; border-bottom:1px solid var(--line); background:var(--panel-2); display:none; }
-  .thumb-options.on { display:block; }
-  .thumb-options label { min-height:0; align-items:center; font-size:10.5px; gap:6px; }
-  .thumb-options input { width:auto; height:auto; }
 
   .preview-toolbar-v2 { min-height:42px; border-bottom:1px solid var(--line); background:var(--panel-2); padding:7px 9px; display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
   .preview-toolbar-v2 .grow { flex:1; }
@@ -235,25 +294,11 @@
   .boundary { position:absolute; inset:3.5%; border:2px dashed var(--red); pointer-events:none; display:none; }
   .boundary.on { display:block; }
 
-  .output-panel { margin-top:10px; border:1px solid var(--line); background:var(--panel); }
-  .output-toolbar { min-height:40px; padding:7px 9px; border-bottom:1px solid var(--line); background:var(--panel-2); display:flex; align-items:center;gap:6px;flex-wrap:wrap; }
-  .output-toolbar .grow { flex:1; }
-  .output-pages { padding:10px; display:flex; gap:9px; overflow-x:auto; min-height:178px; align-items:flex-start; }
-  .output-card { flex:0 0 118px; border:1px solid var(--line); background:var(--panel-2); cursor:grab; }
-  .output-card.active { outline:2px solid var(--red); outline-offset:1px; }
-  .output-card.selected { box-shadow:inset 0 0 0 2px var(--red); }
-  .output-card.dragging { opacity:.35; }
-  .output-img { height:112px; background:#d7d3ca; display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative; }
-  .output-img img { width:100%;height:100%;object-fit:contain; }
-  .output-info { padding:5px; }
-  .output-name { font-size:9.5px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
-  .output-actions { display:flex;gap:3px;margin-top:4px; }
-  .output-actions button { flex:1;padding:3px 4px;font-size:9px; }
-  .output-empty { color:var(--muted);font-size:11px;padding:55px 18px; }
+  .preview-paper[style*="width"] { max-width:none; }
+  .preview-stage { justify-content:safe center; }
+  .preview-paper img { width:100%; }
 
-  @media(max-width:1100px){ .workspace-v2{grid-template-columns:280px 240px minmax(0,1fr);} }
-  @media(max-width:860px){ .workspace-v2{grid-template-columns:1fr 1fr;} .preview-pane{grid-column:1/-1;} .preview-stage{min-height:420px;} }
-  @media(max-width:600px){ .workspace-v2{grid-template-columns:1fr;} .preview-pane{grid-column:auto;} .thumb-list{grid-template-columns:repeat(3,minmax(0,1fr));} }
+  @media(max-width:760px){ .workspace-v2{grid-template-columns:1fr; gap:10px;} .splitter{display:none;} .preview-stage{min-height:420px;} }
 
 </style>
 </head>
@@ -290,23 +335,14 @@
 
 
   <div class="workspace-v2">
-    <aside class="pane">
-      <div class="section-head"><b>/ SOURCE FILES</b><span id="sourceCount" class="count">0 FILES</span></div>
-      <div id="sourceList" class="pane-body source-list-v2">
+    <aside class="pane tree-pane">
+      <div class="section-head"><b>/ FILES &amp; PAGES</b><span id="docCount" class="count">0 FILES</span></div>
+      <div class="pg-hint"><b>+</b> opens a file's pages: drag to reorder, ↻ rotate, ✕ remove, + put back; Ctrl/Shift-click selects several, Del / R act on them.<br>Drag a file onto another to <b>merge</b> them into a new document, onto its top or bottom edge to reorder. <b>⤓ PDF</b> downloads a document.</div>
+      <div id="tree" class="pane-body tree">
         <div class="thumb-empty">Drop files above to start.</div>
       </div>
     </aside>
-
-    <section class="pane">
-      <div class="section-head"><b>/ PAGES / LAYOUTS</b><span id="sourcePageCount" class="count">0</span></div>
-      <div id="thumbOptions" class="thumb-options">
-        <label><input id="includeModel" type="checkbox"> Include Model Space</label>
-        <div style="margin-top:5px;font-size:9.5px;color:var(--muted)">Paper Space layouts are included by default. Paper/Model spaces are detected locally. Plot-style fidelity depends on LibreDWG support.</div>
-      </div>
-      <div id="thumbList" class="pane-body thumb-list">
-        <div class="thumb-empty">Select a source file.</div>
-      </div>
-    </section>
+    <div id="splitter" class="splitter" role="separator" aria-orientation="vertical" aria-label="Resize the file list" tabindex="0" title="Drag to resize · ← → keys"></div>
 
     <main class="pane preview-pane">
       <div class="section-head">
@@ -328,22 +364,19 @@
     </main>
   </div>
 
-  <section class="output-panel">
-    <div class="section-head"><b>/ OUTPUT PDF — PAGE ORDER</b><span id="pageCount" class="count">0 PAGES</span></div>
-    <div class="output-toolbar">
-      <button id="moveFirstBtn" class="btn btn-ghost">⇤ FIRST</button>
-      <button id="moveLastBtn" class="btn btn-ghost">LAST ⇥</button>
-      <button id="rotateBtn" class="btn btn-ghost">ROTATE 90°</button>
-      <button id="deleteBtn" class="btn btn-ghost">DELETE SELECTED</button>
-      <button id="selectAllBtn" class="btn btn-ghost">SELECT ALL</button>
-      <button id="deselectBtn" class="btn btn-ghost">DESELECT</button>
-      <span class="grow"></span>
-      <div id="exportProgress" class="progressbar" hidden><i></i></div>
-      <button id="exportBtn" class="btn btn-primary">EXPORT PDF</button>
-    </div>
-    <div id="pages" class="output-pages"><div class="output-empty">Pages from loaded files will appear here in final PDF order.</div></div>
-  </section>
 
+
+<div id="mergeModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="mergeTitle">
+  <div class="modal-box merge-box">
+    <div class="modal-head"><b id="mergeTitle">MERGE FILES — ORDER</b><span class="grow"></span><button id="mergeCancelX" class="btn btn-ghost" aria-label="Cancel">✕</button></div>
+    <div class="merge-body">
+      <div class="merge-note">The files go into one PDF in this order. Pages keep their order inside each file.</div>
+      <ol id="mergeList" class="merge-list"></ol>
+      <label class="merge-name">Name of the merged document<input id="mergeName" type="text" autocomplete="off"></label>
+    </div>
+    <div class="merge-foot"><button id="mergeCancel" class="btn btn-ghost">CANCEL</button><button id="mergeOk" class="btn btn-primary">MERGE</button></div>
+  </div>
+</div>
 
 <div id="previewModal" class="modal" role="dialog" aria-modal="true">
   <div class="modal-box">
@@ -383,13 +416,18 @@ window.DOC_STUDIO_CONFIG = {
 </script>
 <script type="module">
 import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs";
-import { parseDwg, svgToPng } from "./libredwg-engine.js?v=wasm9";
+import { parseDwg, svgToPng } from "./libredwg-engine.js?v=wasm10";
 pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs";
 
 const $ = s => document.querySelector(s);
+/* A document is what becomes one PDF: at first one per file; dragging one file
+   onto another makes a new, merged one (the files stay). doc.pages is that PDF.
+   A source is a file as read. state.all holds every page any source can give,
+   including those not in its document — removed pages, empty layouts, Model
+   Space — so that a removed page can be previewed and put back. */
 const state = {
-  sources:new Map(), pages:[], activeSourceId:null, activePageId:null,
-  activeLayoutId:null, selected:new Set(), previewZoom:1, showBoundary:false
+  sources:new Map(), docs:[], all:new Map(), activeDocId:null, activePageId:null,
+  selected:new Set(), anchorId:null, previewZoom:1, showBoundary:false
 };
 
 function uid(p="id"){ return p+"-"+Math.random().toString(36).slice(2,10); }
@@ -397,14 +435,27 @@ function ext(n){ return (n.split(".").pop()||"").toLowerCase(); }
 function bytes(n){ return n<1024?n+" B":n<1048576?(n/1024).toFixed(1)+" KB":(n/1048576).toFixed(1)+" MB"; }
 function esc(s){ return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c])); }
 function source(id){ return state.sources.get(id); }
-function activeSource(){ return source(state.activeSourceId); }
-function page(id){ return state.pages.find(p=>p.id===id); }
+function page(id){ return state.all.get(id); }
+function doc(id){ return state.docs.find(d=>d.id===id); }
+function docOfSource(sid){ return state.docs.find(d=>!d.merged&&d.sourceIds[0]===sid); }
+function docOfPage(p){ return p?doc(p.docId):null; }
+function activeDoc(){ return doc(state.activeDocId); }
+function newPage(o){ const p={id:uid("page"),rotation:0,thumb:null,orient:null,...o}; state.all.set(p.id,p); return p; }
+const inDoc = p => !!p && !!docOfPage(p)?.pages.includes(p);
+/* d.all: every page the document can hold, in source order; d.pages: the PDF */
+function outPages(d){ return d.all.filter(p=>!d.pages.includes(p)); }
+// a merged document holds copies of the pages, sharing the original's
+// thumbnail: rotating or removing a page there leaves the original file alone
+const baseThumb = p => p.thumb||p.orig?.thumb||null;
 
 function addSource(file,type){
-  const s={id:uid("src"),file,name:file.name,size:file.size,type,status:"pending",statusText:"Queued",pdfBytes:null,pdfDoc:null,pageIds:[],layouts:[],dependencies:[],jobId:null};
-  state.sources.set(s.id,s); state.activeSourceId=s.id; return s;
+  const s={id:uid("src"),file,name:file.name,size:file.size,type,status:"pending",statusText:"Queued",pdfBytes:null,pdfDoc:null,pageIds:[],layouts:[]};
+  state.sources.set(s.id,s);
+  const d={id:uid("doc"),name:file.name,sourceIds:[s.id],all:[],pages:[],open:true,merged:false};
+  state.docs.push(d); state.activeDocId=d.id;
+  return s;
 }
-function setStatus(s,status,text){ s.status=status;s.statusText=text;renderSources(); }
+function setStatus(s,status,text){ s.status=status;s.statusText=text;renderTree(); }
 
 async function acceptFiles(list){
   for(const file of [...list]){
@@ -419,7 +470,7 @@ async function acceptFiles(list){
 }
 
 async function ingestPdf(file, existing=null, displayName=null){
-  const s=existing||addSource(file,"pdf");
+  const s=existing||addSource(file,"pdf"), d=docOfSource(s.id);
   try{
     setStatus(s,"pending","Reading PDF");
     const ab=await file.arrayBuffer();
@@ -427,28 +478,31 @@ async function ingestPdf(file, existing=null, displayName=null){
     s.pdfDoc=await pdfjsLib.getDocument({data:ab.slice(0)}).promise;
     s.type="pdf";
     for(let n=1;n<=s.pdfDoc.numPages;n++){
-      const p={id:uid("page"),sourceId:s.id,sourceType:"pdf",sourcePage:n-1,label:(displayName||file.name)+" — "+n,rotation:0,thumb:null};
-      state.pages.push(p);s.pageIds.push(p.id);queueThumb(s,p,n);
+      const p=newPage({docId:d.id,sourceId:s.id,sourceType:"pdf",sourcePage:n-1,label:(displayName||file.name)+" — "+n});
+      d.all.push(p);d.pages.push(p);s.pageIds.push(p.id);
     }
-    setStatus(s,"ready",s.pdfDoc.numPages+" pages");
-    state.activeSourceId=s.id;
-    state.activePageId=s.pageIds[0]||null;
+    setStatus(s,"ready",s.pdfDoc.numPages+" page"+(s.pdfDoc.numPages===1?"":"s"));
+    state.activeDocId=d.id; state.activePageId=s.pageIds[0]||null;
+    renderAll();
+    queueThumbs(async()=>{ for(const id of s.pageIds){ const p=page(id); if(p) await pdfThumb(s,p); } });
   }catch(e){ console.error(e);setStatus(s,"error","PDF read failed"); }
 }
 
-async function queueThumb(s,p,n){
+async function pdfThumb(s,p){
   try{
-    const pg=await s.pdfDoc.getPage(n), vp=pg.getViewport({scale:.28});
+    const pg=await s.pdfDoc.getPage(p.sourcePage+1), vp=pg.getViewport({scale:.3});
     const cv=document.createElement("canvas");cv.width=Math.ceil(vp.width);cv.height=Math.ceil(vp.height);
     await pg.render({canvasContext:cv.getContext("2d"),viewport:vp}).promise;
-    p.thumb=cv.toDataURL("image/jpeg",.82);renderThumbs();renderOutput();
+    p.thumb=cv.toDataURL("image/jpeg",.82); p.orient=cv.width>cv.height?"landscape":"portrait";
+    updateCard(p);
   }catch(e){ console.warn(e); }
 }
 
 async function ingestImage(file){
-  const s=addSource(file,"image"), url=URL.createObjectURL(file);
-  const p={id:uid("page"),sourceId:s.id,sourceType:"image",sourcePage:0,label:file.name,rotation:0,thumb:url,imageFile:file};
-  state.pages.push(p);s.pageIds.push(p.id);setStatus(s,"ready","1 page");state.activePageId=p.id;
+  const s=addSource(file,"image"), d=docOfSource(s.id), url=URL.createObjectURL(file);
+  const p=newPage({docId:d.id,sourceId:s.id,sourceType:"image",sourcePage:0,label:file.name,thumb:url,imageFile:file});
+  d.all.push(p);d.pages.push(p);s.pageIds.push(p.id);setStatus(s,"ready","1 page");state.activePageId=p.id;
+  const im=new Image(); im.onload=()=>{p.orient=im.naturalWidth>im.naturalHeight?"landscape":"portrait";updateCard(p);}; im.src=url;
 }
 
 async function ingestOffice(file){
@@ -462,238 +516,541 @@ async function ingestOffice(file){
   }catch(e){console.error(e);setStatus(s,"error","Office renderer unavailable");}
 }
 
-async function ingestDwg(file){
-  const src=addSource(file,"dwg");
-  state.activeSourceId=src.id;
+/* A reload re-reads the same file in place: its pages keep their place in the
+   document instead of a second copy of the file being added. */
+async function ingestDwg(file, existing=null){
+  const src=existing||addSource(file,"dwg"), d=docOfSource(src.id);
+  let at=d.pages.length;
+  if(existing){
+    const first=d.pages.findIndex(p=>p.sourceId===src.id); if(first>=0) at=first;
+    d.pages=[]; d.all=[];
+    for(const id of src.pageIds){ state.all.delete(id); state.selected.delete(id); }
+    src.pageIds=[]; src.layouts=[]; src.engineError=null;
+  }
+  state.activeDocId=d.id;
   setStatus(src,"pending","Parsing locally · LibreDWG");
   renderAll();
   try{
     const result=await parseDwg(file);
     src.layouts=result.layouts||[];
     src.modelOnly=!!result.modelOnly;
-    src.pageIds=[];
-    state.pages=state.pages.filter(p=>p.sourceId!==src.id);
-    /* Everything in Model Space and every paper layout empty — a route plan, a
-       proposal layout — would otherwise open as an empty page. Model is switched
-       on for such a drawing, and the status line says why. */
-    if(src.modelOnly) $("#includeModel").checked=true;
-    for(const l of src.layouts.filter(x=>x.selected)){
-      const p={id:uid("page"),sourceId:src.id,sourceType:"dwg-svg",sourcePage:src.pageIds.length,label:src.name+" — "+l.name,rotation:0,thumb:l.previewUrl,layout:l,svg:l.svg,pngDataUrl:null};
-      state.pages.push(p);src.pageIds.push(p.id);
+    const put=[];
+    for(const l of src.layouts){
+      const p=newPage({docId:d.id,sourceId:src.id,sourceType:"dwg-svg",label:src.name+" — "+l.name,layout:l,svg:l.svg,orient:l.orientation||"landscape"});
+      src.pageIds.push(p.id); d.all.push(p);
+      // into the PDF from the start: paper layouts with something on them, and
+      // Model only for a drawing kept entirely in Model Space (modelOnly)
+      if(l.selected) put.push(p);
     }
-    const first=src.layouts.find(x=>x.selected)||src.layouts[0];
-    state.activeLayoutId=first?.id||null;
-    state.activePageId=state.pages.find(p=>p.sourceId===src.id&&p.layout?.id===state.activeLayoutId)?.id||null;
+    d.pages.splice(Math.min(at,d.pages.length),0,...put);
+    state.activePageId=(put[0]||page(src.pageIds[0]))?.id||null;
     const paperN=src.layouts.filter(x=>!x.isModel).length, emptyN=src.layouts.filter(x=>!x.isModel&&x.empty).length;
-    setStatus(src,"ready", src.modelOnly
+    const tables=src.layouts.reduce((k,l)=>k+(l.skippedTables||0),0);
+    setStatus(src,"ready", (src.modelOnly
       ? "LibreDWG · Model Space only — "+(paperN?paperN+" paper layout"+(paperN>1?"s are":" is")+" empty, ":"no paper layouts, ")+"Model included"
-      : "LibreDWG · "+(paperN-emptyN)+" layout"+(paperN-emptyN===1?"":"s")+(emptyN?" · "+emptyN+" empty skipped":"")
-      + ((()=>{const t=src.layouts.reduce((k,l)=>k+(l.skippedTables||0),0);return t?" · "+t+" table"+(t>1?"s":"")+" not drawn by LibreDWG":"";})()));
+      : "LibreDWG · "+(paperN-emptyN)+" layout"+(paperN-emptyN===1?"":"s")+(emptyN?" · "+emptyN+" empty":""))
+      + (tables?" · "+tables+" table"+(tables>1?"s":"")+" not drawn by LibreDWG":""));
+    renderAll();
+    queueThumbs(()=>dwgThumbs(src));
   }catch(err){
     console.error(err);
     src.engineError=err?.message||String(err);
     setStatus(src,"error","LibreDWG: "+src.engineError);
+    renderAll();
   }
-  renderAll();
 }
 
-async function rebuildDwgOutput(){
-  const src=activeSource();
-  if(!src||src.type!=="dwg"||!src.layouts?.length)return;
-  state.pages=state.pages.filter(p=>p.sourceId!==src.id);
-  src.pageIds=[];
-  const includeModel=$("#includeModel").checked;
-  for(const l of src.layouts.filter(x=>x.isModel?includeModel:!x.empty)){
-    const p={id:uid("page"),sourceId:src.id,sourceType:"dwg-svg",sourcePage:src.pageIds.length,label:src.name+" — "+l.name,rotation:0,thumb:l.previewUrl,layout:l,svg:l.svg,pngDataUrl:null};
-    state.pages.push(p);src.pageIds.push(p.id);
+/* Thumbnails are small rasters, made once per sheet. The sheet SVG runs to
+   several megabytes; as the <img> of every card it made each redraw decode all
+   of them again, which is what made dragging crawl. Pages in the PDF first. */
+async function dwgThumbs(src){
+  const ids=[...src.pageIds].sort((a,b)=>(inDoc(page(b))?1:0)-(inDoc(page(a))?1:0));
+  for(const id of ids){
+    const p=page(id); if(!p||p.thumb) continue;
+    try{ p.thumb=await svgToPng(p.svg,420); }catch(e){ console.warn(e); p.thumb=p.layout?.previewUrl||null; }
+    updateCard(p);
+    await new Promise(r=>setTimeout(r,40)); // a breath for the page between sheets
   }
-  renderAll();
 }
+/* One queue for all thumbnails, run in the background: the next file is read
+   while the previous one's thumbnails are still being drawn. */
+let thumbChain=Promise.resolve();
+function queueThumbs(job){ thumbChain=thumbChain.then(job).catch(e=>console.warn(e)); }
 
-function renderSources(){
-  const root=$("#sourceList"), arr=[...state.sources.values()];
-  $("#sourceCount").textContent=arr.length+" FILE"+(arr.length===1?"":"S");
-  if(!arr.length){root.innerHTML='<div class="thumb-empty">Drop files above to start.</div>';return;}
-  root.innerHTML=arr.map(s=>'<div class="source-v2 '+(s.id===state.activeSourceId?"active":"")+'" data-id="'+s.id+'">'+
-    '<div class="source-top"><div class="source-icon">'+(s.type==="dwg"?"DWG":s.type==="office"?"WORD":s.type==="image"?"IMG":"PDF")+'</div>'+
-    '<div class="source-main"><div class="source-name">'+esc(s.name)+'</div><div class="source-meta">'+bytes(s.size)+' · '+esc(s.type.toUpperCase())+'</div>'+
-    '<div class="status '+s.status+'"><i class="dot"></i>'+esc(s.statusText)+'</div></div></div>'+
-    '<div class="source-actions">'+(s.type==="dwg"?'<button class="btn btn-ghost" data-act="refresh">RELOAD</button>':'')+
-    '<button class="btn btn-ghost" data-act="remove">REMOVE</button></div></div>').join("");
-  root.querySelectorAll(".source-v2").forEach(el=>{
-    el.onclick=ev=>{
-      const id=el.dataset.id, act=ev.target.dataset.act;
-      if(act==="remove"){ev.stopPropagation();removeSource(id);return;}
-      if(act==="refresh"){ev.stopPropagation();ingestDwg(source(id).file);return;}
-      state.activeSourceId=id;
-      const s=source(id);state.activePageId=s.pageIds[0]||null;state.activeLayoutId=(s.layouts?.find(l=>!l.isModel)||s.layouts?.[0])?.id||null;
-      renderAll();
-    };
-  });
-}
-
-function removeSource(id){
-  const s=source(id);if(!s)return;
-  state.pages=state.pages.filter(p=>p.sourceId!==id);state.sources.delete(id);
-  [...state.selected].forEach(pid=>{if(!page(pid))state.selected.delete(pid)});
-  if(state.activeSourceId===id){const next=[...state.sources.values()][0];state.activeSourceId=next?.id||null;state.activePageId=next?.pageIds?.[0]||null;}
-  renderAll();
-}
-
-function sourceItems(s){
-  if(!s)return [];
-  if(s.type==="dwg"&&s.layouts?.length) return s.layouts.filter(l=>!l.isModel||$("#includeModel").checked).map((l,i)=>({kind:"layout",layout:l,index:i}));
-  if(s.pageIds.length) return s.pageIds.map((id,i)=>({kind:"page",page:page(id),index:i}));
-  return [];
-}
-
-function renderThumbs(){
-  const s=activeSource(), root=$("#thumbList");
-  $("#thumbOptions").classList.toggle("on",!!s&&s.type==="dwg");
-  if(!s){$("#sourcePageCount").textContent="0";root.innerHTML='<div class="thumb-empty">Select a source file.</div>';return;}
-  const items=sourceItems(s);$("#sourcePageCount").textContent=String(items.length);
-  if(!items.length){
-    root.innerHTML='<div class="thumb-empty">'+(s.type==="dwg"?(s.engineError?"LibreDWG error:<br>"+esc(s.engineError):"Parsing local DWG…"):"No pages.")+'</div>';return;
-  }
-  root.innerHTML=items.map(it=>{
-    const p=it.page,l=it.layout;
-    const active=p?state.activePageId===p.id:state.activeLayoutId===l.id;
-    const thumb=p?.thumb||l?.previewUrl||"";
-    const title=p?.label||l?.name||("Page "+(it.index+1));
-    const landscape=(l?.orientation==="landscape")?" landscape":"";
-    // the one caption a thumbnail carries: which page of the output PDF it is; the name stays as a tooltip
-    const at=p?state.pages.indexOf(p):state.pages.findIndex(x=>x.sourceId===s.id&&x.layout?.id===l.id);
-    return '<div class="thumb-card '+(active?"active":"")+(at<0?" out":"")+'" data-kind="'+it.kind+'" data-key="'+(p?.id||l?.id||it.index)+'" title="'+esc(title)+(at<0?" — not in the PDF":"")+'">'+
-      '<div class="thumb-img'+landscape+'">'+(thumb?'<img src="'+esc(thumb)+'">':'<div style="font-size:10px;color:var(--muted)">Rendering…</div>')+'</div>'+
-      '<div class="thumb-pg">'+(at<0?"—":(at+1))+'</div></div>';
-  }).join("");
-  root.querySelectorAll(".thumb-card").forEach(el=>{
-    el.onclick=()=>{
-      if(el.dataset.kind==="page"){state.activePageId=el.dataset.key;const p=page(state.activePageId);state.activeSourceId=p.sourceId;}
-      else {
-        state.activeLayoutId=el.dataset.key;
-        const s=activeSource();
-        const p=state.pages.find(p=>p.sourceId===s?.id&&p.layout?.id===state.activeLayoutId);
-        state.activePageId=p?.id||null;
+/* A rotated page gets a rotated thumbnail, drawn once per angle. */
+function thumbSrc(p){
+  const t=baseThumb(p);
+  if(!t) return "";
+  if(!p.rotation) return t;
+  p._rot=p._rot||{};
+  if(p._rot[p.rotation]) return p._rot[p.rotation];
+  if(!p._rotPending){
+    p._rotPending=true;
+    const im=new Image();
+    im.onload=()=>{
+      for(const r of [90,180,270]){
+        const q=r%180!==0, cv=document.createElement("canvas");
+        cv.width=q?im.height:im.width; cv.height=q?im.width:im.height;
+        const x=cv.getContext("2d"); x.fillStyle="#fff"; x.fillRect(0,0,cv.width,cv.height);
+        x.translate(cv.width/2,cv.height/2); x.rotate(r*Math.PI/180); x.drawImage(im,-im.width/2,-im.height/2);
+        p._rot[r]=cv.toDataURL("image/jpeg",.85);
       }
-      renderThumbs();renderPreview();
+      p._rotPending=false; updateCard(p);
     };
+    im.src=t;
+  }
+  return t;
+}
+function orientOf(p){
+  const o=p.orient||"portrait";
+  return p.rotation%180 ? (o==="landscape"?"portrait":"landscape") : o;
+}
+
+/* ── the tree ──────────────────────────────────────────────────────────── */
+function docMeta(d){
+  const srcs=d.sourceIds.map(source).filter(Boolean);
+  const n=d.pages.length+" page"+(d.pages.length===1?"":"s")+" in PDF";
+  if(d.merged) return "merged · "+d.parts+" files · "+n;
+  const s=srcs[0]; if(!s) return n;
+  return bytes(s.size)+" · "+s.type.toUpperCase()+" · "+(s.status==="ready"?n+" · ":"")+s.statusText;
+}
+function docIcon(d){
+  if(d.merged) return "∑";
+  const s=source(d.sourceIds[0]);
+  return s?.type==="dwg"?"DWG":s?.type==="office"?"WORD":s?.type==="image"?"IMG":s?.type==="pdf"?"PDF":"?";
+}
+function cardHtml(p,n){
+  const cls="pg-card"+(orientOf(p)==="landscape"?" landscape":"")+(p.id===state.activePageId?" active":"")+
+    (state.selected.has(p.id)?" selected":"")+(n?"":" out");
+  const title=p.label+(n?"":(p.layout?.empty?" — empty layout":"")+" — not in the PDF");
+  const src=thumbSrc(p);
+  return '<div class="'+cls+'" data-id="'+p.id+'" data-in="'+(n?1:0)+'" title="'+esc(title)+'">'+
+    '<div class="pg-img">'+(src?'<img draggable="false" alt="" src="'+esc(src)+'">':'<span class="pg-wait">Rendering…</span>')+'</div>'+
+    '<div class="pg-no">'+(n||"—")+'</div>'+
+    '<div class="pg-acts">'+(n?'<button data-act="rot" title="Rotate 90° (R)">↻</button><button data-act="del" title="Remove from the PDF (Del)">✕</button>'
+                              :'<button data-act="add" title="Put into the PDF">+</button>')+'</div></div>';
+}
+function pagesHtml(d){
+  const out=outPages(d), s=d.merged?null:source(d.sourceIds[0]);
+  if(!d.pages.length&&!out.length)
+    return '<div class="thumb-empty">'+(s?.status==="pending"?"Reading "+esc(s.name)+"…":s?.engineError?"LibreDWG error:<br>"+esc(s.engineError):s?.status==="error"?esc(s.statusText):"No pages.")+'</div>';
+  return d.pages.map((p,i)=>cardHtml(p,i+1)).join("")+
+    (out.length?'<div class="pg-sep">NOT IN THE PDF · '+out.length+'</div>'+out.map(p=>cardHtml(p,0)).join(""):"");
+}
+function docHtml(d){
+  const s=d.merged?null:source(d.sourceIds[0]);
+  const acts=(s?.type==="dwg"?'<button class="btn btn-ghost" data-act="reload" title="Read the drawing again">RELOAD</button>':'')+
+    '<button class="btn btn-ghost" data-act="remove" title="Remove from the list">✕</button>'+
+    '<button class="btn btn-primary doc-dl" data-act="dl" title="Download this document as one PDF"'+(d.pages.length?"":" disabled")+'>⤓ PDF</button>';
+  return '<div class="doc'+(d.id===state.activeDocId?" active":"")+'" data-doc="'+d.id+'">'+
+    '<div class="doc-row">'+
+      '<button class="doc-tog" data-act="toggle" title="'+(d.open?"Hide pages":"Show pages")+'" aria-expanded="'+d.open+'">'+(d.open?"−":"+")+'</button>'+
+      '<div class="source-icon">'+docIcon(d)+'</div>'+
+      '<div class="doc-main"><div class="doc-name" title="'+esc(d.name)+'">'+esc(d.name)+'</div>'+
+        '<div class="doc-meta'+(s?.status==="error"?" status error":"")+'">'+esc(docMeta(d))+'</div></div>'+
+      '<div class="doc-acts">'+acts+'</div>'+
+    '</div>'+
+    (d.open?'<div class="pg-list" data-doc="'+d.id+'">'+pagesHtml(d)+'</div>':"")+
+  '</div>';
+}
+function renderTree(){
+  const root=$("#tree");
+  $("#docCount").textContent=state.docs.length+" FILE"+(state.docs.length===1?"":"S");
+  if(!state.docs.length){ root.innerHTML='<div class="thumb-empty">Drop files above to start.</div>'; return; }
+  root.innerHTML=state.docs.map(docHtml).join("");
+}
+function renderDoc(d){
+  const el=$('#tree .doc[data-doc="'+d.id+'"]'); if(!el) return renderTree();
+  const t=document.createElement("div"); t.innerHTML=docHtml(d); el.replaceWith(t.firstElementChild);
+  $("#docCount").textContent=state.docs.length+" FILE"+(state.docs.length===1?"":"S");
+}
+/* a thumbnail that arrives, or a rotation, touches its own card only */
+function updateCard(p){
+  for(const q of state.all.values()){
+    if(q!==p&&q.orig!==p) continue;
+    const el=$('#tree .pg-card[data-id="'+q.id+'"]'); if(!el) continue;
+    const d=docOfPage(q), i=d?d.pages.indexOf(q):-1;
+    const t=document.createElement("div"); t.innerHTML=cardHtml(q,i+1); el.replaceWith(t.firstElementChild);
+  }
+}
+/* selection and the active page change classes only */
+function syncMarks(){
+  document.querySelectorAll("#tree .doc").forEach(el=>el.classList.toggle("active",el.dataset.doc===state.activeDocId));
+  document.querySelectorAll("#tree .pg-card").forEach(el=>{
+    el.classList.toggle("active",el.dataset.id===state.activePageId);
+    el.classList.toggle("selected",state.selected.has(el.dataset.id));
   });
 }
 
+function removePages(ids){
+  const set=new Set(ids), touched=new Set();
+  for(const id of ids){ const d=docOfPage(page(id)); if(d){ d.pages=d.pages.filter(p=>p.id!==id); touched.add(d); } state.selected.delete(id); }
+  touched.forEach(renderDoc); if(set.has(state.activePageId)) renderPreview();
+}
+function rotatePages(ids){
+  const touched=new Set();
+  for(const id of ids){ const p=page(id); if(p){ p.rotation=(p.rotation+90)%360; touched.add(docOfPage(p)); } }
+  touched.forEach(d=>d&&renderDoc(d)); if(ids.includes(state.activePageId)) renderPreview();
+}
+/* back where it came from: after the nearest page of the same file that is
+   still in the document, or before the next one, or at the end */
+function putBack(p){
+  const d=docOfPage(p), order=d.all, k=order.indexOf(p);
+  let at=-1;
+  for(let j=k-1;j>=0&&at<0;j--){ const q=order[j]; if(d.pages.includes(q)) at=d.pages.indexOf(q)+1; }
+  for(let j=k+1;j<order.length&&at<0;j++){ const q=order[j]; if(d.pages.includes(q)) at=d.pages.indexOf(q); }
+  if(at<0) at=d.pages.length;
+  d.pages.splice(at,0,p);
+  renderDoc(d); if(p.id===state.activePageId) renderPreview();
+}
+function actOn(p){ return state.selected.has(p.id)&&state.selected.size>1 ? [...state.selected] : [p.id]; }
+function setActiveDoc(d){ if(state.activeDocId!==d.id){ state.activeDocId=d.id; state.selected.clear(); } }
+
+let suppressClick=false;
+$("#tree").addEventListener("click",ev=>{
+  if(suppressClick){suppressClick=false;return;}
+  const act=ev.target.closest("button")?.dataset.act;
+  const card=ev.target.closest(".pg-card");
+  if(card){
+    const p=page(card.dataset.id); if(!p) return;
+    if(act==="rot") return rotatePages(actOn(p));
+    if(act==="del") return removePages(actOn(p));
+    if(act==="add") return putBack(p);
+    const d=docOfPage(p); setActiveDoc(d);
+    if(inDoc(p)){
+      if(ev.ctrlKey||ev.metaKey){ state.selected.has(p.id)?state.selected.delete(p.id):state.selected.add(p.id); state.anchorId=p.id; }
+      else if(ev.shiftKey&&state.anchorId&&d.pages.includes(page(state.anchorId))){
+        const a=d.pages.indexOf(page(state.anchorId)), b=d.pages.indexOf(p);
+        state.selected=new Set(d.pages.slice(Math.min(a,b),Math.max(a,b)+1).map(x=>x.id));
+      } else { state.selected=new Set([p.id]); state.anchorId=p.id; }
+    } else state.selected.clear();
+    state.activePageId=p.id; syncMarks(); renderPreview();
+    return;
+  }
+  const el=ev.target.closest(".doc"); if(!el) return;
+  const d=doc(el.dataset.doc); if(!d) return;
+  if(act==="toggle"){ d.open=!d.open; renderDoc(d); return; }
+  if(act==="remove") return removeDoc(d);
+  if(act==="dl") return exportPdf(d, ev.target.closest("button"));
+  if(act==="reload"){ const s=source(d.sourceIds[0]); ingestDwg(s.file,s); return; }
+  setActiveDoc(d);
+  if(!d.open){ d.open=true; renderDoc(d); }
+  const first=d.pages[0]||outPages(d)[0];
+  state.activePageId=first?.id||null; syncMarks(); renderPreview();
+});
+document.addEventListener("keydown",ev=>{
+  if(/^(INPUT|TEXTAREA|SELECT)$/.test(ev.target.tagName)||ev.target.isContentEditable) return;
+  if($("#mergeModal").classList.contains("on")) return;
+  const ids=[...state.selected].filter(id=>inDoc(page(id)));
+  if(!ids.length) return;
+  if(ev.key==="Delete"||ev.key==="Backspace"){ ev.preventDefault(); removePages(ids); }
+  else if((ev.key==="r"||ev.key==="R")&&!ev.ctrlKey&&!ev.metaKey){ ev.preventDefault(); rotatePages(ids); }
+  else if(ev.key==="Escape"){ state.selected.clear(); syncMarks(); }
+});
+
+function removeDoc(d){
+  for(const p of d.all){ state.all.delete(p.id); state.selected.delete(p.id); }
+  const i=state.docs.indexOf(d); state.docs.splice(i,1);
+  // a file stays while a merged document still draws on it
+  for(const sid of d.sourceIds) if(!state.docs.some(x=>x.sourceIds.includes(sid))) state.sources.delete(sid);
+  if(state.activeDocId===d.id){ const next=state.docs[Math.min(i,state.docs.length-1)]; state.activeDocId=next?.id||null; state.activePageId=next?.pages[0]?.id||null; }
+  if(!page(state.activePageId)) state.activePageId=null;
+  renderAll();
+}
+/* ── merging ───────────────────────────────────────────────────────────── */
+let merge=null;
+function openMerge(dragged,target){
+  merge={order:[target,dragged],auto:true};
+  drawMerge(); $("#mergeModal").classList.add("on"); $("#mergeOk").focus();
+}
+// the name follows the order until the user types one of their own
+const autoName=()=>merge.order.map(d=>d.name.replace(/\.[^.]+$/,"")).join(" + ");
+function drawMerge(){
+  if(merge.auto) $("#mergeName").value=autoName();
+  $("#mergeList").innerHTML=merge.order.map((d,i)=>'<li><span class="m-name" title="'+esc(d.name)+'">'+esc(d.name)+'</span><span class="m-n">'+d.pages.length+' p.</span>'+
+    '<button class="btn btn-ghost" data-mv="-1" data-i="'+i+'" '+(i===0?"disabled":"")+' title="Earlier">↑</button>'+
+    '<button class="btn btn-ghost" data-mv="1" data-i="'+i+'" '+(i===merge.order.length-1?"disabled":"")+' title="Later">↓</button></li>').join("");
+}
+$("#mergeList").addEventListener("click",ev=>{
+  const b=ev.target.closest("button[data-mv]"); if(!b||!merge) return;
+  const i=+b.dataset.i, j=i+(+b.dataset.mv); const o=merge.order; [o[i],o[j]]=[o[j],o[i]]; drawMerge();
+});
+function closeMerge(){ merge=null; $("#mergeModal").classList.remove("on"); }
+$("#mergeName").addEventListener("input",()=>{ if(merge) merge.auto=false; });
+$("#mergeCancel").onclick=closeMerge; $("#mergeCancelX").onclick=closeMerge;
+$("#mergeModal").addEventListener("keydown",ev=>{ if(ev.key==="Escape") closeMerge(); if(ev.key==="Enter"&&ev.target.id==="mergeName") $("#mergeOk").click(); });
+$("#mergeOk").onclick=()=>{
+  if(!merge) return;
+  /* The merged document is a new entry in the list, right after the lower of
+     the two; the files it was made from stay as they are. */
+  const at=Math.max(...merge.order.map(d=>state.docs.indexOf(d)))+1;
+  const m={id:uid("doc"),name:$("#mergeName").value.trim()||merge.order.map(d=>d.name).join(" + "),
+    sourceIds:[...new Set(merge.order.flatMap(d=>d.sourceIds))],all:[],pages:[],open:true,merged:true,
+    parts:merge.order.reduce((k,d)=>k+(d.merged?d.parts:1),0)};
+  for(const d of merge.order){
+    const copy=new Map();
+    for(const p of d.all){
+      const {id,docId,_rot,_rotPending,_svgUrl,pngDataUrl,thumb,...rest}=p;
+      const q=newPage({...rest,docId:m.id,orig:p.orig||p}); copy.set(p,q); m.all.push(q);
+    }
+    for(const p of d.pages) m.pages.push(copy.get(p));
+  }
+  state.docs.splice(at,0,m);
+  for(const d of merge.order) d.open=false;
+  state.activeDocId=m.id; state.selected.clear(); state.activePageId=m.pages[0]?.id||null;
+  closeMerge(); renderTree(); renderPreview();
+};
+
+/* ── dragging ─────────────────────────────────────────────────────────────
+   Pointer events, not HTML5 drag and drop: a native drag of an <img> hands the
+   page a file ("download.svg"), which the drop-anywhere handler used to open
+   as a new source.
+   A page card, dragged inside its document: the card itself becomes the
+   insertion slot — a dashed frame that moves through the grid live — while a
+   copy follows the pointer and the other cards slide aside (FLIP: measured
+   before the slot moves, animated from where they were). Dragging one of
+   several selected cards moves them all.
+   A file row, dragged over another: its middle half means merge, its top or
+   bottom quarter means before or after. Near the panel's edges it scrolls. */
+(function dragging(){
+  const tree=$("#tree");
+  let drag=null;
+  tree.addEventListener("pointerdown",ev=>{
+    if(ev.button!==0||ev.target.closest("button")) return;
+    const card=ev.target.closest('.pg-card[data-in="1"]');
+    const row=!card&&ev.target.closest(".doc-row");
+    if(!card&&!row) return;
+    const sx=ev.clientX, sy=ev.clientY;
+    const move=e=>{
+      if(!drag){ if(Math.hypot(e.clientX-sx,e.clientY-sy)<5) return; drag=card?beginCard(card,e):beginDoc(row.closest(".doc"),e); }
+      drag.x=e.clientX; drag.y=e.clientY; drag.step();
+    };
+    const up=()=>{
+      window.removeEventListener("pointermove",move); window.removeEventListener("pointerup",up); window.removeEventListener("pointercancel",up);
+      if(drag){ const d=drag; drag=null; cancelAnimationFrame(d.raf); d.ghost.remove(); d.finish(); suppressClick=true; setTimeout(()=>{suppressClick=false;},0); }
+    };
+    window.addEventListener("pointermove",move); window.addEventListener("pointerup",up); window.addEventListener("pointercancel",up);
+  });
+  function ghostOf(el,e,cls){
+    const r=el.getBoundingClientRect(), g=el.cloneNode(true);
+    g.classList.add(cls); g.classList.remove("placeholder","active","dragging"); g.style.width=r.width+"px";
+    if(cls==="doc-ghost"){ g.querySelector(".pg-list")?.remove(); }
+    document.body.appendChild(g);
+    return {g,dx:e.clientX-r.left,dy:Math.min(e.clientY-r.top,30)};
+  }
+  function autoscroll(d){
+    d.raf=requestAnimationFrame(function tick(){
+      const r=tree.getBoundingClientRect(), edge=40;
+      let v=0; if(d.y<r.top+edge) v=-(r.top+edge-d.y)/3; else if(d.y>r.bottom-edge) v=(d.y-(r.bottom-edge))/3;
+      if(v){ tree.scrollTop+=Math.max(-24,Math.min(24,v)); d.step(); }
+      d.raf=requestAnimationFrame(tick);
+    });
+  }
+  function beginCard(card,e){
+    const list=card.closest(".pg-list"), {g,dx,dy}=ghostOf(card,e,"pg-ghost");
+    card.classList.add("placeholder"); list.classList.add("sorting");
+    const d={ghost:g,x:e.clientX,y:e.clientY,raf:0};
+    const ins=()=>[...list.querySelectorAll('.pg-card[data-in="1"]')];
+    d.step=()=>{
+      g.style.transform="translate("+(d.x-dx)+"px,"+(d.y-dy)+"px)";
+      const cards=ins().filter(c=>c!==card); if(!cards.length) return;
+      // the slot goes before the first card whose centre lies after the
+      // pointer, reading the grid row by row
+      let before=null;
+      for(const c of cards){
+        const r=c.getBoundingClientRect();
+        if(d.y<r.top){ before=c; break; }
+        if(d.y<=r.bottom&&d.x<r.left+r.width/2){ before=c; break; }
+      }
+      const cur=ins(), k=cur.indexOf(card);
+      if(before===cur[k+1]||(!before&&k===cur.length-1)) return;
+      const all=[...list.querySelectorAll(".pg-card")], first=new Map(all.map(c=>[c,c.getBoundingClientRect()]));
+      if(before) list.insertBefore(card,before); else cards[cards.length-1].after(card);
+      for(const c of all){
+        if(c===card) continue;
+        const a=first.get(c), b=c.getBoundingClientRect(), tx=a.left-b.left, ty=a.top-b.top;
+        if(tx||ty) c.animate([{transform:"translate("+tx+"px,"+ty+"px)"},{transform:"none"}],{duration:150,easing:"cubic-bezier(.2,.7,.3,1)"});
+      }
+    };
+    d.finish=()=>{
+      card.classList.remove("placeholder"); list.classList.remove("sorting");
+      const dc=doc(list.dataset.doc), moved=page(card.dataset.id);
+      let pages=ins().map(c=>page(c.dataset.id)).filter(Boolean);
+      if(state.selected.has(moved.id)&&state.selected.size>1){
+        const group=pages.filter(p=>state.selected.has(p.id)&&p!==moved);
+        pages=pages.filter(p=>!group.includes(p)); pages.splice(pages.indexOf(moved)+1,0,...group);
+      }
+      dc.pages=pages; renderDoc(dc);
+      if(state.activePageId) renderPreviewMeta();
+    };
+    autoscroll(d); d.step();
+    return d;
+  }
+  function beginDoc(el,e){
+    const {g,dx,dy}=ghostOf(el,e,"doc-ghost");
+    el.classList.add("dragging");
+    const d={ghost:g,x:e.clientX,y:e.clientY,raf:0,target:null,mode:null};
+    const clear=()=>tree.querySelectorAll(".doc-row").forEach(r=>r.classList.remove("drop-before","drop-after","drop-merge"));
+    d.step=()=>{
+      g.style.transform="translate("+(d.x-dx)+"px,"+(d.y-dy)+"px)";
+      clear(); d.target=null; d.mode=null;
+      const hit=document.elementFromPoint(d.x,d.y)?.closest?.(".doc");
+      if(!hit||hit===el||!tree.contains(hit)) return;
+      const row=hit.querySelector(".doc-row"), r=row.getBoundingClientRect();
+      let mode;
+      if(d.y>=r.top&&d.y<=r.bottom){ const f=(d.y-r.top)/r.height; mode=f<.25?"before":f>.75?"after":"merge"; }
+      else mode="after"; // over the open pages of that file
+      row.classList.add("drop-"+mode); d.target=doc(hit.dataset.doc); d.mode=mode;
+    };
+    d.finish=()=>{
+      clear(); el.classList.remove("dragging");
+      const src=doc(el.dataset.doc), t=d.target;
+      if(!t||!src) return;
+      if(d.mode==="merge") return openMerge(src,t);
+      state.docs.splice(state.docs.indexOf(src),1);
+      state.docs.splice(state.docs.indexOf(t)+(d.mode==="after"?1:0),0,src);
+      renderTree();
+    };
+    autoscroll(d); d.step();
+    return d;
+  }
+})();
+
+/* ── preview ───────────────────────────────────────────────────────────── */
+let previewToken=0;
+function svgUrl(p){ const o=p.orig||p; return o._svgUrl||(o._svgUrl=URL.createObjectURL(new Blob([o.svg],{type:"image/svg+xml"}))); }
+function renderPreviewMeta(){
+  const p=page(state.activePageId); if(!p) return;
+  const d=docOfPage(p), n=d?d.pages.indexOf(p)+1:0, l=p.layout;
+  $("#previewTitle").textContent=p.label;
+  $("#previewMeta").textContent=[n?"page "+n+" of "+d.pages.length+" · "+d.name:"not in the PDF",l?.paper,l?.empty?"empty layout":null,p.rotation?"rotated "+p.rotation+"°":null].filter(Boolean).join(" · ");
+}
 async function renderPreview(){
-  const s=activeSource(), p=page(state.activePageId), root=$("#previewStage");
-  if(!s){$("#previewTitle").textContent="NO PAGE SELECTED";$("#previewMeta").textContent="";root.innerHTML='<div class="preview-empty"><b>Select a file and then a page/layout.</b></div>';return;}
-  let l=null;
-  if(!p && s.layouts?.length) l=s.layouts.find(x=>x.id===state.activeLayoutId)||s.layouts[0];
-  $("#previewTitle").textContent=p?.label||l?.name||s.name;
-  $("#previewMeta").textContent=l?[l.paper,l.widthMm&&l.heightMm?l.widthMm+" × "+l.heightMm+" mm":null,l.orientation].filter(Boolean).join(" · "):p?"Page "+(p.sourcePage+1):"";
-  if(p?.sourceType==="pdf"&&s.pdfDoc){
+  const p=page(state.activePageId), root=$("#previewStage"), token=++previewToken;
+  if(!p){
+    $("#previewTitle").textContent="NO PAGE SELECTED";$("#previewMeta").textContent="";
+    root.innerHTML='<div class="preview-empty"><b>Open a file with + and pick a page.</b><br><br>This pane shows what will go to the PDF.</div>';return;
+  }
+  renderPreviewMeta();
+  const s=source(p.sourceId);
+  const boundary='<div class="boundary '+(state.showBoundary?"on":"")+'"></div>';
+  const width='style="width:'+Math.round(state.previewZoom*100)+'%"';
+  if(p.sourceType==="pdf"&&s?.pdfDoc){
     try{
       const pg=await s.pdfDoc.getPage(p.sourcePage+1);
       const vp=pg.getViewport({scale:Math.max(.7,1.25*state.previewZoom),rotation:p.rotation});
       const cv=document.createElement("canvas");cv.width=Math.ceil(vp.width);cv.height=Math.ceil(vp.height);
-      root.innerHTML='<div class="preview-paper"></div>';const paper=root.firstElementChild;paper.appendChild(cv);
       await pg.render({canvasContext:cv.getContext("2d"),viewport:vp}).promise;
-      const b=document.createElement("div");b.className="boundary "+(state.showBoundary?"on":"");paper.appendChild(b);
+      if(token!==previewToken) return;
+      root.innerHTML='<div class="preview-paper"></div>';root.firstElementChild.append(cv);root.firstElementChild.insertAdjacentHTML("beforeend",boundary);
       return;
     }catch(e){console.error(e);}
   }
-  if(p?.sourceType==="image"){
-    root.innerHTML='<div class="preview-paper" style="transform:scale('+state.previewZoom+')"><img src="'+esc(p.thumb)+'" style="transform:rotate('+p.rotation+'deg)"><div class="boundary '+(state.showBoundary?"on":"")+'"></div></div>';return;
+  const url=p.sourceType==="image"?baseThumb(p):p.sourceType==="dwg-svg"&&p.svg?svgUrl(p):null;
+  if(!url){ root.innerHTML='<div class="preview-empty">Preview unavailable.</div>'; return; }
+  if(!p.rotation){
+    root.innerHTML='<div class="preview-paper" '+width+'><img draggable="false" alt="" src="'+esc(url)+'">'+boundary+'</div>';
+    return;
   }
-  if(p?.sourceType==="dwg-svg"&&p.svg){
-    root.innerHTML='<div class="preview-paper" style="transform:scale('+state.previewZoom+')">'+p.svg+'<div class="boundary '+(state.showBoundary?"on":"")+'"></div></div>';return;
-  }
-  if(l?.previewUrl){
-    root.innerHTML='<div class="preview-paper" style="transform:scale('+state.previewZoom+')"><img src="'+esc(l.previewUrl)+'"><div class="boundary '+(state.showBoundary?"on":"")+'"></div></div>';return;
-  }
-  root.innerHTML='<div class="preview-empty">'+(s.type==="dwg"?"Preparing local preview…":"Preview unavailable.")+'</div>';
+  // rotated: drawn onto a canvas turned by the page's rotation; a vector sheet
+  // is rasterised at the size it is shown
+  const im=new Image(); im.src=url;
+  try{ await im.decode(); }catch{ return; }
+  if(token!==previewToken) return;
+  const long=2400, k=long/Math.max(im.naturalWidth,im.naturalHeight), w=im.naturalWidth*k, h=im.naturalHeight*k;
+  const q=p.rotation%180!==0, cv=document.createElement("canvas");
+  cv.width=Math.round(q?h:w); cv.height=Math.round(q?w:h);
+  const x=cv.getContext("2d"); x.fillStyle="#fff"; x.fillRect(0,0,cv.width,cv.height);
+  x.translate(cv.width/2,cv.height/2); x.rotate(p.rotation*Math.PI/180); x.drawImage(im,-w/2,-h/2,w,h);
+  cv.style.width="100%";
+  root.innerHTML='<div class="preview-paper" '+width+'></div>'; root.firstElementChild.append(cv); root.firstElementChild.insertAdjacentHTML("beforeend",boundary);
 }
 
-function renderOutput(){
-  const root=$("#pages");$("#pageCount").textContent=state.pages.length+" PAGE"+(state.pages.length===1?"":"S");
-  if(!state.pages.length){root.innerHTML='<div class="output-empty">Pages from loaded files will appear here in final PDF order.</div>';return;}
-  root.innerHTML=state.pages.map((p,i)=>{
-    const s=source(p.sourceId);
-    return '<div class="output-card '+(state.selected.has(p.id)?"selected ":"")+(state.activePageId===p.id?"active":"")+'" draggable="true" data-id="'+p.id+'">'+
-      '<div class="output-img">'+(p.thumb?'<img src="'+esc(p.thumb)+'" style="transform:rotate('+p.rotation+'deg)">':'…')+'<span class="thumb-n">'+(i+1)+'</span></div>'+
-      '<div class="output-info"><div class="output-name">'+esc(p.label)+'</div><div class="output-actions"><button data-act="rot" class="btn btn-ghost">↻</button><button data-act="del" class="btn btn-ghost">×</button></div></div></div>';
-  }).join("");
-  root.querySelectorAll(".output-card").forEach(card=>{
-    const pid=card.dataset.id;
-    card.onclick=ev=>{
-      const act=ev.target.dataset.act;
-      if(act==="rot"){page(pid).rotation=(page(pid).rotation+90)%360;renderAll();return;}
-      if(act==="del"){state.pages=state.pages.filter(x=>x.id!==pid);state.selected.delete(pid);if(state.activePageId===pid)state.activePageId=null;renderAll();return;}
-      if(ev.ctrlKey||ev.metaKey)state.selected.has(pid)?state.selected.delete(pid):state.selected.add(pid);else{state.selected.clear();state.selected.add(pid);}
-      const p=page(pid);state.activePageId=pid;state.activeSourceId=p.sourceId;renderAll();
-    };
-    card.ondragstart=ev=>{card.classList.add("dragging");ev.dataTransfer.setData("text/plain",pid)};
-    card.ondragend=()=>card.classList.remove("dragging");
-    card.ondragover=ev=>ev.preventDefault();
-    card.ondrop=ev=>{ev.preventDefault();const from=ev.dataTransfer.getData("text/plain");if(from===pid)return;const fi=state.pages.findIndex(x=>x.id===from),ti=state.pages.findIndex(x=>x.id===pid);const [x]=state.pages.splice(fi,1);state.pages.splice(fi<ti?ti-1:ti,0,x);renderOutput();};
-  });
-}
+function renderAll(){renderTree();renderPreview();}
 
-function renderAll(){renderSources();renderThumbs();renderOutput();renderPreview();}
-
-async function exportPdf(){
-  if(!state.pages.length)return alert("There are no pages to export.");
+/* One document, one PDF — a single file or a merged set; the progress is
+   shown on the document's own download button. */
+async function exportPdf(d, btn){
+  if(!d||!d.pages.length) return;
   const {PDFDocument,degrees}=PDFLib,out=await PDFDocument.create(), loaded=new Map();
-  $("#exportBtn").disabled=true;$("#exportProgress").hidden=false;
+  const label=btn?.textContent; if(btn){ btn.disabled=true; btn.textContent="0%"; }
   try{
-    for(let i=0;i<state.pages.length;i++){
-      const p=state.pages[i],s=source(p.sourceId);
+    for(let i=0;i<d.pages.length;i++){
+      const p=d.pages[i],s=source(p.sourceId);
       if(p.sourceType==="pdf"&&s?.pdfBytes){
-        let doc=loaded.get(s.id);if(!doc){doc=await PDFDocument.load(s.pdfBytes.slice(0));loaded.set(s.id,doc);}
-        const [cp]=await out.copyPages(doc,[p.sourcePage]);if(p.rotation)cp.setRotation(degrees((cp.getRotation().angle+p.rotation)%360));out.addPage(cp);
+        let pdf=loaded.get(s.id);if(!pdf){pdf=await PDFDocument.load(s.pdfBytes.slice(0));loaded.set(s.id,pdf);}
+        const [cp]=await out.copyPages(pdf,[p.sourcePage]);if(p.rotation)cp.setRotation(degrees((cp.getRotation().angle+p.rotation)%360));out.addPage(cp);
       }else if(p.sourceType==="image"&&p.imageFile){
         const ab=await p.imageFile.arrayBuffer(), im=ext(p.imageFile.name)==="png"?await out.embedPng(ab):await out.embedJpg(ab);
         const w=im.width*.75,h=im.height*.75,pg=out.addPage([w,h]);pg.drawImage(im,{x:0,y:0,width:w,height:h});
+        if(p.rotation)pg.setRotation(degrees(p.rotation));
       }else if(p.sourceType==="dwg-svg"&&p.svg){
-        if(!p.pngDataUrl)p.pngDataUrl=await svgToPng(p.svg);
-        const png=await fetch(p.pngDataUrl).then(r=>r.arrayBuffer());
+        const o=p.orig||p; if(!o.pngDataUrl)o.pngDataUrl=await svgToPng(o.svg);
+        const png=await fetch(o.pngDataUrl).then(r=>r.arrayBuffer());
         const im=await out.embedPng(png);
         const landscape=(p.layout?.orientation||"landscape")==="landscape";
         const mm=landscape?[841,594]:[594,841];
         const pg=out.addPage(mm.map(x=>x*72/25.4));
-        const d=im.scaleToFit(pg.getWidth(),pg.getHeight());
-        pg.drawImage(im,{x:(pg.getWidth()-d.width)/2,y:(pg.getHeight()-d.height)/2,width:d.width,height:d.height});
+        const f=im.scaleToFit(pg.getWidth(),pg.getHeight());
+        pg.drawImage(im,{x:(pg.getWidth()-f.width)/2,y:(pg.getHeight()-f.height)/2,width:f.width,height:f.height});
+        if(p.rotation)pg.setRotation(degrees(p.rotation));
       }
-      $("#exportProgress i").style.width=Math.round((i+1)/state.pages.length*100)+"%";
+      if(btn) btn.textContent=Math.round((i+1)/d.pages.length*100)+"%";
     }
-    const ab=await out.save(),a=document.createElement("a");a.href=URL.createObjectURL(new Blob([ab],{type:"application/pdf"}));a.download="IECCalc_Engineering_Document.pdf";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
-  }finally{$("#exportBtn").disabled=false;setTimeout(()=>{$("#exportProgress").hidden=true;$("#exportProgress i").style.width="0"},500);}
+    const ab=await out.save(),a=document.createElement("a");
+    a.href=URL.createObjectURL(new Blob([ab],{type:"application/pdf"}));
+    a.download=(d.name.replace(/\.[^.]+$/,"").replace(/[\\/:*?"<>|]+/g,"_").trim()||"IECCalc_Engineering_Document")+".pdf";
+    a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  }catch(e){ console.error(e); alert("PDF export failed: "+(e?.message||e)); }
+  finally{ if(btn){ btn.disabled=false; btn.textContent=label; } }
 }
 
 $("#fileInput").onchange=e=>{acceptFiles(e.target.files);e.target.value="";};
-const dz=$("#dropzone");["dragenter","dragover"].forEach(n=>dz.addEventListener(n,e=>{e.preventDefault();dz.classList.add("drag")}));
-["dragleave","drop"].forEach(n=>dz.addEventListener(n,e=>{e.preventDefault();dz.classList.remove("drag")}));
-dz.ondrop=e=>{e.stopPropagation();acceptFiles(e.dataTransfer.files);};dz.onclick=()=>$("#fileInput").click();
+const dz=$("#dropzone");
+dz.onclick=()=>$("#fileInput").click();
 dz.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();$("#fileInput").click();}};
-/* A file dropped anywhere else on the page used to be opened by the browser in
-   place of the studio, and everything loaded so far was lost. The whole page
-   takes it now, and the zone lights up while a file is being dragged over it. */
-let dragDepth=0;
-const hasFiles=e=>[...(e.dataTransfer?.types||[])].includes("Files");
+/* A file dropped anywhere on the page is taken, and the zone lights up while a
+   file is dragged over the page — only files from outside the page: anything
+   dragged out of the page itself starts with a dragstart here. */
+let dragDepth=0, innerDrag=false;
+document.addEventListener("dragstart",()=>{innerDrag=true;});
+document.addEventListener("dragend",()=>{innerDrag=false;});
+const hasFiles=e=>!innerDrag&&[...(e.dataTransfer?.types||[])].includes("Files");
 document.addEventListener("dragenter",e=>{if(!hasFiles(e))return;dragDepth++;dz.classList.add("drag");});
 document.addEventListener("dragleave",e=>{if(!hasFiles(e))return;dragDepth=Math.max(0,dragDepth-1);if(!dragDepth)dz.classList.remove("drag");});
 document.addEventListener("dragover",e=>{if(hasFiles(e))e.preventDefault();});
-document.addEventListener("drop",e=>{if(!hasFiles(e))return;e.preventDefault();dragDepth=0;dz.classList.remove("drag");if(e.dataTransfer.files.length)acceptFiles(e.dataTransfer.files);});
-$("#clearBtn").onclick=()=>{state.sources.clear();state.pages=[];state.selected.clear();state.activeSourceId=null;state.activePageId=null;renderAll();};
-$("#includeModel").onchange=rebuildDwgOutput;
-$("#previewZoomIn").onclick=()=>{state.previewZoom=Math.min(1.8,state.previewZoom+.1);$("#previewZoomLabel").textContent=Math.round(state.previewZoom*100)+"%";renderPreview();};
-$("#previewZoomOut").onclick=()=>{state.previewZoom=Math.max(.5,state.previewZoom-.1);$("#previewZoomLabel").textContent=Math.round(state.previewZoom*100)+"%";renderPreview();};
-$("#toggleBoundary").onclick=()=>{state.showBoundary=!state.showBoundary;$("#toggleBoundary").classList.toggle("btn-active",state.showBoundary);renderPreview();};
-$("#moveFirstBtn").onclick=()=>{const a=state.pages.filter(p=>state.selected.has(p.id)),b=state.pages.filter(p=>!state.selected.has(p.id));state.pages=[...a,...b];renderOutput();};
-$("#moveLastBtn").onclick=()=>{const a=state.pages.filter(p=>!state.selected.has(p.id)),b=state.pages.filter(p=>state.selected.has(p.id));state.pages=[...a,...b];renderOutput();};
-$("#rotateBtn").onclick=()=>{state.pages.forEach(p=>{if(state.selected.has(p.id))p.rotation=(p.rotation+90)%360});renderAll();};
-$("#deleteBtn").onclick=()=>{state.pages=state.pages.filter(p=>!state.selected.has(p.id));state.selected.clear();renderAll();};
-$("#selectAllBtn").onclick=()=>{state.pages.forEach(p=>state.selected.add(p.id));renderOutput();};
-$("#deselectBtn").onclick=()=>{state.selected.clear();renderOutput();};
-$("#exportBtn").onclick=exportPdf;
+document.addEventListener("drop",e=>{
+  if(innerDrag){e.preventDefault();innerDrag=false;return;}
+  if(!hasFiles(e))return;
+  e.preventDefault();dragDepth=0;dz.classList.remove("drag");
+  if(e.dataTransfer.files.length)acceptFiles(e.dataTransfer.files);
+});
+$("#clearBtn").onclick=()=>{state.sources.clear();state.docs=[];state.all.clear();state.selected.clear();state.activeDocId=null;state.activePageId=null;renderAll();};
+const zoomLabel=()=>{$("#previewZoomLabel").textContent=Math.round(state.previewZoom*100)+"%";};
+$("#previewZoomIn").onclick=()=>{state.previewZoom=Math.min(3,+(state.previewZoom+.25).toFixed(2));zoomLabel();renderPreview();};
+$("#previewZoomOut").onclick=()=>{state.previewZoom=Math.max(.5,+(state.previewZoom-.25).toFixed(2));zoomLabel();renderPreview();};
+$("#toggleBoundary").onclick=()=>{state.showBoundary=!state.showBoundary;$("#toggleBoundary").classList.toggle("btn-active",state.showBoundary);document.querySelectorAll("#previewStage .boundary").forEach(b=>b.classList.toggle("on",state.showBoundary));};
+/* The file list is as wide as the user drags it; remembered in this browser. */
+(function splitter(){
+  const ws=$(".workspace-v2"), sp=$("#splitter"), KEY="docStudio.treeWidth";
+  const clamp=w=>Math.max(260,Math.min(w,Math.round(ws.getBoundingClientRect().width*.7)));
+  const set=w=>{ w=clamp(w); ws.style.setProperty("--tree-w",w+"px"); sp.setAttribute("aria-valuenow",String(w)); return w; };
+  try{ const w=+localStorage.getItem(KEY); if(w) set(w); }catch{}
+  const save=w=>{ try{ localStorage.setItem(KEY,String(w)); }catch{} };
+  sp.addEventListener("pointerdown",e=>{
+    e.preventDefault(); sp.setPointerCapture(e.pointerId); sp.classList.add("on");
+    const left=ws.getBoundingClientRect().left;
+    const mv=ev=>set(ev.clientX-left);
+    const up=ev=>{ sp.releasePointerCapture(e.pointerId); sp.classList.remove("on"); sp.removeEventListener("pointermove",mv); sp.removeEventListener("pointerup",up); save(set(ev.clientX-left)); };
+    sp.addEventListener("pointermove",mv); sp.addEventListener("pointerup",up);
+  });
+  sp.addEventListener("keydown",e=>{
+    if(e.key!=="ArrowLeft"&&e.key!=="ArrowRight") return; e.preventDefault();
+    const cur=$(".tree-pane").getBoundingClientRect().width; save(set(cur+(e.key==="ArrowRight"?20:-20)));
+  });
+})();
 renderAll();
+window.__docStudio={state,openMerge};
 window.__docStudioReady=true;
 document.getElementById("dsFail")?.remove();
 </script>
