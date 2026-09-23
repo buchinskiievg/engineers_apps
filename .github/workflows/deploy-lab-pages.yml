@@ -1,0 +1,32 @@
+name: Deploy IECCalc LAB to Cloudflare Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "lab/**"
+      - "_redirects"
+      - "_lib/chrome.js"
+      - "index.html"
+      - ".github/workflows/deploy-lab-pages.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ieccalc-pages-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy site to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CF_PAGES_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: e5d02013758955380085433a5a0b24ed
+          command: pages deploy . --project-name=engineers-apps --branch=main
