@@ -833,7 +833,11 @@ function parseRendered(db) {
       const kk = Math.min(page[0] / w, page[1] / h);
       cut++;
       const rr = R.render(modelEnts, { s: kk, ltK: 1, idp: "w" + cut + "_", window: [win.minX, win.minY, win.maxX, win.maxY] });
-      const s2 = assemble(rr.defs, rr.body, win, kk);
+      // the sheet is exactly the window: what crosses its edge is cut there,
+      // as AutoCAD plots a window (the entities are kept or dropped whole)
+      const cid = "w" + cut + "_clip";
+      const s2 = assemble(rr.defs + '<clipPath id="' + cid + '" clipPathUnits="userSpaceOnUse"><rect x="' + num(win.minX) + '" y="' + num(win.minY) +
+        '" width="' + num(w) + '" height="' + num(h) + '"/></clipPath>', '<g clip-path="url(#' + cid + ')">' + rr.body + "</g>", win, kk);
       return { id: "model-sheet-" + cut, name: "Model sheet " + cut, isModel: true, selected: true, empty: false, entityCount: n, skippedTables: 0,
                recordName: model.name, svg: s2, previewUrl: svgUrl(s2), paper: "Model Space · window", ext: { ...win }, unitMm: kk, sheet, framed: true, ...meta(s2) };
     };

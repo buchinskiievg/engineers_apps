@@ -296,6 +296,8 @@
   .pv-el { position:absolute; left:0; top:0; width:100%; height:100%; display:block; transform-origin:0 0; }
   .frame-msg { font:700 10.5px var(--mono); color:var(--ok-ink, #1d6b35); }
   .frame-box { position:absolute; border:2px dashed var(--red); background:rgba(163,14,24,.08); pointer-events:none; z-index:5; }
+  .snap-mark { position:absolute; width:11px; height:11px; margin:-6px 0 0 -6px; border:2px solid #1d8a3a; background:rgba(29,138,58,.15); pointer-events:none; z-index:6; }
+  .snap-mark[hidden] { display:none; }
   .frame-tools { display:inline-flex; align-items:center; gap:5px; padding-right:6px; margin-right:2px; border-right:1px solid var(--line); }
   .frame-tools[hidden] { display:none; }
   .frame-tools select { min-height:0; height:28px; padding:2px 6px; font:700 11px var(--mono); border:1px solid var(--line); background:#fff; }
@@ -361,6 +363,7 @@
         <span class="grow"></span>
         <span id="frameTools" class="frame-tools" hidden>
           <button id="frameBtn" class="btn btn-ghost" title="Cut a sheet out of Model Space: click two corners of its frame (Esc to stop)">SHEET BY 2 CORNERS</button>
+          <button id="snapBtn" class="btn btn-ghost btn-active" title="Snap the corners to the drawing's vertices — line ends, polyline and frame corners (F3)">SNAP</button>
           <select id="frameSheet" title="Paper size of the sheets you cut">
             <option>A0</option><option selected>A1</option><option>A2</option><option>A3</option><option>A4</option>
           </select>
@@ -429,8 +432,8 @@ window.DOC_STUDIO_CONFIG = {
 </script>
 <script type="module">
 import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs";
-import { parseDwg, svgToPng, sheetsPdf } from "./libredwg-engine.js?v=r2d";
-import * as CV from "./canvas-view.js?v=r2e";
+import { parseDwg, svgToPng, sheetsPdf } from "./libredwg-engine.js?v=r2f";
+import * as CV from "./canvas-view.js?v=r2f";
 pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs";
 
 const $ = s => document.querySelector(s);
@@ -971,10 +974,14 @@ function commit(){
    they do not (a heavy sheet on a slow GPU: the frame interval, not only the
    script time, is watched), the rest of that gesture moves the last frame and
    the vectors follow when the wheel stops */
-let rafQ=0, lastFrame=0, slowFrames=0, gestureSlow=false, idleT=0;
+let rafQ=0, lastFrame=0, slowFrames=0, gestureSlow=false, idleT=0, sharpT=0;
 function changed(){
   $("#previewZoomLabel").textContent=Math.round(view.s/view.fit*100)+"%";
   clearTimeout(idleT); idleT=setTimeout(()=>{ gestureSlow=false; slowFrames=0; lastFrame=0; },350);
+  if(host&&host.kind==="scene"){
+    host.moving=true; clearTimeout(sharpT);
+    const h=host; sharpT=setTimeout(()=>{ if(host!==h) return; h.moving=false; commit(); },150);
+  }
   if(host&&host.kind==="scene"&&!gestureSlow&&host.lastMs<40){
     clearTimeout(commitT);
     if(!rafQ) rafQ=requestAnimationFrame(now=>{
@@ -1016,17 +1023,31 @@ function svgHost(svgText){
 }
 /* the DWG sheet as a scene drawn on a canvas (canvas-view.js) */
 function sceneHost(scene){
-  const st=stage(); st.innerHTML=""; const cv=document.createElement("canvas"); cv.className="pv-el"; st.appendChild(cv);
-  const ctx=cv.getContext("2d",{alpha:false});
-  const h={ kind:"scene", el:cv, scene, page:scene.page, lastMs:0, draw(t){
-    const [W,H]=stageSize(), dpr=window.devicePixelRatio||1, bw=Math.round(W*dpr), bh=Math.round(H*dpr);
-    if(cv.width!==bw||cv.height!==bh){ cv.width=bw; cv.height=bh; }
-    cv.style.width=W+"px"; cv.style.height=H+"px";
-    h.lastMs=CV.draw(ctx,scene,t,W,H,dpr).ms; return true;
+  // two canvases: one at one pixel per CSS pixel for frames while the view
+  // moves, one at the screen's resolution drawn once it stops (a 150 % screen
+  // has 2.25× the pixels to fill, a 200 % one 4×); each keeps its size, so
+  // switching between them allocates nothing
+  const st=stage(); st.innerHTML="";
+  const mk=()=>{ const cv=document.createElement("canvas"); cv.className="pv-el"; st.appendChild(cv); return { cv, ctx:cv.getContext("2d",{alpha:false}) }; };
+  const hi=mk(), lo=mk(); lo.cv.style.visibility="hidden";
+  const h={ kind:"scene", el:hi.cv, scene, page:scene.page, lastMs:0, moving:false, draw(t){
+    const [W,H]=stageSize(), full=window.devicePixelRatio||1, low=h.moving&&full>1;
+    const c=low?lo:hi, dpr=low?1:full, bw=Math.round(W*dpr), bh=Math.round(H*dpr);
+    if(c.cv.width!==bw||c.cv.height!==bh){ c.cv.width=bw; c.cv.height=bh; }
+    c.cv.style.width=W+"px"; c.cv.style.height=H+"px";
+    // while it moves, a copy of the whole-sheet picture when that is sharp enough
+    if(h.moving&&CV.blit(c.ctx,scene,t,W,H,dpr)) h.lastMs=1;
+    else h.lastMs=CV.draw(c.ctx,scene,t,W,H,dpr).ms;
+    if(!h.moving&&!scene.ov&&!h.ovT) h.ovT=setTimeout(()=>{ h.ovT=0; if(host===h&&!h.moving) CV.overview(scene); },300);
+    const other=low?hi:lo; c.cv.style.visibility=""; other.cv.style.visibility="hidden";
+    c.cv.style.transform=""; other.cv.style.transform="";
+    h.el=c.cv;                                   // the one a live transform moves
+    return true;
   }};
   scene.ready.then(()=>{ if(host===h) commit(); });        // pictures decoded
   return h;
 }
+if(/[?&]dsdebug=1(?:&|$)/.test(location.search)) window.__ds={ view, get host(){ return host; }, commit };   // for the timing scripts
 const FORCE_SVG=/[?&]svgview=1(?:&|$)/.test(location.search);    // the SVG preview, for comparison
 function sceneOf(o){
   if(o._sceneFor!==o.svg){ o._sceneFor=o.svg; try{ o._scene=CV.compile(o.svg); }catch(e){ console.error(e); o._scene=null; } }
@@ -1123,9 +1144,28 @@ let framing=false, corner=null;
 function setFraming(on){
   framing=on; corner=null; stage().classList.toggle("framing",on); $("#frameBtn").classList.toggle("btn-active",on);
   $("#frameBtn").textContent=on?"CLICK 1ST CORNER…":"SHEET BY 2 CORNERS";
-  stage().querySelector(".frame-box")?.remove();
+  stage().querySelector(".frame-box")?.remove(); stage().querySelector(".snap-mark")?.remove();
+  if(on&&host?.kind==="scene") CV.snapIndex(host.scene);          // the vertices, once per sheet
 }
 const toUnits=(mx,my)=>({x:view.x+mx/view.s, y:view.y+my/view.s});     // viewBox units (y down)
+/* the point a corner click means: the nearest vertex within 12 px when SNAP
+   is on (line ends, polyline and frame corners, circle centres), shown by a
+   green square as AutoCAD's endpoint marker */
+let snapOn=true;
+function pickPoint(mx,my){
+  const p=toUnits(mx,my);
+  let q=null;
+  if(snapOn&&host?.kind==="scene") q=CV.snap(CV.snapIndex(host.scene),p.x,p.y,12/view.s);
+  let mk=stage().querySelector(".snap-mark");
+  if(q){
+    if(!mk){ mk=document.createElement("div"); mk.className="snap-mark"; stage().appendChild(mk); }
+    mk.hidden=false; mk.style.left=(q.x-view.x)*view.s+"px"; mk.style.top=(q.y-view.y)*view.s+"px";
+    return { x:q.x, y:q.y, mx:(q.x-view.x)*view.s, my:(q.y-view.y)*view.s };
+  }
+  if(mk) mk.hidden=true;
+  return { x:p.x, y:p.y, mx, my };
+}
+$("#snapBtn").onclick=()=>{ snapOn=!snapOn; $("#snapBtn").classList.toggle("btn-active",snapOn); if(!snapOn) stage().querySelector(".snap-mark")?.remove(); };
 async function addSheet(a,b){
   const p=page(state.activePageId), o=p&&(p.orig||p), l=o?.layout; if(!l?.makeSheet) return;
   // viewBox y runs down; the drawing's y is its negative (the content is flipped)
@@ -1155,9 +1195,9 @@ $("#frameBtn").onclick=async()=>{
     if(!host) return; e.preventDefault();
     const r=st.getBoundingClientRect(), d=e.deltaMode===1?e.deltaY*16:e.deltaMode===2?e.deltaY*400:e.deltaY;
     zoomAt(e.clientX-r.left,e.clientY-r.top,Math.exp(-d*0.0018));
-    if(corner) rubber(e.clientX-r.left,e.clientY-r.top);
+    if(framing){ const q=pickPoint(e.clientX-r.left,e.clientY-r.top); if(corner) rubber(q.mx,q.my); }
   },{passive:false});
-  let drag=null;
+  let drag=null, last=null;
   function rubber(mx,my){
     let box=st.querySelector(".frame-box"); if(!box){ box=document.createElement("div"); box.className="frame-box"; st.appendChild(box); }
     const ax=(corner.x-view.x)*view.s, ay=(corner.y-view.y)*view.s;
@@ -1167,35 +1207,43 @@ $("#frameBtn").onclick=async()=>{
     if(!host||(e.button!==0&&e.button!==1)) return;
     e.preventDefault(); try{ st.setPointerCapture(e.pointerId); }catch{}
     const r=st.getBoundingClientRect();
-    drag={x:e.clientX,y:e.clientY,x0:e.clientX,y0:e.clientY,moved:false,button:e.button,r};
+    drag={x:e.clientX,y:e.clientY,x0:e.clientX,y0:e.clientY,moved:false,button:e.button,r,
+          pick:framing&&e.button===0?pickPoint(e.clientX-r.left,e.clientY-r.top):null};
     if(!(framing&&e.button===0)) st.classList.add("panning");
   });
   st.addEventListener("pointermove",e=>{
     const r=st.getBoundingClientRect();
-    if(framing&&corner&&!drag) rubber(e.clientX-r.left,e.clientY-r.top);
+    if(framing&&(!drag||drag.button===0)){
+      const q=pickPoint(e.clientX-r.left,e.clientY-r.top); last=q;
+      if(corner&&!drag) rubber(q.mx,q.my);
+    }
     if(!drag) return;
     if(Math.hypot(e.clientX-drag.x0,e.clientY-drag.y0)>4) drag.moved=true;
     if(framing&&drag.button===0){
       // dragging a window works too: the press is the first corner
-      if(drag.moved&&!corner) corner=toUnits(drag.x0-r.left,drag.y0-r.top);
-      if(corner) rubber(e.clientX-r.left,e.clientY-r.top);
+      if(drag.moved&&!corner){ const q=drag.pick||toUnits(drag.x0-r.left,drag.y0-r.top); corner={x:q.x,y:q.y}; }
+      if(corner) rubber(last.mx,last.my);
       return;
     }
     view.x-=(e.clientX-drag.x)/view.s; view.y-=(e.clientY-drag.y)/view.s; drag.x=e.clientX; drag.y=e.clientY; changed();
+    if(framing){ const q=pickPoint(e.clientX-r.left,e.clientY-r.top); if(corner) rubber(q.mx,q.my); }   // panning with the middle button while framing
   });
   const end=async e=>{
     if(!drag) return; const d=drag; drag=null; st.classList.remove("panning");
     try{ st.releasePointerCapture(e.pointerId); }catch{}
     if(!(framing&&d.button===0)) return;
-    const r=st.getBoundingClientRect(), pt=toUnits(e.clientX-r.left,e.clientY-r.top);
-    if(!corner){ corner=pt; $("#frameBtn").textContent="CLICK 2ND CORNER…"; rubber(e.clientX-r.left,e.clientY-r.top); return; }
+    const r=st.getBoundingClientRect(), q=pickPoint(e.clientX-r.left,e.clientY-r.top), pt={x:q.x,y:q.y};
+    if(!corner){ corner=pt; $("#frameBtn").textContent="CLICK 2ND CORNER…"; rubber(q.mx,q.my); return; }
     if(Math.abs(pt.x-corner.x)*view.s<6||Math.abs(pt.y-corner.y)*view.s<6) return;
     const a=corner; corner=null; st.querySelector(".frame-box")?.remove(); $("#frameBtn").textContent="CLICK 1ST CORNER…";
     await addSheet(a,pt);                           // stays in the mode: the next sheet can be picked right away
   };
   st.addEventListener("pointerup",end); st.addEventListener("pointercancel",end);
   st.addEventListener("dblclick",()=>{ if(!framing) fitView(); });
-  document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&framing) setFraming(false); });
+  document.addEventListener("keydown",e=>{
+    if(e.key==="Escape"&&framing) setFraming(false);
+    if(e.key==="F3"&&framing){ e.preventDefault(); $("#snapBtn").click(); }
+  });
   window.addEventListener("resize",()=>{ if(host) commit(); });
 })();
 
