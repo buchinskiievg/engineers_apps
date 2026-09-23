@@ -30,20 +30,30 @@ import { Dwg_File_Type, LibreDwg } from "https://cdn.jsdelivr.net/npm/@mlightcad
 // "$/" as regex flags and the module failed to load, which took the whole
 // studio page down with it — nothing, not even a PDF, could be added.)
 const WASM = new URL(".", import.meta.url).href.replace(/\/$/, "");
-let enginePromise;
+let probed = null;
 
-async function getEngine() {
-  if (!enginePromise) {
-    enginePromise = (async () => {
-      const wasmUrl = WASM + "/libredwg-web.wasm";
-      // HEAD, not GET: a GET with cache:"no-store" downloaded all 9.5 MB just to
-      // look at the status, and the library then downloaded them a second time.
-      const probe = await fetch(wasmUrl, { method: "HEAD" }).catch(() => null);
-      if (probe && !probe.ok) throw new Error("LibreDWG WASM not available: HTTP " + probe.status + " at " + wasmUrl);
-      return LibreDwg.create(WASM);
-    })().catch(err => { enginePromise = null; throw err; });
+/* One engine instance per drawing, not one per page.
+
+   A shared instance keeps state between files that some drawings break: a real
+   AutoCAD 2018 route plan read fine the first time, and the second read of the
+   same file in the same instance failed with "null function"; after that the
+   instance aborted on every file, so the second DWG a user added in a session
+   never opened. A fresh instance costs about half a second, and the WASM itself
+   is not downloaded again — it is served with an ETag, so the browser only
+   revalidates it.
+
+   The file is probed once with HEAD, not GET: a GET with cache:"no-store"
+   downloaded all 9.5 MB just to look at the status. */
+async function freshEngine() {
+  const wasmUrl = WASM + "/libredwg-web.wasm";
+  if (!probed) {
+    probed = fetch(wasmUrl, { method: "HEAD" }).then(r => {
+      if (!r.ok) throw new Error("LibreDWG WASM not available: HTTP " + r.status + " at " + wasmUrl);
+    }, () => { /* offline or blocked HEAD: let the library try, and report its own error */ });
+    probed.catch(() => { probed = null; });
   }
-  return enginePromise;
+  await probed;
+  return LibreDwg.create(WASM);
 }
 
 function svgUrl(svg) {
@@ -67,12 +77,50 @@ const isModel = br => /^\*Model_Space$/i.test(String(br?.name || ""));
 const isPaper = br => /^\*Paper_Space/i.test(String(br?.name || ""));
 const ownerOf = e => String(e?.ownerBlockRecordSoftId ?? e?.ownerHandle ?? "");
 
-/* The same drawing with only one space's entities in it. Block definitions stay
-   whole: an INSERT in the space still needs the block it refers to. */
+/* The block records go back into the drawing in the same shape they came out. */
+function withRecords(db, recs) {
+  const t = db?.tables || {};
+  if (t.BLOCK_RECORD && Array.isArray(t.BLOCK_RECORD.entries)) return { ...db, tables: { ...t, BLOCK_RECORD: { ...t.BLOCK_RECORD, entries: recs } } };
+  if (Array.isArray(t.BLOCK_RECORD)) return { ...db, tables: { ...t, BLOCK_RECORD: recs } };
+  if (Array.isArray(t.blockRecords)) return { ...db, tables: { ...t, blockRecords: recs } };
+  return db;
+}
+
+/* The same drawing with only one space in it.
+
+   dwg_to_svg does NOT draw from db.entities: it draws from the entities held
+   inside the block records, and *Model_Space carries its own copy of every
+   model entity. Filtering db.entities alone therefore isolated nothing — every
+   paper layout came out as the whole of Model Space in another frame (checked:
+   3 084 508 characters of SVG for a layout holding one viewport, against
+   3 084 531 for Model). The other spaces are emptied in the block records too.
+   Ordinary block definitions stay whole: an INSERT still needs its block. */
 function isolate(db, record) {
   const h = String(record.handle);
   const ents = Array.isArray(db?.entities) ? db.entities : [];
-  return { ...db, entities: ents.filter(e => ownerOf(e) === h) };
+  const recs = blockRecords(db).map(r =>
+    ((isModel(r) || isPaper(r)) && String(r.handle) !== h) ? { ...r, entities: [] } : r);
+  return withRecords({ ...db, entities: ents.filter(e => ownerOf(e) === h) }, recs);
+}
+
+/* LibreDWG's SVG writer throws on some table objects — an R2000 ACAD_TABLE
+   without cell border styles ("reading 'topBorderVisibility'"), and one such
+   object takes the whole sheet down with it. The sheet is then drawn again
+   without the tables, and the count of what was left out goes to the user. */
+const isTable = e => /^(ACAD_TABLE|TABLE)$/i.test(String(e?.type || ""));
+function drawSvg(lib, iso) {
+  try { return { svg: lib.dwg_to_svg(iso), skippedTables: 0 }; }
+  catch (err) {
+    const own = (iso.entities || []).filter(isTable).length;
+    let inBlocks = 0;
+    const recs = blockRecords(iso).map(r => {
+      const kept = (r.entities || []).filter(e => { if (isTable(e)) { inBlocks++; return false; } return true; });
+      return { ...r, entities: kept };
+    });
+    if (!own && !inBlocks) throw err;
+    const svg = lib.dwg_to_svg(withRecords({ ...iso, entities: (iso.entities || []).filter(e => !isTable(e)) }, recs));
+    return { svg, skippedTables: Math.max(own, inBlocks) };
+  }
 }
 
 /* ── extents ─────────────────────────────────────────────────────────────
@@ -85,6 +133,8 @@ function collectPoints(entities) {
   const xs = [], ys = [];
   const add = p => { if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) { xs.push(p.x); ys.push(p.y); } };
   for (const e of entities) {
+    // construction lines are infinite; AutoCAD leaves them out of the extents too
+    if (/^(XLINE|RAY)$/i.test(String(e?.type || ""))) continue;
     add(e.startPoint); add(e.endPoint); add(e.center); add(e.insertionPoint); add(e.position);
     add(e.definitionPoint); add(e.textPosition);
     if (Array.isArray(e.vertices)) for (const v of e.vertices) add(v);
@@ -101,17 +151,25 @@ function quantile(sorted, q) {
 function extentsFor(entities, header) {
   const { xs, ys } = collectPoints(entities);
   if (!xs.length) return null;
-  const mn = header?.EXTMIN, mx = header?.EXTMAX;
-  if (mn && mx && [mn.x, mn.y, mx.x, mx.y].every(Number.isFinite) && mx.x > mn.x && mx.y > mn.y) {
-    let inside = 0;
-    for (let i = 0; i < xs.length; i++) if (xs[i] >= mn.x && xs[i] <= mx.x && ys[i] >= mn.y && ys[i] <= mx.y) inside++;
-    if (inside / xs.length >= 0.9) return { minX: mn.x, minY: mn.y, maxX: mx.x, maxY: mx.y, from: "header" };
-  }
   const sx = [...xs].sort((a, b) => a - b), sy = [...ys].sort((a, b) => a - b);
   let minX = quantile(sx, 0.005), maxX = quantile(sx, 0.995), minY = quantile(sy, 0.005), maxY = quantile(sy, 0.995);
   if (!(maxX > minX)) { minX -= 1; maxX += 1; }
   if (!(maxY > minY)) { minY -= 1; maxY += 1; }
-  return { minX, minY, maxX, maxY, from: "points" };
+  const robust = { minX, minY, maxX, maxY, from: "points" };
+  /* The header is trusted only when it both holds the drawing (90 % of the
+     points inside) and is not far bigger than it (at most three times the
+     robust box on each axis). A header can be stale or count infinite
+     construction lines: the LibreDWG sample drawings carry EXTMIN/EXTMAX of
+     −2.7 million … 0.9 million around geometry 14 000 units across, and passed
+     the first test alone. */
+  const mn = header?.EXTMIN, mx = header?.EXTMAX;
+  if (mn && mx && [mn.x, mn.y, mx.x, mx.y].every(Number.isFinite) && mx.x > mn.x && mx.y > mn.y) {
+    let inside = 0;
+    for (let i = 0; i < xs.length; i++) if (xs[i] >= mn.x && xs[i] <= mx.x && ys[i] >= mn.y && ys[i] <= mx.y) inside++;
+    const notTooBig = (mx.x - mn.x) <= 3 * (maxX - minX) && (mx.y - mn.y) <= 3 * (maxY - minY);
+    if (inside / xs.length >= 0.9 && notTooBig) return { minX: mn.x, minY: mn.y, maxX: mx.x, maxY: mx.y, from: "header" };
+  }
+  return robust;
 }
 
 /* dwg_to_svg draws with y turned over (the view box starts at −maxY), and sizes
@@ -150,7 +208,7 @@ function meta(svg) {
 }
 
 export async function parseDwg(file) {
-  const lib = await getEngine();
+  const lib = await freshEngine();
   const ptr = lib.dwg_read_data(await file.arrayBuffer(), Dwg_File_Type.DWG);
   if (!ptr) throw new Error("LibreDWG could not open this DWG.");
   let db;
@@ -173,8 +231,9 @@ export async function parseDwg(file) {
   if (model) {
     const iso = isolate(db, model);
     const n = iso.entities.length;
-    const svg = frame(lib.dwg_to_svg(iso), extentsFor(iso.entities, db.header));
-    layouts.push({ id:"model", name:"Model", isModel:true, selected:false, empty:n===0, entityCount:n,
+    const drawn = drawSvg(lib, iso);
+    const svg = frame(drawn.svg, extentsFor(iso.entities, db.header));
+    layouts.push({ id:"model", name:"Model", isModel:true, selected:false, empty:n===0, entityCount:n, skippedTables:drawn.skippedTables,
                    recordName:model.name, svg, previewUrl:svgUrl(svg), paper:"Model Space", ...meta(svg) });
   }
   // paper layouts in the order of their tabs in AutoCAD
@@ -184,9 +243,10 @@ export async function parseDwg(file) {
     const iso = isolate(db, br);
     const n = iso.entities.length;
     // an empty layout still gets a sheet, framed on nothing, so it can be seen as empty
-    const svg = frame(lib.dwg_to_svg(iso), n ? extentsFor(iso.entities, null) : null);
+    const drawn = drawSvg(lib, iso);
+    const svg = frame(drawn.svg, n ? extentsFor(iso.entities, null) : null);
     layouts.push({ id:"layout-"+i, name: lo?.layoutName || lo?.name || ("Layout " + (i + 1)), isModel:false,
-                   selected: n > 0, empty: n === 0, entityCount: n,
+                   selected: n > 0, empty: n === 0, entityCount: n, skippedTables: drawn.skippedTables,
                    recordName:br.name, svg, previewUrl:svgUrl(svg), paper:"Paper Space", ...meta(svg) });
   });
 

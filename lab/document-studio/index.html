@@ -383,7 +383,7 @@ window.DOC_STUDIO_CONFIG = {
 </script>
 <script type="module">
 import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs";
-import { parseDwg, svgToPng } from "./libredwg-engine.js?v=wasm5";
+import { parseDwg, svgToPng } from "./libredwg-engine.js?v=wasm8";
 pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs";
 
 const $ = s => document.querySelector(s);
@@ -487,7 +487,8 @@ async function ingestDwg(file){
     const paperN=src.layouts.filter(x=>!x.isModel).length, emptyN=src.layouts.filter(x=>!x.isModel&&x.empty).length;
     setStatus(src,"ready", src.modelOnly
       ? "LibreDWG · Model Space only — "+(paperN?paperN+" paper layout"+(paperN>1?"s are":" is")+" empty, ":"no paper layouts, ")+"Model included"
-      : "LibreDWG · "+(paperN-emptyN)+" layout"+(paperN-emptyN===1?"":"s")+(emptyN?" · "+emptyN+" empty skipped":""));
+      : "LibreDWG · "+(paperN-emptyN)+" layout"+(paperN-emptyN===1?"":"s")+(emptyN?" · "+emptyN+" empty skipped":"")
+      + ((()=>{const t=src.layouts.reduce((k,l)=>k+(l.skippedTables||0),0);return t?" · "+t+" table"+(t>1?"s":"")+" not drawn by LibreDWG":"";})()));
   }catch(err){
     console.error(err);
     src.engineError=err?.message||String(err);
