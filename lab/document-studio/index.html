@@ -268,7 +268,7 @@
     <div style="font-size:11px;color:var(--muted);text-align:right">
       <b style="color:var(--ink)">IECCalc Document Tools</b><br>
       Browser-side PDF composition<br>
-      Self-hosted DWG rendering
+      Browser-side DWG rendering · LibreDWG
     </div>
   </div>
 
@@ -359,13 +359,12 @@
 <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 <script>
 window.DOC_STUDIO_CONFIG = {
-  dwgPreflightUrl: "https://api.ieccalc.com/document-studio/dwg/preflight",
-  dwgConvertUrl: "https://api.ieccalc.com/document-studio/dwg/convert",
   officeConvertUrl: "https://api.ieccalc.com/document-studio/office/convert"
 };
 </script>
 <script type="module">
 import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs";
+import { parseDwg, svgToPng } from "./libredwg-engine.js";
 pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs";
 
 const $ = s => document.querySelector(s);
@@ -445,54 +444,42 @@ async function ingestOffice(file){
 }
 
 async function ingestDwg(file){
-  const s=addSource(file,"dwg");setStatus(s,"pending","DWG preflight");
-  state.activeSourceId=s.id;renderAll();
-  await runDwg(s,false);
+  const src=addSource(file,"dwg");
+  state.activeSourceId=src.id;
+  setStatus(src,"pending","Parsing locally · LibreDWG");
+  renderAll();
+  try{
+    const result=await parseDwg(file);
+    src.layouts=result.layouts||[];
+    src.pageIds=[];
+    state.pages=state.pages.filter(p=>p.sourceId!==src.id);
+    for(const l of src.layouts.filter(x=>!x.isModel)){
+      const p={id:uid("page"),sourceId:src.id,sourceType:"dwg-svg",sourcePage:src.pageIds.length,label:src.name+" — "+l.name,rotation:0,thumb:l.previewUrl,layout:l,svg:l.svg,pngDataUrl:null};
+      state.pages.push(p);src.pageIds.push(p.id);
+    }
+    const first=src.layouts.find(x=>!x.isModel)||src.layouts[0];
+    state.activeLayoutId=first?.id||null;
+    state.activePageId=state.pages.find(p=>p.sourceId===src.id&&p.layout?.id===state.activeLayoutId)?.id||null;
+    setStatus(src,"ready","LibreDWG · "+src.layouts.filter(x=>!x.isModel).length+" layouts");
+  }catch(err){
+    console.error(err);
+    src.engineError=err?.message||String(err);
+    setStatus(src,"error","LibreDWG: "+src.engineError);
+  }
+  renderAll();
 }
 
-async function runDwg(s,includeModel){
-  try{
-    setStatus(s,"pending","Rendering DWG…");
-    const fd=new FormData();fd.append("file",s.file);fd.append("includeModel",String(includeModel));
-    const r=await fetch(DOC_STUDIO_CONFIG.dwgPreflightUrl,{method:"POST",body:fd});
-    let data=await r.json().catch(()=>({}));
-    if(!r.ok) throw new Error(data.error||data.message||("DWG renderer HTTP "+r.status));
-    s.jobId=data.jobId||null;s.layouts=data.layouts||[];s.dependencies=data.dependencies||[];
-
-    // AutoCAD Automation is asynchronous. Poll until APS returns the plotted PDF.
-    if(data.jobId && !data.pdfUrl){
-      let tries=0;
-      while(tries++<120){
-        const jr=await fetch("https://api.ieccalc.com/document-studio/dwg/jobs/"+encodeURIComponent(data.jobId));
-        const jd=await jr.json().catch(()=>({}));
-        if(!jr.ok && jr.status!==422) throw new Error(jd.error||("DWG job status HTTP "+jr.status));
-        if(jd.status==="success"&&jd.pdfUrl){data=jd;break;}
-        if(jd.status==="failed"||jd.status==="cancelled") throw new Error(jd.error||("DWG job "+jd.status));
-        const q=jd.queuePosition!=null?" · queue "+jd.queuePosition:"";
-        setStatus(s,"pending","DWG "+(jd.status||"pending")+q);
-        await new Promise(resolve=>setTimeout(resolve,2000));
-      }
-      if(!data.pdfUrl) throw new Error("DWG render timed out.");
-    }
-
-    if(data.pdfUrl){
-      const pdf=await fetch(data.pdfUrl);if(!pdf.ok)throw new Error("Rendered PDF download failed");
-      const blob=await pdf.blob();
-      s.pageIds.forEach(pid=>{state.pages=state.pages.filter(p=>p.id!==pid);state.selected.delete(pid)});s.pageIds=[];
-      await ingestPdf(new File([blob],s.name.replace(/\.(dwg|zip)$/i,".pdf"),{type:"application/pdf"}),s,s.name);
-      s.type="dwg";
-      for(let i=0;i<s.pageIds.length;i++){
-        const p=page(s.pageIds[i]), l=s.layouts[i];
-        if(p&&l){p.label=l.name||p.label;p.layout=l;}
-      }
-      setStatus(s,"ready","DWG · "+s.pageIds.length+" layouts");
-    }else{
-      setStatus(s,"ready",(s.layouts.length||0)+" layouts previewed");
-    }
-    renderAll();
-  }catch(e){
-    console.error(e);s.engineError=e.message;setStatus(s,"error","DWG renderer: "+e.message);renderAll();
+async function rebuildDwgOutput(){
+  const src=activeSource();
+  if(!src||src.type!=="dwg"||!src.layouts?.length)return;
+  state.pages=state.pages.filter(p=>p.sourceId!==src.id);
+  src.pageIds=[];
+  const includeModel=$("#includeModel").checked;
+  for(const l of src.layouts.filter(x=>!x.isModel||includeModel)){
+    const p={id:uid("page"),sourceId:src.id,sourceType:"dwg-svg",sourcePage:src.pageIds.length,label:src.name+" — "+l.name,rotation:0,thumb:l.previewUrl,layout:l,svg:l.svg,pngDataUrl:null};
+    state.pages.push(p);src.pageIds.push(p.id);
   }
+  renderAll();
 }
 
 function renderSources(){
@@ -503,13 +490,13 @@ function renderSources(){
     '<div class="source-top"><div class="source-icon">'+(s.type==="dwg"?"DWG":s.type==="office"?"WORD":s.type==="image"?"IMG":"PDF")+'</div>'+
     '<div class="source-main"><div class="source-name">'+esc(s.name)+'</div><div class="source-meta">'+bytes(s.size)+' · '+esc(s.type.toUpperCase())+'</div>'+
     '<div class="status '+s.status+'"><i class="dot"></i>'+esc(s.statusText)+'</div></div></div>'+
-    '<div class="source-actions">'+(s.type==="dwg"?'<button class="btn btn-ghost" data-act="refresh">RENDER</button>':'')+
+    '<div class="source-actions">'+(s.type==="dwg"?'<button class="btn btn-ghost" data-act="refresh">RELOAD</button>':'')+
     '<button class="btn btn-ghost" data-act="remove">REMOVE</button></div></div>').join("");
   root.querySelectorAll(".source-v2").forEach(el=>{
     el.onclick=ev=>{
       const id=el.dataset.id, act=ev.target.dataset.act;
       if(act==="remove"){ev.stopPropagation();removeSource(id);return;}
-      if(act==="refresh"){ev.stopPropagation();runDwg(source(id),$("#includeModel").checked);return;}
+      if(act==="refresh"){ev.stopPropagation();ingestDwg(source(id).file);return;}
       state.activeSourceId=id;
       const s=source(id);state.activePageId=s.pageIds[0]||null;state.activeLayoutId=s.layouts?.[0]?.id||null;
       renderAll();
@@ -527,8 +514,9 @@ function removeSource(id){
 
 function sourceItems(s){
   if(!s)return [];
+  if(s.type==="dwg"&&s.layouts?.length) return s.layouts.filter(l=>!l.isModel||$("#includeModel").checked).map((l,i)=>({kind:"layout",layout:l,index:i}));
   if(s.pageIds.length) return s.pageIds.map((id,i)=>({kind:"page",page:page(id),index:i}));
-  return (s.layouts||[]).filter(l=>!l.isModel||$("#includeModel").checked).map((l,i)=>({kind:"layout",layout:l,index:i}));
+  return [];
 }
 
 function renderThumbs(){
@@ -537,7 +525,7 @@ function renderThumbs(){
   if(!s){$("#sourcePageCount").textContent="0";root.innerHTML='<div class="thumb-empty">Select a source file.</div>';return;}
   const items=sourceItems(s);$("#sourcePageCount").textContent=String(items.length);
   if(!items.length){
-    root.innerHTML='<div class="thumb-empty">'+(s.type==="dwg"?(s.engineError?"DWG renderer error:<br>"+esc(s.engineError):"Waiting for DWG layout render…"):"No pages.")+'</div>';return;
+    root.innerHTML='<div class="thumb-empty">'+(s.type==="dwg"?(s.engineError?"LibreDWG error:<br>"+esc(s.engineError):"Parsing local DWG…"):"No pages.")+'</div>';return;
   }
   root.innerHTML=items.map(it=>{
     const p=it.page,l=it.layout;
@@ -553,7 +541,12 @@ function renderThumbs(){
   root.querySelectorAll(".thumb-card").forEach(el=>{
     el.onclick=()=>{
       if(el.dataset.kind==="page"){state.activePageId=el.dataset.key;const p=page(state.activePageId);state.activeSourceId=p.sourceId;}
-      else state.activeLayoutId=el.dataset.key;
+      else {
+        state.activeLayoutId=el.dataset.key;
+        const s=activeSource();
+        const p=state.pages.find(p=>p.sourceId===s?.id&&p.layout?.id===state.activeLayoutId);
+        state.activePageId=p?.id||null;
+      }
       renderThumbs();renderPreview();
     };
   });
@@ -580,10 +573,13 @@ async function renderPreview(){
   if(p?.sourceType==="image"){
     root.innerHTML='<div class="preview-paper" style="transform:scale('+state.previewZoom+')"><img src="'+esc(p.thumb)+'" style="transform:rotate('+p.rotation+'deg)"><div class="boundary '+(state.showBoundary?"on":"")+'"></div></div>';return;
   }
+  if(p?.sourceType==="dwg-svg"&&p.svg){
+    root.innerHTML='<div class="preview-paper" style="transform:scale('+state.previewZoom+')">'+p.svg+'<div class="boundary '+(state.showBoundary?"on":"")+'"></div></div>';return;
+  }
   if(l?.previewUrl){
     root.innerHTML='<div class="preview-paper" style="transform:scale('+state.previewZoom+')"><img src="'+esc(l.previewUrl)+'"><div class="boundary '+(state.showBoundary?"on":"")+'"></div></div>';return;
   }
-  root.innerHTML='<div class="preview-empty">'+(s.type==="dwg"?"Waiting for DWG preview…":"Preview unavailable.")+'</div>';
+  root.innerHTML='<div class="preview-empty">'+(s.type==="dwg"?"Preparing local preview…":"Preview unavailable.")+'</div>';
 }
 
 function renderOutput(){
@@ -626,6 +622,15 @@ async function exportPdf(){
       }else if(p.sourceType==="image"&&p.imageFile){
         const ab=await p.imageFile.arrayBuffer(), im=ext(p.imageFile.name)==="png"?await out.embedPng(ab):await out.embedJpg(ab);
         const w=im.width*.75,h=im.height*.75,pg=out.addPage([w,h]);pg.drawImage(im,{x:0,y:0,width:w,height:h});
+      }else if(p.sourceType==="dwg-svg"&&p.svg){
+        if(!p.pngDataUrl)p.pngDataUrl=await svgToPng(p.svg,2.5);
+        const png=await fetch(p.pngDataUrl).then(r=>r.arrayBuffer());
+        const im=await out.embedPng(png);
+        const landscape=(p.layout?.orientation||"landscape")==="landscape";
+        const mm=landscape?[841,594]:[594,841];
+        const pg=out.addPage(mm.map(x=>x*72/25.4));
+        const d=im.scaleToFit(pg.getWidth(),pg.getHeight());
+        pg.drawImage(im,{x:(pg.getWidth()-d.width)/2,y:(pg.getHeight()-d.height)/2,width:d.width,height:d.height});
       }
       $("#exportProgress i").style.width=Math.round((i+1)/state.pages.length*100)+"%";
     }
@@ -638,7 +643,7 @@ const dz=$("#dropzone");["dragenter","dragover"].forEach(n=>dz.addEventListener(
 ["dragleave","drop"].forEach(n=>dz.addEventListener(n,e=>{e.preventDefault();dz.classList.remove("drag")}));
 dz.ondrop=e=>acceptFiles(e.dataTransfer.files);dz.onclick=()=>$("#fileInput").click();
 $("#clearBtn").onclick=()=>{state.sources.clear();state.pages=[];state.selected.clear();state.activeSourceId=null;state.activePageId=null;renderAll();};
-$("#includeModel").onchange=()=>{const s=activeSource();if(s?.type==="dwg")runDwg(s,$("#includeModel").checked);};
+$("#includeModel").onchange=rebuildDwgOutput;
 $("#previewZoomIn").onclick=()=>{state.previewZoom=Math.min(1.8,state.previewZoom+.1);$("#previewZoomLabel").textContent=Math.round(state.previewZoom*100)+"%";renderPreview();};
 $("#previewZoomOut").onclick=()=>{state.previewZoom=Math.max(.5,state.previewZoom-.1);$("#previewZoomLabel").textContent=Math.round(state.previewZoom*100)+"%";renderPreview();};
 $("#toggleBoundary").onclick=()=>{state.showBoundary=!state.showBoundary;$("#toggleBoundary").classList.toggle("btn-active",state.showBoundary);renderPreview();};
