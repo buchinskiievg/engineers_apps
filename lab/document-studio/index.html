@@ -462,9 +462,26 @@ async function runDwg(s,includeModel){
     setStatus(s,"pending","AutoCAD rendering…");
     const fd=new FormData();fd.append("file",s.file);fd.append("includeModel",String(includeModel));
     const r=await fetch(DOC_STUDIO_CONFIG.dwgPreflightUrl,{method:"POST",body:fd});
-    const data=await r.json().catch(()=>({}));
+    let data=await r.json().catch(()=>({}));
     if(!r.ok) throw new Error(data.error||data.message||("HTTP "+r.status));
     s.jobId=data.jobId||null;s.layouts=data.layouts||[];s.dependencies=data.dependencies||[];
+
+    // AutoCAD Automation is asynchronous. Poll until APS returns the plotted PDF.
+    if(data.jobId && !data.pdfUrl){
+      let tries=0;
+      while(tries++<120){
+        const jr=await fetch("https://api.ieccalc.com/document-studio/dwg/jobs/"+encodeURIComponent(data.jobId));
+        const jd=await jr.json().catch(()=>({}));
+        if(!jr.ok && jr.status!==422) throw new Error(jd.error||("AutoCAD job status HTTP "+jr.status));
+        if(jd.status==="success"&&jd.pdfUrl){data=jd;break;}
+        if(jd.status==="failed"||jd.status==="cancelled") throw new Error(jd.error||("AutoCAD job "+jd.status));
+        const q=jd.queuePosition!=null?" · queue "+jd.queuePosition:"";
+        setStatus(s,"pending","AutoCAD "+(jd.status||"pending")+q);
+        await new Promise(resolve=>setTimeout(resolve,2000));
+      }
+      if(!data.pdfUrl) throw new Error("AutoCAD render timed out.");
+    }
+
     if(data.pdfUrl){
       const pdf=await fetch(data.pdfUrl);if(!pdf.ok)throw new Error("Rendered PDF download failed");
       const blob=await pdf.blob();
