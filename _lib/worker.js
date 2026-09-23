@@ -165,225 +165,29 @@ async function pagesAutoDeploy(env) {
 }
 
 
-// ── Document Studio / Autodesk AutoCAD Automation ──────────────────────
-// Required Worker secrets/vars for live AutoCAD rendering:
-//   APS_CLIENT_ID
-//   APS_CLIENT_SECRET
-//   APS_DWG_ACTIVITY_ID   e.g. nickname.ieccalcDwgExport+prod
-// Optional:
-//   APS_REGION            defaults to us-east
-//   APS_BUCKET_KEY        defaults to ieccalc-<clientid-prefix>-document-studio
-//
-// The configured APS Activity must accept:
-//   inputFile  (GET, localName input.dwg)
-//   resultPdf  (PUT, localName output.pdf)
-// and run on Autodesk.AutoCAD+26_0 (AutoCAD 2027).
-//
-// Jobs are stored temporarily in the existing LICENSES KV using a
-// "docstudio:job:" prefix. Binary DWG/PDF data stays in Autodesk OSS.
+// ── Document Studio / self-hosted DWG renderer ───────────────────────
+// Paid cloud CAD engines are intentionally not used here.
+// A future self-hosted renderer can implement these endpoints without changing
+// the front-end contract.
 
-function apsConfigured(env) {
-  return !!(env.APS_CLIENT_ID && env.APS_CLIENT_SECRET && env.APS_DWG_ACTIVITY_ID);
-}
-
-async function apsToken(env) {
-  const body = new URLSearchParams({
-    grant_type: "client_credentials",
-    client_id: env.APS_CLIENT_ID,
-    client_secret: env.APS_CLIENT_SECRET,
-    scope: "data:read data:write data:create bucket:create bucket:read code:all"
-  });
-  const r = await fetch("https://developer.api.autodesk.com/authentication/v2/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body
-  });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok || !j.access_token) throw new Error("APS authentication failed: " + (j.error_description || j.error || r.status));
-  return j.access_token;
-}
-
-function apsBucketKey(env) {
-  const raw = (env.APS_BUCKET_KEY || ("ieccalc-" + String(env.APS_CLIENT_ID || "app").slice(0,12) + "-document-studio")).toLowerCase();
-  return raw.replace(/[^a-z0-9_-]/g, "-").slice(0,128);
-}
-
-async function apsEnsureBucket(token, env) {
-  const bucketKey = apsBucketKey(env);
-  const r = await fetch("https://developer.api.autodesk.com/oss/v2/buckets", {
-    method:"POST",
-    headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},
-    body:JSON.stringify({bucketKey,policyKey:"transient"})
-  });
-  if (!r.ok && r.status !== 409) {
-    const t = await r.text();
-    throw new Error("APS bucket creation failed: " + r.status + " " + t.slice(0,300));
-  }
-  return bucketKey;
-}
-
-async function apsCreateUpload(token,bucketKey,objectKey,minutes=60) {
-  const u = "https://developer.api.autodesk.com/oss/v2/buckets/" + encodeURIComponent(bucketKey) +
-    "/objects/" + encodeURIComponent(objectKey) + "/signeds3upload?parts=1&firstPart=1&minutesExpiration=" + minutes;
-  const r = await fetch(u,{headers:{Authorization:"Bearer "+token}});
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok || !j.urls?.[0] || !j.uploadKey) throw new Error("APS signed upload creation failed: "+r.status);
-  return {url:j.urls[0],uploadKey:j.uploadKey};
-}
-
-async function apsCompleteUpload(token,bucketKey,objectKey,uploadKey,contentType) {
-  const u = "https://developer.api.autodesk.com/oss/v2/buckets/" + encodeURIComponent(bucketKey) +
-    "/objects/" + encodeURIComponent(objectKey) + "/signeds3upload";
-  const r = await fetch(u,{
-    method:"POST",
-    headers:{
-      Authorization:"Bearer "+token,
-      "Content-Type":"application/json",
-      "x-ads-meta-Content-Type":contentType || "application/octet-stream"
-    },
-    body:JSON.stringify({uploadKey})
-  });
-  if (!r.ok) throw new Error("APS upload finalize failed: "+r.status+" "+(await r.text()).slice(0,200));
-  return r.json().catch(() => ({}));
-}
-
-async function apsDownloadUrl(token,bucketKey,objectKey,minutes=60) {
-  const u = "https://developer.api.autodesk.com/oss/v2/buckets/" + encodeURIComponent(bucketKey) +
-    "/objects/" + encodeURIComponent(objectKey) + "/signeds3download?minutesExpiration=" + minutes + "&useCdn=true";
-  const r = await fetch(u,{headers:{Authorization:"Bearer "+token}});
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok || !j.url) throw new Error("APS signed download failed: "+r.status);
-  return j.url;
-}
-
-async function docStudioEngineStatus(env) {
-  let tokenOk = false, detail = null;
-  if (apsConfigured(env)) {
-    try { await apsToken(env); tokenOk = true; }
-    catch (e) { detail = e.message; }
-  }
-  return json({
-    provider:"Autodesk Platform Services",
-    engine:"AutoCAD Automation API",
-    version:"2027",
-    engineId:"Autodesk.AutoCAD+26_0",
-    configured:apsConfigured(env) && tokenOk,
-    activityId:env.APS_DWG_ACTIVITY_ID || null,
-    detail: apsConfigured(env) ? detail : "APS_CLIENT_ID / APS_CLIENT_SECRET / APS_DWG_ACTIVITY_ID are required"
+async function docStudioDwgPreflight(req, env) {
+  return err("Self-hosted DWG renderer is not connected yet.", 503, {
+    code: "DWG_RENDERER_NOT_CONFIGURED"
   });
 }
 
-async function docStudioDwgPreflight(req,env) {
-  if (!apsConfigured(env)) {
-    return err("AutoCAD APS engine is not configured. Set APS_CLIENT_ID, APS_CLIENT_SECRET and APS_DWG_ACTIVITY_ID.",503,{code:"APS_NOT_CONFIGURED"});
-  }
-  if (!env.LICENSES) return err("Temporary job storage is unavailable.",500);
-  const form = await req.formData();
-  const file = form.get("file");
-  const includeModel = String(form.get("includeModel") || "false") === "true";
-  if (!file || typeof file.arrayBuffer !== "function") return err("DWG file is required.",400);
-  const name = String(file.name || "drawing.dwg");
-  if (!/\.(dwg|zip)$/i.test(name)) return err("Only DWG or ZIP packages are accepted.",400);
-
-  const token = await apsToken(env);
-  const bucketKey = await apsEnsureBucket(token,env);
-  const jobId = crypto.randomUUID();
-  const safeBase = name.replace(/[^A-Za-z0-9._-]+/g,"_").slice(0,100);
-  const inputKey = "docstudio/" + jobId + "/input-" + safeBase;
-  const outputKey = "docstudio/" + jobId + "/output.pdf";
-
-  const inputUpload = await apsCreateUpload(token,bucketKey,inputKey);
-  const putInput = await fetch(inputUpload.url,{
-    method:"PUT",
-    headers:{"Content-Type":file.type || "application/octet-stream"},
-    body:await file.arrayBuffer()
+async function docStudioDwgJob(jobId, env) {
+  return err("Self-hosted DWG renderer is not connected yet.", 503, {
+    code: "DWG_RENDERER_NOT_CONFIGURED"
   });
-  if (!putInput.ok) throw new Error("APS S3 input upload failed: "+putInput.status);
-  await apsCompleteUpload(token,bucketKey,inputKey,inputUpload.uploadKey,file.type || "application/octet-stream");
-  const inputUrl = await apsDownloadUrl(token,bucketKey,inputKey,60);
-
-  const outputUpload = await apsCreateUpload(token,bucketKey,outputKey,60);
-  const region = env.APS_REGION || "us-east";
-  const workBody = {
-    activityId: env.APS_DWG_ACTIVITY_ID,
-    arguments: {
-      inputFile: { verb:"get", url:inputUrl, localName:"input.dwg" },
-      resultPdf: { verb:"put", url:outputUpload.url, localName:"output.pdf" },
-      optionsJson: {
-        verb:"get",
-        localName:"options.json",
-        url:"data:application/json," + encodeURIComponent(JSON.stringify({
-          includeModel,
-          export:"all-layouts",
-          useSavedPageSetups:true,
-          pdfPreset:"AutoCAD PDF (General Documentation).pc3"
-        }))
-      }
-    },
-    limitProcessingTimeSec: 900
-  };
-  const wr = await fetch("https://developer.api.autodesk.com/da/"+region+"/v3/workitems",{
-    method:"POST",
-    headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},
-    body:JSON.stringify(workBody)
-  });
-  const wj = await wr.json().catch(() => ({}));
-  if (!wr.ok || !wj.id) {
-    return err("Failed to start AutoCAD workitem.",502,{apsStatus:wr.status,apsResponse:wj});
-  }
-
-  const rec = {
-    jobId, workitemId:wj.id, bucketKey, inputKey, outputKey,
-    outputUploadKey:outputUpload.uploadKey, originalName:name, includeModel,
-    createdAt:Date.now(), status:"pending"
-  };
-  await env.LICENSES.put("docstudio:job:"+jobId,JSON.stringify(rec),{expirationTtl:7200});
-  return json({jobId,status:"pending",engine:"Autodesk AutoCAD 2027"});
 }
 
-async function docStudioDwgJob(jobId,env) {
-  if (!apsConfigured(env)) return err("AutoCAD APS engine is not configured.",503,{code:"APS_NOT_CONFIGURED"});
-  const raw = await env.LICENSES.get("docstudio:job:"+jobId);
-  if (!raw) return err("Job not found or expired.",404);
-  const rec = JSON.parse(raw);
-  if (rec.status === "success" && rec.pdfUrl) return json(rec);
-
-  const token = await apsToken(env), region=env.APS_REGION || "us-east";
-  const r = await fetch("https://developer.api.autodesk.com/da/"+region+"/v3/workitems/"+encodeURIComponent(rec.workitemId),{
-    headers:{Authorization:"Bearer "+token}
-  });
-  const w = await r.json().catch(() => ({}));
-  if (!r.ok) return err("Failed to read AutoCAD workitem.",502,{apsStatus:r.status});
-
-  const st = String(w.status || "pending").toLowerCase();
-  if (st === "success") {
-    if (!rec.finalized) {
-      await apsCompleteUpload(token,rec.bucketKey,rec.outputKey,rec.outputUploadKey,"application/pdf");
-      rec.finalized = true;
-    }
-    rec.status="success";
-    rec.pdfUrl=await apsDownloadUrl(token,rec.bucketKey,rec.outputKey,60);
-    rec.engine="Autodesk AutoCAD 2027";
-    rec.reportUrl=w.reportUrl || null;
-    await env.LICENSES.put("docstudio:job:"+jobId,JSON.stringify(rec),{expirationTtl:7200});
-    return json(rec);
-  }
-  if (["failed","cancelled"].includes(st)) {
-    rec.status=st;rec.reportUrl=w.reportUrl||null;rec.error=w.error||"AutoCAD workitem failed";
-    await env.LICENSES.put("docstudio:job:"+jobId,JSON.stringify(rec),{expirationTtl:7200});
-    return json(rec,{status:422});
-  }
-  rec.status=st || "pending";
-  if (w.approximateQueuePosition != null) rec.queuePosition=w.approximateQueuePosition;
-  return json(rec);
-}
 async function dispatch(req, env, ctx, url, path) {
   const method = req.method;
 
   if (path === "/health") return json({ ok: true, time: now(), version: "v2" });
 
-  // ── Engineering Document Studio / AutoCAD APS ─────────────────────
-  if (path === "/document-studio/engine-status" && method === "GET") return docStudioEngineStatus(env);
+  // ── Engineering Document Studio / self-hosted DWG renderer ────────
   if (path === "/document-studio/dwg/preflight" && method === "POST") return docStudioDwgPreflight(req,env);
   if ((m = path.match(/^\/document-studio\/dwg\/jobs\/([A-Za-z0-9-]+)$/)) && method === "GET") {
     return docStudioDwgJob(m[1],env);
