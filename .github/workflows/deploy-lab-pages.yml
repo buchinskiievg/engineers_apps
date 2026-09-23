@@ -28,14 +28,14 @@ jobs:
         shell: bash
         run: |
           npm install --no-save @mlightcad/libredwg-web@0.7.14
-          WASM_FILE="$(find node_modules/@mlightcad/libredwg-web -type f -name 'libredwg.wasm' | head -n 1)"
+          WASM_FILE="$(find node_modules/@mlightcad/libredwg-web -type f -name 'libredwg-web.wasm' | head -n 1)"
           if [ -z "$WASM_FILE" ]; then
-            echo "libredwg.wasm not found in npm package"
+            echo "libredwg-web.wasm not found in npm package"
             find node_modules/@mlightcad/libredwg-web -maxdepth 3 -type f | sort
             exit 1
           fi
-          cp "$WASM_FILE" lab/document-studio/libredwg.wasm
-          ls -lh lab/document-studio/libredwg.wasm
+          cp "$WASM_FILE" lab/document-studio/libredwg-web.wasm
+          ls -lh lab/document-studio/libredwg-web.wasm
 
       - name: Deploy site to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
