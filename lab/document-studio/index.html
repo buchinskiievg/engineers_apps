@@ -192,6 +192,68 @@
     .page-actions { flex-wrap:wrap; }
     .page-actions button { flex:1 1 40%; }
   }
+
+  /* === Document Studio v2: Files -> thumbnails -> preview -> output === */
+  .workspace-v2 { display:grid; grid-template-columns:300px 280px minmax(0,1fr); gap:10px; align-items:stretch; min-height:610px; }
+  .pane { border:1px solid var(--line); background:var(--panel); min-width:0; display:flex; flex-direction:column; }
+  .pane-body { min-height:0; flex:1; overflow:auto; }
+  .source-list-v2 { padding:8px; display:flex; flex-direction:column; gap:7px; }
+  .thumb-list { padding:8px; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; align-content:start; }
+  .thumb-card { border:1px solid var(--line); background:var(--panel-2); cursor:pointer; min-width:0; }
+  .thumb-card:hover { border-color:var(--ink); }
+  .thumb-card.active { outline:2px solid var(--red); outline-offset:1px; }
+  .thumb-img { aspect-ratio:1/1.414; background:#d7d3ca; display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative; }
+  .thumb-img.landscape { aspect-ratio:1.414/1; }
+  .thumb-img img, .thumb-img canvas { width:100%; height:100%; object-fit:contain; display:block; }
+  .thumb-n { position:absolute; left:4px; top:4px; background:rgba(42,40,35,.88); color:#fff; padding:2px 5px; font:700 9px var(--mono); }
+  .thumb-info { padding:6px; }
+  .thumb-title { font-size:10.5px; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .thumb-meta { margin-top:2px; font:9px var(--mono); color:var(--muted); }
+  .thumb-empty { grid-column:1/-1; padding:40px 12px; text-align:center; color:var(--muted); font-size:11px; }
+
+  .source-v2 { border:1px solid var(--line); background:var(--panel-2); padding:9px; cursor:pointer; }
+  .source-v2.active { border-left:4px solid var(--red); padding-left:6px; }
+  .source-v2:hover { border-color:var(--ink); }
+  .source-v2 .source-actions { margin-top:7px; }
+  .engine-chip { display:inline-flex;align-items:center;gap:5px;padding:4px 7px;border:1px solid var(--line);font:800 9px var(--mono);background:var(--panel-2); }
+  .engine-chip.ok { color:var(--ok-ink); }
+  .engine-chip.warn { color:var(--warn-ink); }
+  .engine-dot { width:6px;height:6px;border-radius:50%;background:currentColor; }
+
+  .thumb-options { padding:8px 9px; border-bottom:1px solid var(--line); background:var(--panel-2); display:none; }
+  .thumb-options.on { display:block; }
+  .thumb-options label { min-height:0; align-items:center; font-size:10.5px; gap:6px; }
+  .thumb-options input { width:auto; height:auto; }
+
+  .preview-toolbar-v2 { min-height:42px; border-bottom:1px solid var(--line); background:var(--panel-2); padding:7px 9px; display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+  .preview-toolbar-v2 .grow { flex:1; }
+  .preview-stage { flex:1; min-height:520px; overflow:auto; background:#aaa69d; padding:22px; display:flex; justify-content:center; align-items:flex-start; }
+  .preview-paper { position:relative; background:#fff; box-shadow:0 5px 22px rgba(0,0,0,.24); max-width:100%; transform-origin:top center; }
+  .preview-paper canvas,.preview-paper img { display:block; max-width:100%; height:auto; }
+  .preview-empty { color:#55514a; text-align:center; padding:100px 20px; }
+  .boundary { position:absolute; inset:3.5%; border:2px dashed var(--red); pointer-events:none; display:none; }
+  .boundary.on { display:block; }
+
+  .output-panel { margin-top:10px; border:1px solid var(--line); background:var(--panel); }
+  .output-toolbar { min-height:40px; padding:7px 9px; border-bottom:1px solid var(--line); background:var(--panel-2); display:flex; align-items:center;gap:6px;flex-wrap:wrap; }
+  .output-toolbar .grow { flex:1; }
+  .output-pages { padding:10px; display:flex; gap:9px; overflow-x:auto; min-height:178px; align-items:flex-start; }
+  .output-card { flex:0 0 118px; border:1px solid var(--line); background:var(--panel-2); cursor:grab; }
+  .output-card.active { outline:2px solid var(--red); outline-offset:1px; }
+  .output-card.selected { box-shadow:inset 0 0 0 2px var(--red); }
+  .output-card.dragging { opacity:.35; }
+  .output-img { height:112px; background:#d7d3ca; display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative; }
+  .output-img img { width:100%;height:100%;object-fit:contain; }
+  .output-info { padding:5px; }
+  .output-name { font-size:9.5px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+  .output-actions { display:flex;gap:3px;margin-top:4px; }
+  .output-actions button { flex:1;padding:3px 4px;font-size:9px; }
+  .output-empty { color:var(--muted);font-size:11px;padding:55px 18px; }
+
+  @media(max-width:1100px){ .workspace-v2{grid-template-columns:280px 240px minmax(0,1fr);} }
+  @media(max-width:860px){ .workspace-v2{grid-template-columns:1fr 1fr;} .preview-pane{grid-column:1/-1;} .preview-stage{min-height:420px;} }
+  @media(max-width:600px){ .workspace-v2{grid-template-columns:1fr;} .preview-pane{grid-column:auto;} .thumb-list{grid-template-columns:repeat(3,minmax(0,1fr));} }
+
 </style>
 </head>
 <body>
@@ -219,14 +281,8 @@
     <input id="fileInput" class="file-input" type="file" multiple accept=".pdf,.dwg,.doc,.docx,.png,.jpg,.jpeg,.zip" />
     <button id="clearBtn" class="btn btn-ghost">CLEAR</button>
     <span class="tool-sep"></span>
-    <button id="rotateBtn" class="btn btn-ghost">ROTATE 90°</button>
-    <button id="deleteBtn" class="btn btn-ghost">DELETE SELECTED</button>
-    <span class="tool-sep"></span>
-    <button id="selectAllBtn" class="btn btn-ghost">SELECT ALL</button>
-    <button id="deselectBtn" class="btn btn-ghost">DESELECT</button>
     <span class="grow"></span>
-    <div id="exportProgress" class="progressbar" hidden><i></i></div>
-    <button id="exportBtn" class="btn btn-primary">EXPORT PDF</button>
+    <span id="topEngine" class="engine-chip warn"><i class="engine-dot"></i>AUTOCAD APS</span>
   </div>
 
   <div id="dropzone" class="dropzone">
@@ -236,68 +292,63 @@
     </div>
   </div>
 
-  <div class="workspace">
-    <aside class="side">
+
+  <div class="workspace-v2">
+    <aside class="pane">
       <div class="section-head"><b>/ SOURCE FILES</b><span id="sourceCount" class="count">0 FILES</span></div>
-      <div id="sourceList" class="source-list">
-        <div id="sourceEmpty" style="padding:28px 12px;text-align:center;color:var(--muted);font-size:11px">No files loaded.</div>
+      <div id="sourceList" class="pane-body source-list-v2">
+        <div class="thumb-empty">Drop files above to start.</div>
       </div>
     </aside>
 
-    <main class="mainpanel">
-      <div class="section-head"><b>/ DOCUMENT</b><span id="pageCount" class="count">0 PAGES</span></div>
-      <div class="page-toolbar">
-        <button id="moveFirstBtn" class="btn btn-ghost">⇤ FIRST</button>
-        <button id="moveLastBtn" class="btn btn-ghost">LAST ⇥</button>
-        <span class="grow"></span>
-        <span style="font-size:10px;color:var(--muted)">THUMBNAILS</span>
-        <button id="zoomOutBtn" class="btn btn-ghost">−</button>
-        <span id="zoomLabel" class="zoom">100%</span>
-        <button id="zoomInBtn" class="btn btn-ghost">+</button>
+    <section class="pane">
+      <div class="section-head"><b>/ PAGES / LAYOUTS</b><span id="sourcePageCount" class="count">0</span></div>
+      <div id="thumbOptions" class="thumb-options">
+        <label><input id="includeModel" type="checkbox"> Include Model Space</label>
+        <div style="margin-top:5px;font-size:9.5px;color:var(--muted)">Paper Space layouts are included by default. AutoCAD saved page setup / plot settings are used.</div>
       </div>
-      <div id="pages" class="pages">
-        <div class="empty-pages">
-          <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 3h10l4 4v14H5z"/><path d="M15 3v5h5M8 12h8M8 16h8"/></svg>
-          <div><b>Add PDF, DWG, Word or image files.</b><br>PDF pages can already be reordered and merged entirely in your browser.</div>
-        </div>
+      <div id="thumbList" class="pane-body thumb-list">
+        <div class="thumb-empty">Select a source file.</div>
       </div>
+    </section>
 
-      <section id="preflight" class="preflight">
-        <div class="section-head"><b>/ DWG PREFLIGHT</b><span id="pfFileName" class="count"></span></div>
-        <div class="preflight-grid">
-          <div class="pf-left">
-            <div class="pf-settings">
-              <label class="pf-check"><input id="includeModel" type="checkbox"> Include Model Space</label>
-              <label class="pf-check"><input id="usePlotSettings" type="checkbox" checked> Use saved layout plot settings</label>
-              <div class="warning">Final PDF conversion is allowed only after preview. Missing XREF, SHX or CTB dependencies must be reported here before publishing.</div>
-            </div>
-            <div id="layoutList" class="layouts"></div>
-          </div>
-          <div class="pf-right">
-            <div class="pf-preview-toolbar">
-              <b id="pfLayoutTitle" style="font-size:11px">SELECT A LAYOUT</b>
-              <span id="pfPaperMeta" style="font:10px var(--mono);color:var(--muted)"></span>
-              <span class="grow"></span>
-              <button id="pfZoomOut" class="btn btn-ghost">−</button>
-              <span id="pfZoomLabel" style="font:700 11px var(--mono)">100%</span>
-              <button id="pfZoomIn" class="btn btn-ghost">+</button>
-              <button id="pfOpenLarge" class="btn btn-ghost">OPEN LARGE</button>
-            </div>
-            <div id="pfPreviewWrap" class="pf-preview-wrap">
-              <div class="pf-placeholder">DWG preview will appear here after the server-side preflight renderer returns layout thumbnails and plot metadata.</div>
-            </div>
-            <div class="pf-footer">
-              <span id="pfSummary" style="font-size:11px;color:var(--muted)">No layouts detected yet.</span>
-              <span class="grow"></span>
-              <button id="pfRefresh" class="btn btn-ghost">REFRESH PREFLIGHT</button>
-              <button id="pfAddSelected" class="btn btn-primary">ADD SELECTED LAYOUTS TO DOCUMENT</button>
-            </div>
-          </div>
-        </div>
-      </section>
+    <main class="pane preview-pane">
+      <div class="section-head">
+        <b>/ PDF PREVIEW</b>
+        <span class="grow"></span>
+        <span id="engineChip" class="engine-chip warn"><i class="engine-dot"></i>AUTOCAD APS: CHECKING</span>
+      </div>
+      <div class="preview-toolbar-v2">
+        <b id="previewTitle" style="font-size:11px">NO PAGE SELECTED</b>
+        <span id="previewMeta" style="font:10px var(--mono);color:var(--muted)"></span>
+        <span class="grow"></span>
+        <button id="previewZoomOut" class="btn btn-ghost">−</button>
+        <span id="previewZoomLabel" style="font:700 11px var(--mono)">100%</span>
+        <button id="previewZoomIn" class="btn btn-ghost">+</button>
+        <button id="toggleBoundary" class="btn btn-ghost">PLOT BOUNDARY</button>
+      </div>
+      <div id="previewStage" class="preview-stage">
+        <div class="preview-empty"><b>Select a file and then a page/layout.</b><br><br>This pane shows what will go to the PDF.</div>
+      </div>
     </main>
   </div>
-</div>
+
+  <section class="output-panel">
+    <div class="section-head"><b>/ OUTPUT PDF — PAGE ORDER</b><span id="pageCount" class="count">0 PAGES</span></div>
+    <div class="output-toolbar">
+      <button id="moveFirstBtn" class="btn btn-ghost">⇤ FIRST</button>
+      <button id="moveLastBtn" class="btn btn-ghost">LAST ⇥</button>
+      <button id="rotateBtn" class="btn btn-ghost">ROTATE 90°</button>
+      <button id="deleteBtn" class="btn btn-ghost">DELETE SELECTED</button>
+      <button id="selectAllBtn" class="btn btn-ghost">SELECT ALL</button>
+      <button id="deselectBtn" class="btn btn-ghost">DESELECT</button>
+      <span class="grow"></span>
+      <div id="exportProgress" class="progressbar" hidden><i></i></div>
+      <button id="exportBtn" class="btn btn-primary">EXPORT PDF</button>
+    </div>
+    <div id="pages" class="output-pages"><div class="output-empty">Pages from loaded files will appear here in final PDF order.</div></div>
+  </section>
+
 
 <div id="previewModal" class="modal" role="dialog" aria-modal="true">
   <div class="modal-box">
@@ -314,9 +365,10 @@
 <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 <script>
 window.DOC_STUDIO_CONFIG = {
-  dwgPreflightUrl: "/api/document-studio/dwg/preflight",
-  dwgConvertUrl: "/api/document-studio/dwg/convert",
-  officeConvertUrl: "/api/document-studio/office/convert"
+  engineStatusUrl: "https://api.ieccalc.com/document-studio/engine-status",
+  dwgPreflightUrl: "https://api.ieccalc.com/document-studio/dwg/preflight",
+  dwgConvertUrl: "https://api.ieccalc.com/document-studio/dwg/convert",
+  officeConvertUrl: "https://api.ieccalc.com/document-studio/office/convert"
 };
 </script>
 <script type="module">
@@ -325,408 +377,278 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs
 
 const $ = s => document.querySelector(s);
 const state = {
-  sources: new Map(),
-  pages: [],
-  activeSourceId: null,
-  selected: new Set(),
-  thumbScale: 1,
-  pfZoom: 1,
-  activeLayoutId: null
+  sources:new Map(), pages:[], activeSourceId:null, activePageId:null,
+  activeLayoutId:null, selected:new Set(), previewZoom:1, showBoundary:false
 };
 
-function id(prefix="id"){ return prefix + "-" + Math.random().toString(36).slice(2,10); }
-function ext(name){ return (name.split(".").pop() || "").toLowerCase(); }
-function humanBytes(n){
-  if(n < 1024) return n + " B";
-  if(n < 1048576) return (n/1024).toFixed(1) + " KB";
-  return (n/1048576).toFixed(1) + " MB";
-}
-function esc(s){
-  return String(s??"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]));
-}
-function setStatus(src, status, text){
-  src.status = status; src.statusText = text;
-  renderSources();
-}
-function addSource(file, type){
-  const source = {
-    id:id("src"), file, name:file.name, size:file.size, type,
-    status:"pending", statusText:"Queued", pdfBytes:null, pdfDoc:null,
-    pageIds:[], layouts:[], dependencies:[], preflightError:null
-  };
-  state.sources.set(source.id, source);
-  state.activeSourceId = source.id;
-  renderSources();
-  return source;
-}
+function uid(p="id"){ return p+"-"+Math.random().toString(36).slice(2,10); }
+function ext(n){ return (n.split(".").pop()||"").toLowerCase(); }
+function bytes(n){ return n<1024?n+" B":n<1048576?(n/1024).toFixed(1)+" KB":(n/1048576).toFixed(1)+" MB"; }
+function esc(s){ return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c])); }
+function source(id){ return state.sources.get(id); }
+function activeSource(){ return source(state.activeSourceId); }
+function page(id){ return state.pages.find(p=>p.id===id); }
 
-async function acceptFiles(fileList){
-  const files=[...fileList];
-  for(const file of files){
+function addSource(file,type){
+  const s={id:uid("src"),file,name:file.name,size:file.size,type,status:"pending",statusText:"Queued",pdfBytes:null,pdfDoc:null,pageIds:[],layouts:[],dependencies:[],jobId:null};
+  state.sources.set(s.id,s); state.activeSourceId=s.id; return s;
+}
+function setStatus(s,status,text){ s.status=status;s.statusText=text;renderSources(); }
+
+async function acceptFiles(list){
+  for(const file of [...list]){
     const e=ext(file.name);
     if(e==="pdf") await ingestPdf(file);
     else if(["png","jpg","jpeg"].includes(e)) await ingestImage(file);
-    else if(e==="dwg" || e==="zip") await ingestDwgPackage(file);
+    else if(e==="dwg"||e==="zip") await ingestDwg(file);
     else if(["doc","docx"].includes(e)) await ingestOffice(file);
-    else {
-      const s=addSource(file,"other");
-      setStatus(s,"error","Unsupported file");
-    }
+    else { const s=addSource(file,"other"); setStatus(s,"error","Unsupported file"); }
   }
   renderAll();
 }
 
-async function ingestPdf(file){
-  const src=addSource(file,"pdf");
+async function ingestPdf(file, existing=null, displayName=null){
+  const s=existing||addSource(file,"pdf");
   try{
-    setStatus(src,"pending","Reading PDF");
-    const bytes=await file.arrayBuffer();
-    src.pdfBytes=bytes.slice(0);
-    src.pdfDoc=await pdfjsLib.getDocument({data:bytes.slice(0)}).promise;
-    for(let n=1;n<=src.pdfDoc.numPages;n++){
-      const p={
-        id:id("page"), sourceId:src.id, sourceType:"pdf", sourcePage:n-1,
-        label:file.name+" — "+n, rotation:0, selected:false, thumb:null
-      };
-      state.pages.push(p); src.pageIds.push(p.id);
-      queuePdfThumb(src,p,n);
+    setStatus(s,"pending","Reading PDF");
+    const ab=await file.arrayBuffer();
+    s.pdfBytes=ab.slice(0);
+    s.pdfDoc=await pdfjsLib.getDocument({data:ab.slice(0)}).promise;
+    s.type="pdf";
+    for(let n=1;n<=s.pdfDoc.numPages;n++){
+      const p={id:uid("page"),sourceId:s.id,sourceType:"pdf",sourcePage:n-1,label:(displayName||file.name)+" — "+n,rotation:0,thumb:null};
+      state.pages.push(p);s.pageIds.push(p.id);queueThumb(s,p,n);
     }
-    setStatus(src,"ready",src.pdfDoc.numPages+" pages ready");
-  }catch(err){
-    console.error(err); setStatus(src,"error","PDF read failed");
-  }
-  renderAll();
+    setStatus(s,"ready",s.pdfDoc.numPages+" pages");
+    state.activeSourceId=s.id;
+    state.activePageId=s.pageIds[0]||null;
+  }catch(e){ console.error(e);setStatus(s,"error","PDF read failed"); }
 }
 
-async function queuePdfThumb(src,p,pageNo){
+async function queueThumb(s,p,n){
   try{
-    const page=await src.pdfDoc.getPage(pageNo);
-    const vp=page.getViewport({scale:.32});
-    const canvas=document.createElement("canvas");
-    canvas.width=Math.ceil(vp.width); canvas.height=Math.ceil(vp.height);
-    await page.render({canvasContext:canvas.getContext("2d"),viewport:vp}).promise;
-    p.thumb=canvas.toDataURL("image/jpeg",.82);
-    renderPages();
-  }catch(err){ console.warn("thumb",err); }
+    const pg=await s.pdfDoc.getPage(n), vp=pg.getViewport({scale:.28});
+    const cv=document.createElement("canvas");cv.width=Math.ceil(vp.width);cv.height=Math.ceil(vp.height);
+    await pg.render({canvasContext:cv.getContext("2d"),viewport:vp}).promise;
+    p.thumb=cv.toDataURL("image/jpeg",.82);renderThumbs();renderOutput();
+  }catch(e){ console.warn(e); }
 }
 
 async function ingestImage(file){
-  const src=addSource(file,"image");
-  const url=URL.createObjectURL(file);
-  const p={id:id("page"),sourceId:src.id,sourceType:"image",sourcePage:0,label:file.name,rotation:0,thumb:url,imageFile:file};
-  state.pages.push(p); src.pageIds.push(p.id);
-  setStatus(src,"ready","1 image page");
-  renderAll();
+  const s=addSource(file,"image"), url=URL.createObjectURL(file);
+  const p={id:uid("page"),sourceId:s.id,sourceType:"image",sourcePage:0,label:file.name,rotation:0,thumb:url,imageFile:file};
+  state.pages.push(p);s.pageIds.push(p.id);setStatus(s,"ready","1 page");state.activePageId=p.id;
 }
 
 async function ingestOffice(file){
-  const src=addSource(file,"office");
-  setStatus(src,"pending","Waiting for Word renderer");
+  const s=addSource(file,"office");setStatus(s,"pending","Converting with Office engine");
   try{
-    const fd=new FormData(); fd.append("file",file);
-    const r=await fetch(window.DOC_STUDIO_CONFIG.officeConvertUrl,{method:"POST",body:fd});
-    if(!r.ok) throw new Error("Office API "+r.status);
+    const fd=new FormData();fd.append("file",file);
+    const r=await fetch(DOC_STUDIO_CONFIG.officeConvertUrl,{method:"POST",body:fd});
+    if(!r.ok) throw new Error(await r.text());
     const blob=await r.blob();
-    await ingestConvertedPdf(blob,file.name.replace(/\.(docx?|DOCX?)$/,".pdf"),src);
-  }catch(err){
-    console.info("Office renderer not connected yet",err);
-    src.preflightError="Server-side Office renderer is not connected yet.";
-    setStatus(src,"pending","Renderer not connected");
-  }
+    await ingestPdf(new File([blob],file.name.replace(/\.docx?$/i,".pdf"),{type:"application/pdf"}),s,file.name);
+  }catch(e){console.error(e);setStatus(s,"error","Office renderer unavailable");}
 }
 
-async function ingestConvertedPdf(blob,name,originalSource){
-  const file=new File([blob],name,{type:"application/pdf"});
-  const bytes=await file.arrayBuffer();
-  originalSource.pdfBytes=bytes.slice(0);
-  originalSource.pdfDoc=await pdfjsLib.getDocument({data:bytes.slice(0)}).promise;
-  for(let n=1;n<=originalSource.pdfDoc.numPages;n++){
-    const p={id:id("page"),sourceId:originalSource.id,sourceType:"pdf",sourcePage:n-1,label:name+" — "+n,rotation:0,thumb:null};
-    state.pages.push(p); originalSource.pageIds.push(p.id); queuePdfThumb(originalSource,p,n);
-  }
-  originalSource.type="pdf";
-  setStatus(originalSource,"ready",originalSource.pdfDoc.numPages+" pages ready");
-  renderAll();
+async function ingestDwg(file){
+  const s=addSource(file,"dwg");setStatus(s,"pending","AutoCAD preflight");
+  state.activeSourceId=s.id;renderAll();
+  await runDwg(s,false);
 }
 
-async function ingestDwgPackage(file){
-  const src=addSource(file,"dwg");
-  setStatus(src,"pending","Running DWG preflight");
-  await runDwgPreflight(src);
-  renderAll();
-}
-
-async function runDwgPreflight(src){
-  src.preflightError=null; src.layouts=[];
+async function runDwg(s,includeModel){
   try{
-    const fd=new FormData(); fd.append("file",src.file);
-    fd.append("includeModel","false");
-    const r=await fetch(window.DOC_STUDIO_CONFIG.dwgPreflightUrl,{method:"POST",body:fd});
-    if(!r.ok) throw new Error("DWG preflight API "+r.status);
-    const data=await r.json();
-    src.layouts=(data.layouts||[]).map((l,i)=>({
-      id:l.id||("layout-"+i), name:l.name||("Layout "+(i+1)), isModel:!!l.isModel,
-      selected:l.isModel?false:(l.selected!==false), paper:l.paper||"Unknown",
-      orientation:l.orientation||"landscape", widthMm:l.widthMm||null, heightMm:l.heightMm||null,
-      previewUrl:l.previewUrl||null, plotBounds:l.plotBounds||null, plotStyle:l.plotStyle||null,
-      warning:l.warning||null
-    }));
-    src.dependencies=data.dependencies||[];
-    setStatus(src,"ready",src.layouts.length+" layouts detected");
-    openPreflight(src.id);
-  }catch(err){
-    console.info("DWG preflight renderer not connected yet",err);
-    src.preflightError="DWG preflight renderer endpoint is not connected yet. UI and API contract are ready.";
-    setStatus(src,"pending","Preflight renderer not connected");
-    openPreflight(src.id);
+    setStatus(s,"pending","AutoCAD rendering…");
+    const fd=new FormData();fd.append("file",s.file);fd.append("includeModel",String(includeModel));
+    const r=await fetch(DOC_STUDIO_CONFIG.dwgPreflightUrl,{method:"POST",body:fd});
+    const data=await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(data.error||data.message||("HTTP "+r.status));
+    s.jobId=data.jobId||null;s.layouts=data.layouts||[];s.dependencies=data.dependencies||[];
+    if(data.pdfUrl){
+      const pdf=await fetch(data.pdfUrl);if(!pdf.ok)throw new Error("Rendered PDF download failed");
+      const blob=await pdf.blob();
+      s.pageIds.forEach(pid=>{state.pages=state.pages.filter(p=>p.id!==pid);state.selected.delete(pid)});s.pageIds=[];
+      await ingestPdf(new File([blob],s.name.replace(/\.(dwg|zip)$/i,".pdf"),{type:"application/pdf"}),s,s.name);
+      s.type="dwg";
+      for(let i=0;i<s.pageIds.length;i++){
+        const p=page(s.pageIds[i]), l=s.layouts[i];
+        if(p&&l){p.label=l.name||p.label;p.layout=l;}
+      }
+      setStatus(s,"ready","AutoCAD · "+s.pageIds.length+" layouts");
+    }else{
+      setStatus(s,"ready",(s.layouts.length||0)+" layouts previewed");
+    }
+    renderAll();
+  }catch(e){
+    console.error(e);s.engineError=e.message;setStatus(s,"error","AutoCAD: "+e.message);renderAll();
   }
 }
 
 function renderSources(){
-  const list=$("#sourceList");
-  const all=[...state.sources.values()];
-  $("#sourceCount").textContent=all.length+" FILE"+(all.length===1?"":"S");
-  if(!all.length){ list.innerHTML='<div style="padding:28px 12px;text-align:center;color:var(--muted);font-size:11px">No files loaded.</div>'; return; }
-  list.innerHTML=all.map(s=>{
-    const badge=s.type==="dwg"?"DWG":s.type==="office"?"WORD":s.type==="image"?"IMG":s.type==="pdf"?"PDF":"FILE";
-    return '<div class="source '+(state.activeSourceId===s.id?"active":"")+'" data-src="'+s.id+'">'+
-      '<div class="source-top"><div class="source-icon">'+badge+'</div><div class="source-main">'+
-      '<div class="source-name" title="'+esc(s.name)+'">'+esc(s.name)+'</div>'+
-      '<div class="source-meta">'+humanBytes(s.size)+' · '+esc(s.type.toUpperCase())+'</div>'+
-      '<div class="status '+s.status+'"><i class="dot"></i>'+esc(s.statusText)+'</div>'+
-      '</div></div>'+
-      '<div class="source-actions">'+
-      (s.type==="dwg"?'<button data-act="preflight" class="btn btn-ghost">PREFLIGHT</button>':'')+
-      '<button data-act="remove" class="btn btn-ghost">REMOVE</button></div></div>';
-  }).join("");
-  list.querySelectorAll(".source").forEach(el=>{
-    el.addEventListener("click",ev=>{
-      const sid=el.dataset.src; state.activeSourceId=sid;
-      if(ev.target.dataset.act==="remove"){ removeSource(sid); return; }
-      if(ev.target.dataset.act==="preflight"){ openPreflight(sid); return; }
-      renderSources();
-    });
+  const root=$("#sourceList"), arr=[...state.sources.values()];
+  $("#sourceCount").textContent=arr.length+" FILE"+(arr.length===1?"":"S");
+  if(!arr.length){root.innerHTML='<div class="thumb-empty">Drop files above to start.</div>';return;}
+  root.innerHTML=arr.map(s=>'<div class="source-v2 '+(s.id===state.activeSourceId?"active":"")+'" data-id="'+s.id+'">'+
+    '<div class="source-top"><div class="source-icon">'+(s.type==="dwg"?"DWG":s.type==="office"?"WORD":s.type==="image"?"IMG":"PDF")+'</div>'+
+    '<div class="source-main"><div class="source-name">'+esc(s.name)+'</div><div class="source-meta">'+bytes(s.size)+' · '+esc(s.type.toUpperCase())+'</div>'+
+    '<div class="status '+s.status+'"><i class="dot"></i>'+esc(s.statusText)+'</div></div></div>'+
+    '<div class="source-actions">'+(s.type==="dwg"?'<button class="btn btn-ghost" data-act="refresh">RENDER</button>':'')+
+    '<button class="btn btn-ghost" data-act="remove">REMOVE</button></div></div>').join("");
+  root.querySelectorAll(".source-v2").forEach(el=>{
+    el.onclick=ev=>{
+      const id=el.dataset.id, act=ev.target.dataset.act;
+      if(act==="remove"){ev.stopPropagation();removeSource(id);return;}
+      if(act==="refresh"){ev.stopPropagation();runDwg(source(id),$("#includeModel").checked);return;}
+      state.activeSourceId=id;
+      const s=source(id);state.activePageId=s.pageIds[0]||null;state.activeLayoutId=s.layouts?.[0]?.id||null;
+      renderAll();
+    };
   });
 }
 
-function renderPages(){
-  const root=$("#pages");
-  $("#pageCount").textContent=state.pages.length+" PAGE"+(state.pages.length===1?"":"S");
-  const min=Math.max(105,Math.round(160*state.thumbScale));
-  root.style.gridTemplateColumns="repeat(auto-fill,minmax("+min+"px,1fr))";
-  if(!state.pages.length){
-    root.innerHTML='<div class="empty-pages"><svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 3h10l4 4v14H5z"/><path d="M15 3v5h5M8 12h8M8 16h8"/></svg><div><b>Add PDF, DWG, Word or image files.</b><br>PDF pages can already be reordered and merged entirely in your browser.</div></div>';
-    return;
+function removeSource(id){
+  const s=source(id);if(!s)return;
+  state.pages=state.pages.filter(p=>p.sourceId!==id);state.sources.delete(id);
+  [...state.selected].forEach(pid=>{if(!page(pid))state.selected.delete(pid)});
+  if(state.activeSourceId===id){const next=[...state.sources.values()][0];state.activeSourceId=next?.id||null;state.activePageId=next?.pageIds?.[0]||null;}
+  renderAll();
+}
+
+function sourceItems(s){
+  if(!s)return [];
+  if(s.pageIds.length) return s.pageIds.map((id,i)=>({kind:"page",page:page(id),index:i}));
+  return (s.layouts||[]).filter(l=>!l.isModel||$("#includeModel").checked).map((l,i)=>({kind:"layout",layout:l,index:i}));
+}
+
+function renderThumbs(){
+  const s=activeSource(), root=$("#thumbList");
+  $("#thumbOptions").classList.toggle("on",!!s&&s.type==="dwg");
+  if(!s){$("#sourcePageCount").textContent="0";root.innerHTML='<div class="thumb-empty">Select a source file.</div>';return;}
+  const items=sourceItems(s);$("#sourcePageCount").textContent=String(items.length);
+  if(!items.length){
+    root.innerHTML='<div class="thumb-empty">'+(s.type==="dwg"?(s.engineError?"AutoCAD engine error:<br>"+esc(s.engineError):"Waiting for AutoCAD layout render…"):"No pages.")+'</div>';return;
   }
+  root.innerHTML=items.map(it=>{
+    const p=it.page,l=it.layout;
+    const active=p?state.activePageId===p.id:state.activeLayoutId===l.id;
+    const thumb=p?.thumb||l?.previewUrl||"";
+    const title=p?.label||l?.name||("Page "+(it.index+1));
+    const meta=l?[l.paper,l.orientation].filter(Boolean).join(" · "):"Page "+(it.index+1);
+    const landscape=(l?.orientation==="landscape")?" landscape":"";
+    return '<div class="thumb-card '+(active?"active":"")+'" data-kind="'+it.kind+'" data-key="'+(p?.id||l?.id||it.index)+'">'+
+      '<div class="thumb-img'+landscape+'">'+(thumb?'<img src="'+esc(thumb)+'">':'<div style="font-size:10px;color:var(--muted)">Rendering…</div>')+'<span class="thumb-n">'+(it.index+1)+'</span></div>'+
+      '<div class="thumb-info"><div class="thumb-title">'+esc(title)+'</div><div class="thumb-meta">'+esc(meta)+'</div></div></div>';
+  }).join("");
+  root.querySelectorAll(".thumb-card").forEach(el=>{
+    el.onclick=()=>{
+      if(el.dataset.kind==="page"){state.activePageId=el.dataset.key;const p=page(state.activePageId);state.activeSourceId=p.sourceId;}
+      else state.activeLayoutId=el.dataset.key;
+      renderThumbs();renderPreview();
+    };
+  });
+}
+
+async function renderPreview(){
+  const s=activeSource(), p=page(state.activePageId), root=$("#previewStage");
+  if(!s){$("#previewTitle").textContent="NO PAGE SELECTED";$("#previewMeta").textContent="";root.innerHTML='<div class="preview-empty"><b>Select a file and then a page/layout.</b></div>';return;}
+  let l=null;
+  if(!p && s.layouts?.length) l=s.layouts.find(x=>x.id===state.activeLayoutId)||s.layouts[0];
+  $("#previewTitle").textContent=p?.label||l?.name||s.name;
+  $("#previewMeta").textContent=l?[l.paper,l.widthMm&&l.heightMm?l.widthMm+" × "+l.heightMm+" mm":null,l.orientation].filter(Boolean).join(" · "):p?"Page "+(p.sourcePage+1):"";
+  if(p?.sourceType==="pdf"&&s.pdfDoc){
+    try{
+      const pg=await s.pdfDoc.getPage(p.sourcePage+1);
+      const vp=pg.getViewport({scale:Math.max(.7,1.25*state.previewZoom),rotation:p.rotation});
+      const cv=document.createElement("canvas");cv.width=Math.ceil(vp.width);cv.height=Math.ceil(vp.height);
+      root.innerHTML='<div class="preview-paper"></div>';const paper=root.firstElementChild;paper.appendChild(cv);
+      await pg.render({canvasContext:cv.getContext("2d"),viewport:vp}).promise;
+      const b=document.createElement("div");b.className="boundary "+(state.showBoundary?"on":"");paper.appendChild(b);
+      return;
+    }catch(e){console.error(e);}
+  }
+  if(p?.sourceType==="image"){
+    root.innerHTML='<div class="preview-paper" style="transform:scale('+state.previewZoom+')"><img src="'+esc(p.thumb)+'" style="transform:rotate('+p.rotation+'deg)"><div class="boundary '+(state.showBoundary?"on":"")+'"></div></div>';return;
+  }
+  if(l?.previewUrl){
+    root.innerHTML='<div class="preview-paper" style="transform:scale('+state.previewZoom+')"><img src="'+esc(l.previewUrl)+'"><div class="boundary '+(state.showBoundary?"on":"")+'"></div></div>';return;
+  }
+  root.innerHTML='<div class="preview-empty">'+(s.type==="dwg"?"Waiting for AutoCAD preview…":"Preview unavailable.")+'</div>';
+}
+
+function renderOutput(){
+  const root=$("#pages");$("#pageCount").textContent=state.pages.length+" PAGE"+(state.pages.length===1?"":"S");
+  if(!state.pages.length){root.innerHTML='<div class="output-empty">Pages from loaded files will appear here in final PDF order.</div>';return;}
   root.innerHTML=state.pages.map((p,i)=>{
-    const src=state.sources.get(p.sourceId);
-    const preview=p.thumb?'<img src="'+p.thumb+'" style="transform:rotate('+p.rotation+'deg)"/>':
-      '<div class="page-placeholder"><b>PREVIEW</b>Generating thumbnail…</div>';
-    return '<article class="page-card '+(state.selected.has(p.id)?"selected":"")+'" draggable="true" data-id="'+p.id+'">'+
-      '<div class="page-preview">'+preview+'<span class="page-no">'+(i+1)+'</span><span class="page-type">'+esc((src?.type||p.sourceType).toUpperCase())+'</span></div>'+
-      '<div class="page-info"><div class="page-title" title="'+esc(p.label)+'">'+esc(p.label)+'</div>'+
-      '<div class="page-sub">source page '+(p.sourcePage+1)+' · rot '+p.rotation+'°</div>'+
-      '<div class="page-actions"><button data-act="left" class="btn btn-ghost">←</button><button data-act="rotate" class="btn btn-ghost">↻</button><button data-act="delete" class="btn btn-ghost">×</button><button data-act="right" class="btn btn-ghost">→</button></div></div></article>';
+    const s=source(p.sourceId);
+    return '<div class="output-card '+(state.selected.has(p.id)?"selected ":"")+(state.activePageId===p.id?"active":"")+'" draggable="true" data-id="'+p.id+'">'+
+      '<div class="output-img">'+(p.thumb?'<img src="'+esc(p.thumb)+'" style="transform:rotate('+p.rotation+'deg)">':'…')+'<span class="thumb-n">'+(i+1)+'</span></div>'+
+      '<div class="output-info"><div class="output-name">'+esc(p.label)+'</div><div class="output-actions"><button data-act="rot" class="btn btn-ghost">↻</button><button data-act="del" class="btn btn-ghost">×</button></div></div></div>';
   }).join("");
-  wirePageCards();
-}
-
-function wirePageCards(){
-  document.querySelectorAll(".page-card").forEach(card=>{
+  root.querySelectorAll(".output-card").forEach(card=>{
     const pid=card.dataset.id;
-    card.addEventListener("click",ev=>{
+    card.onclick=ev=>{
       const act=ev.target.dataset.act;
-      if(act){ ev.stopPropagation(); pageAction(pid,act); return; }
-      if(ev.ctrlKey||ev.metaKey) state.selected.has(pid)?state.selected.delete(pid):state.selected.add(pid);
-      else { state.selected.clear(); state.selected.add(pid); }
-      renderPages();
-    });
-    card.addEventListener("dragstart",ev=>{ card.classList.add("dragging"); ev.dataTransfer.setData("text/plain",pid); ev.dataTransfer.effectAllowed="move"; });
-    card.addEventListener("dragend",()=>document.querySelectorAll(".page-card").forEach(x=>x.classList.remove("dragging","drop-before")));
-    card.addEventListener("dragover",ev=>{ ev.preventDefault(); card.classList.add("drop-before"); });
-    card.addEventListener("dragleave",()=>card.classList.remove("drop-before"));
-    card.addEventListener("drop",ev=>{
-      ev.preventDefault(); card.classList.remove("drop-before");
-      const from=ev.dataTransfer.getData("text/plain"); if(from===pid)return;
-      const fi=state.pages.findIndex(p=>p.id===from), ti=state.pages.findIndex(p=>p.id===pid);
-      if(fi<0||ti<0)return;
-      const [p]=state.pages.splice(fi,1);
-      state.pages.splice(fi<ti?ti-1:ti,0,p);
-      renderPages();
-    });
+      if(act==="rot"){page(pid).rotation=(page(pid).rotation+90)%360;renderAll();return;}
+      if(act==="del"){state.pages=state.pages.filter(x=>x.id!==pid);state.selected.delete(pid);if(state.activePageId===pid)state.activePageId=null;renderAll();return;}
+      if(ev.ctrlKey||ev.metaKey)state.selected.has(pid)?state.selected.delete(pid):state.selected.add(pid);else{state.selected.clear();state.selected.add(pid);}
+      const p=page(pid);state.activePageId=pid;state.activeSourceId=p.sourceId;renderAll();
+    };
+    card.ondragstart=ev=>{card.classList.add("dragging");ev.dataTransfer.setData("text/plain",pid)};
+    card.ondragend=()=>card.classList.remove("dragging");
+    card.ondragover=ev=>ev.preventDefault();
+    card.ondrop=ev=>{ev.preventDefault();const from=ev.dataTransfer.getData("text/plain");if(from===pid)return;const fi=state.pages.findIndex(x=>x.id===from),ti=state.pages.findIndex(x=>x.id===pid);const [x]=state.pages.splice(fi,1);state.pages.splice(fi<ti?ti-1:ti,0,x);renderOutput();};
   });
 }
 
-function pageAction(pid,act){
-  const i=state.pages.findIndex(p=>p.id===pid); if(i<0)return;
-  const p=state.pages[i];
-  if(act==="delete"){ state.pages.splice(i,1); state.selected.delete(pid); }
-  if(act==="rotate"){ p.rotation=(p.rotation+90)%360; }
-  if(act==="left"&&i>0){ [state.pages[i-1],state.pages[i]]=[state.pages[i],state.pages[i-1]]; }
-  if(act==="right"&&i<state.pages.length-1){ [state.pages[i+1],state.pages[i]]=[state.pages[i],state.pages[i+1]]; }
-  renderPages();
-}
-function removeSource(sid){
-  const s=state.sources.get(sid); if(!s)return;
-  state.pages=state.pages.filter(p=>p.sourceId!==sid);
-  for(const pid of s.pageIds||[]) state.selected.delete(pid);
-  state.sources.delete(sid);
-  if(state.activeSourceId===sid) state.activeSourceId=null;
-  closePreflight(); renderAll();
-}
-function renderAll(){ renderSources(); renderPages(); }
-
-function openPreflight(sid){
-  const src=state.sources.get(sid); if(!src||src.type!=="dwg")return;
-  state.activeSourceId=sid;
-  $("#preflight").classList.add("on");
-  $("#pfFileName").textContent=src.name;
-  renderSources(); renderLayouts(src);
-  setTimeout(()=>$("#preflight").scrollIntoView({behavior:"smooth",block:"start"}),20);
-}
-function closePreflight(){ $("#preflight").classList.remove("on"); }
-
-function renderLayouts(src){
-  const root=$("#layoutList");
-  if(src.preflightError){
-    root.innerHTML='<div class="warning">'+esc(src.preflightError)+'</div>';
-    $("#pfSummary").textContent="Preflight service required for DWG layout detection.";
-    $("#pfPreviewWrap").innerHTML='<div class="pf-placeholder"><div><b>DWG PREVIEW ENGINE NOT CONNECTED</b><br><br>The front-end is ready for layout thumbnails, paper size, orientation, plot area, CTB/STB and dependency warnings.<br><br>Expected endpoint: <code>/api/document-studio/dwg/preflight</code></div></div>';
-    return;
-  }
-  if(!src.layouts.length){
-    root.innerHTML='<div style="padding:14px;color:var(--muted);font-size:11px">No layouts returned.</div>'; return;
-  }
-  root.innerHTML=src.layouts.map((l,i)=>{
-    if(l.isModel && !$("#includeModel").checked) return "";
-    return '<label class="layout-row '+(state.activeLayoutId===l.id?"active":"")+'" data-lid="'+l.id+'">'+
-      '<input type="checkbox" '+(l.selected?"checked":"")+'>'+
-      '<div><div class="layout-name">'+esc(l.name)+'</div><div class="layout-meta">'+esc(l.paper)+(l.plotStyle?" · "+esc(l.plotStyle):"")+'</div></div>'+
-      '<span class="layout-meta">'+(l.isModel?"MODEL":"LAYOUT")+'</span></label>';
-  }).join("");
-  root.querySelectorAll(".layout-row").forEach(row=>{
-    const l=src.layouts.find(x=>x.id===row.dataset.lid);
-    row.querySelector("input").addEventListener("click",ev=>{ ev.stopPropagation(); l.selected=ev.target.checked; updatePfSummary(src); });
-    row.addEventListener("click",()=>{ state.activeLayoutId=l.id; showLayoutPreview(src,l); renderLayouts(src); });
-  });
-  if(!state.activeLayoutId){
-    const first=src.layouts.find(l=>!l.isModel)||src.layouts[0];
-    if(first){ state.activeLayoutId=first.id; showLayoutPreview(src,first); }
-  }
-  updatePfSummary(src);
-}
-function updatePfSummary(src){
-  const n=src.layouts.filter(l=>l.selected && (!l.isModel||$("#includeModel").checked)).length;
-  const warns=src.layouts.filter(l=>l.warning).length+(src.dependencies||[]).filter(d=>d.status==="missing").length;
-  $("#pfSummary").textContent=n+" selected layout"+(n===1?"":"s")+(warns?" · "+warns+" warning(s)":" · no reported warnings");
-}
-function showLayoutPreview(src,l){
-  $("#pfLayoutTitle").textContent=l.name;
-  $("#pfPaperMeta").textContent=[l.paper,l.widthMm&&l.heightMm?(l.widthMm+" × "+l.heightMm+" mm"):null,l.orientation].filter(Boolean).join(" · ");
-  const wrap=$("#pfPreviewWrap");
-  if(l.previewUrl){
-    wrap.innerHTML='<div class="sheet '+(l.orientation==="portrait"?"portrait":"")+'" style="transform:scale('+state.pfZoom+')"><img src="'+esc(l.previewUrl)+'"><div class="plot-boundary"></div><div class="plot-label">PLOT BOUNDARY</div></div>';
-  } else {
-    wrap.innerHTML='<div class="pf-placeholder"><div><b>'+esc(l.name)+'</b><br>'+esc(l.paper)+'<br><br>No preview image returned by renderer.</div></div>';
-  }
-}
-function activeDwg(){ const s=state.sources.get(state.activeSourceId); return s&&s.type==="dwg"?s:null; }
-
-async function addSelectedDwgLayouts(){
-  const src=activeDwg(); if(!src)return;
-  const selected=src.layouts.filter(l=>l.selected && (!l.isModel||$("#includeModel").checked));
-  if(!selected.length){ alert("Select at least one DWG layout."); return; }
-  try{
-    $("#pfAddSelected").disabled=true; $("#pfAddSelected").textContent="CONVERTING…";
-    const fd=new FormData(); fd.append("file",src.file);
-    fd.append("layouts",JSON.stringify(selected.map(l=>l.id)));
-    fd.append("includeModel",String($("#includeModel").checked));
-    const r=await fetch(window.DOC_STUDIO_CONFIG.dwgConvertUrl,{method:"POST",body:fd});
-    if(!r.ok) throw new Error("DWG convert API "+r.status);
-    const blob=await r.blob();
-    src.pageIds.forEach(pid=>{ state.pages=state.pages.filter(p=>p.id!==pid); }); src.pageIds=[];
-    await ingestConvertedPdf(blob,src.name.replace(/\.dwg$/i,".pdf"),src);
-    closePreflight();
-  }catch(err){
-    console.error(err);
-    alert("DWG conversion engine is not connected yet. The preflight and document UI are ready; connect the server endpoint next.");
-  }finally{
-    $("#pfAddSelected").disabled=false; $("#pfAddSelected").textContent="ADD SELECTED LAYOUTS TO DOCUMENT";
-  }
-}
+function renderAll(){renderSources();renderThumbs();renderOutput();renderPreview();}
 
 async function exportPdf(){
-  if(!state.pages.length){ alert("There are no pages to export."); return; }
-  if(!window.PDFLib){ alert("PDF engine failed to load."); return; }
-  const bar=$("#exportProgress"), inner=bar.querySelector("i"); bar.hidden=false; inner.style.width="2%";
-  $("#exportBtn").disabled=true;
+  if(!state.pages.length)return alert("There are no pages to export.");
+  const {PDFDocument,degrees}=PDFLib,out=await PDFDocument.create(), loaded=new Map();
+  $("#exportBtn").disabled=true;$("#exportProgress").hidden=false;
   try{
-    const {PDFDocument,degrees}=PDFLib;
-    const out=await PDFDocument.create();
-    const loaded=new Map();
     for(let i=0;i<state.pages.length;i++){
-      const p=state.pages[i], src=state.sources.get(p.sourceId);
-      if(p.sourceType==="pdf" && src?.pdfBytes){
-        let doc=loaded.get(src.id);
-        if(!doc){ doc=await PDFDocument.load(src.pdfBytes.slice(0)); loaded.set(src.id,doc); }
-        const [copied]=await out.copyPages(doc,[p.sourcePage]);
-        if(p.rotation) copied.setRotation(degrees((copied.getRotation().angle+p.rotation)%360));
-        out.addPage(copied);
-      } else if(p.sourceType==="image" && p.imageFile){
-        const bytes=await p.imageFile.arrayBuffer();
-        const isPng=ext(p.imageFile.name)==="png";
-        const img=isPng?await out.embedPng(bytes):await out.embedJpg(bytes);
-        const dpi=96, w=img.width*72/dpi, h=img.height*72/dpi;
-        const landscape=p.rotation===90||p.rotation===270;
-        const page=out.addPage([landscape?h:w,landscape?w:h]);
-        if(!landscape) page.drawImage(img,{x:0,y:0,width:w,height:h});
-        else page.drawImage(img,{x:0,y:w,width:w,height:h,rotate:degrees(90)});
+      const p=state.pages[i],s=source(p.sourceId);
+      if(p.sourceType==="pdf"&&s?.pdfBytes){
+        let doc=loaded.get(s.id);if(!doc){doc=await PDFDocument.load(s.pdfBytes.slice(0));loaded.set(s.id,doc);}
+        const [cp]=await out.copyPages(doc,[p.sourcePage]);if(p.rotation)cp.setRotation(degrees((cp.getRotation().angle+p.rotation)%360));out.addPage(cp);
+      }else if(p.sourceType==="image"&&p.imageFile){
+        const ab=await p.imageFile.arrayBuffer(), im=ext(p.imageFile.name)==="png"?await out.embedPng(ab):await out.embedJpg(ab);
+        const w=im.width*.75,h=im.height*.75,pg=out.addPage([w,h]);pg.drawImage(im,{x:0,y:0,width:w,height:h});
       }
-      inner.style.width=Math.round((i+1)/state.pages.length*90)+"%";
+      $("#exportProgress i").style.width=Math.round((i+1)/state.pages.length*100)+"%";
     }
-    const bytes=await out.save();
-    inner.style.width="100%";
-    const blob=new Blob([bytes],{type:"application/pdf"});
-    const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="IECCalc_Engineering_Document.pdf"; a.click();
-    setTimeout(()=>URL.revokeObjectURL(a.href),5000);
-  }catch(err){
-    console.error(err); alert("Export failed: "+err.message);
-  }finally{
-    $("#exportBtn").disabled=false; setTimeout(()=>{bar.hidden=true;inner.style.width="0"},700);
-  }
+    const ab=await out.save(),a=document.createElement("a");a.href=URL.createObjectURL(new Blob([ab],{type:"application/pdf"}));a.download="IECCalc_Engineering_Document.pdf";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  }finally{$("#exportBtn").disabled=false;setTimeout(()=>{$("#exportProgress").hidden=true;$("#exportProgress i").style.width="0"},500);}
 }
 
-$("#fileInput").addEventListener("change",e=>{ acceptFiles(e.target.files); e.target.value=""; });
-const dz=$("#dropzone");
-["dragenter","dragover"].forEach(n=>dz.addEventListener(n,e=>{e.preventDefault();dz.classList.add("drag")}));
+async function checkEngine(){
+  for(const el of [$("#engineChip"),$("#topEngine")]){if(el)el.innerHTML='<i class="engine-dot"></i>AUTOCAD APS: CHECKING';}
+  try{
+    const r=await fetch(DOC_STUDIO_CONFIG.engineStatusUrl),d=await r.json();
+    const text=d.configured?"AUTOCAD "+(d.version||"2027")+" · READY":"AUTOCAD APS · SETUP REQUIRED";
+    for(const el of [$("#engineChip"),$("#topEngine")]){if(el){el.className="engine-chip "+(d.configured?"ok":"warn");el.innerHTML='<i class="engine-dot"></i>'+esc(text);}}
+  }catch(e){for(const el of [$("#engineChip"),$("#topEngine")])if(el){el.className="engine-chip warn";el.innerHTML='<i class="engine-dot"></i>AUTOCAD APS · OFFLINE';}}
+}
+
+$("#fileInput").onchange=e=>{acceptFiles(e.target.files);e.target.value="";};
+const dz=$("#dropzone");["dragenter","dragover"].forEach(n=>dz.addEventListener(n,e=>{e.preventDefault();dz.classList.add("drag")}));
 ["dragleave","drop"].forEach(n=>dz.addEventListener(n,e=>{e.preventDefault();dz.classList.remove("drag")}));
-dz.addEventListener("drop",e=>acceptFiles(e.dataTransfer.files));
-dz.addEventListener("click",()=>$("#fileInput").click());
-
-$("#clearBtn").addEventListener("click",()=>{ if(state.sources.size && !confirm("Remove all loaded files and pages?"))return; state.sources.clear();state.pages=[];state.selected.clear();state.activeSourceId=null;closePreflight();renderAll(); });
-$("#rotateBtn").addEventListener("click",()=>{ state.pages.forEach(p=>{if(state.selected.has(p.id))p.rotation=(p.rotation+90)%360});renderPages(); });
-$("#deleteBtn").addEventListener("click",()=>{ state.pages=state.pages.filter(p=>!state.selected.has(p.id));state.selected.clear();renderPages(); });
-$("#selectAllBtn").addEventListener("click",()=>{state.pages.forEach(p=>state.selected.add(p.id));renderPages();});
-$("#deselectBtn").addEventListener("click",()=>{state.selected.clear();renderPages();});
-$("#moveFirstBtn").addEventListener("click",()=>{ const a=state.pages.filter(p=>state.selected.has(p.id)), b=state.pages.filter(p=>!state.selected.has(p.id));state.pages=[...a,...b];renderPages(); });
-$("#moveLastBtn").addEventListener("click",()=>{ const a=state.pages.filter(p=>!state.selected.has(p.id)), b=state.pages.filter(p=>state.selected.has(p.id));state.pages=[...a,...b];renderPages(); });
-$("#zoomInBtn").addEventListener("click",()=>{state.thumbScale=Math.min(1.8,state.thumbScale+.15);$("#zoomLabel").textContent=Math.round(state.thumbScale*100)+"%";renderPages();});
-$("#zoomOutBtn").addEventListener("click",()=>{state.thumbScale=Math.max(.65,state.thumbScale-.15);$("#zoomLabel").textContent=Math.round(state.thumbScale*100)+"%";renderPages();});
-$("#exportBtn").addEventListener("click",exportPdf);
-
-$("#includeModel").addEventListener("change",()=>{const s=activeDwg();if(s)renderLayouts(s);});
-$("#pfRefresh").addEventListener("click",async()=>{const s=activeDwg();if(s)await runDwgPreflight(s);});
-$("#pfAddSelected").addEventListener("click",addSelectedDwgLayouts);
-$("#pfZoomIn").addEventListener("click",()=>{state.pfZoom=Math.min(1.6,state.pfZoom+.1);$("#pfZoomLabel").textContent=Math.round(state.pfZoom*100)+"%";const s=activeDwg(),l=s?.layouts.find(x=>x.id===state.activeLayoutId);if(s&&l)showLayoutPreview(s,l);});
-$("#pfZoomOut").addEventListener("click",()=>{state.pfZoom=Math.max(.5,state.pfZoom-.1);$("#pfZoomLabel").textContent=Math.round(state.pfZoom*100)+"%";const s=activeDwg(),l=s?.layouts.find(x=>x.id===state.activeLayoutId);if(s&&l)showLayoutPreview(s,l);});
-$("#pfOpenLarge").addEventListener("click",()=>{
-  const s=activeDwg(),l=s?.layouts.find(x=>x.id===state.activeLayoutId); if(!l?.previewUrl)return;
-  $("#modalTitle").textContent=s.name+" — "+l.name; $("#modalBody").innerHTML='<img src="'+esc(l.previewUrl)+'">'; $("#previewModal").classList.add("on");
-});
-$("#modalClose").addEventListener("click",()=>$("#previewModal").classList.remove("on"));
-$("#previewModal").addEventListener("click",e=>{if(e.target.id==="previewModal")$("#previewModal").classList.remove("on")});
-
-renderAll();
+dz.ondrop=e=>acceptFiles(e.dataTransfer.files);dz.onclick=()=>$("#fileInput").click();
+$("#clearBtn").onclick=()=>{state.sources.clear();state.pages=[];state.selected.clear();state.activeSourceId=null;state.activePageId=null;renderAll();};
+$("#includeModel").onchange=()=>{const s=activeSource();if(s?.type==="dwg")runDwg(s,$("#includeModel").checked);};
+$("#previewZoomIn").onclick=()=>{state.previewZoom=Math.min(1.8,state.previewZoom+.1);$("#previewZoomLabel").textContent=Math.round(state.previewZoom*100)+"%";renderPreview();};
+$("#previewZoomOut").onclick=()=>{state.previewZoom=Math.max(.5,state.previewZoom-.1);$("#previewZoomLabel").textContent=Math.round(state.previewZoom*100)+"%";renderPreview();};
+$("#toggleBoundary").onclick=()=>{state.showBoundary=!state.showBoundary;$("#toggleBoundary").classList.toggle("btn-active",state.showBoundary);renderPreview();};
+$("#moveFirstBtn").onclick=()=>{const a=state.pages.filter(p=>state.selected.has(p.id)),b=state.pages.filter(p=>!state.selected.has(p.id));state.pages=[...a,...b];renderOutput();};
+$("#moveLastBtn").onclick=()=>{const a=state.pages.filter(p=>!state.selected.has(p.id)),b=state.pages.filter(p=>state.selected.has(p.id));state.pages=[...a,...b];renderOutput();};
+$("#rotateBtn").onclick=()=>{state.pages.forEach(p=>{if(state.selected.has(p.id))p.rotation=(p.rotation+90)%360});renderAll();};
+$("#deleteBtn").onclick=()=>{state.pages=state.pages.filter(p=>!state.selected.has(p.id));state.selected.clear();renderAll();};
+$("#selectAllBtn").onclick=()=>{state.pages.forEach(p=>state.selected.add(p.id));renderOutput();};
+$("#deselectBtn").onclick=()=>{state.selected.clear();renderOutput();};
+$("#exportBtn").onclick=exportPdf;
+renderAll();checkEngine();
 </script>
 <script src="/_lib/api.js"></script>
 <script src="/_lib/chrome.js"></script>
