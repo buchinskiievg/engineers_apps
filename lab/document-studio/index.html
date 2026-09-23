@@ -260,7 +260,7 @@
         <span class="head-badge red">NEW / 005</span>
         <span class="head-badge">DWG</span>
         <span class="head-badge">PDF</span>
-        <span class="head-badge">WORD</span>
+        <span class="head-badge">WORD</span><span class="head-badge">LIBREDWG · OPEN SOURCE</span>
       </div>
       <h1>ENGINEERING DOCUMENT STUDIO</h1>
       <div class="sub">Preflight DWG layouts before conversion, verify plot boundaries, then combine, reorder, rotate and export engineering documents as one PDF.</div>
@@ -274,7 +274,7 @@
 
   <div class="studio-toolbar">
     <label class="btn btn-primary" for="fileInput">+ ADD FILES</label>
-    <input id="fileInput" class="file-input" type="file" multiple accept=".pdf,.dwg,.doc,.docx,.png,.jpg,.jpeg,.zip" />
+    <input id="fileInput" class="file-input" type="file" multiple accept=".pdf,.dwg,.doc,.docx,.png,.jpg,.jpeg" />
     <button id="clearBtn" class="btn btn-ghost">CLEAR</button>
     <span class="tool-sep"></span>
     <span class="grow"></span>
@@ -283,7 +283,7 @@
   <div id="dropzone" class="dropzone">
     <div>
       <strong>DROP PROJECT FILES HERE</strong>
-      <span>PDF · DWG · DOC/DOCX · JPG/PNG · ZIP with DWG dependencies (XREF / SHX / CTB)</span>
+      <span>PDF · DWG · DOC/DOCX · JPG/PNG · DWG is processed locally in your browser</span>
     </div>
   </div>
 
@@ -300,7 +300,7 @@
       <div class="section-head"><b>/ PAGES / LAYOUTS</b><span id="sourcePageCount" class="count">0</span></div>
       <div id="thumbOptions" class="thumb-options">
         <label><input id="includeModel" type="checkbox"> Include Model Space</label>
-        <div style="margin-top:5px;font-size:9.5px;color:var(--muted)">Paper Space layouts are included by default. Saved page setup / plot settings are used when supported by the renderer.</div>
+        <div style="margin-top:5px;font-size:9.5px;color:var(--muted)">Paper Space layouts are included by default. Paper/Model spaces are detected locally. Plot-style fidelity depends on LibreDWG support.</div>
       </div>
       <div id="thumbList" class="pane-body thumb-list">
         <div class="thumb-empty">Select a source file.</div>
@@ -392,7 +392,7 @@ async function acceptFiles(list){
     const e=ext(file.name);
     if(e==="pdf") await ingestPdf(file);
     else if(["png","jpg","jpeg"].includes(e)) await ingestImage(file);
-    else if(e==="dwg"||e==="zip") await ingestDwg(file);
+    else if(e==="dwg") await ingestDwg(file);
     else if(["doc","docx"].includes(e)) await ingestOffice(file);
     else { const s=addSource(file,"other"); setStatus(s,"error","Unsupported file"); }
   }
@@ -498,7 +498,7 @@ function renderSources(){
       if(act==="remove"){ev.stopPropagation();removeSource(id);return;}
       if(act==="refresh"){ev.stopPropagation();ingestDwg(source(id).file);return;}
       state.activeSourceId=id;
-      const s=source(id);state.activePageId=s.pageIds[0]||null;state.activeLayoutId=s.layouts?.[0]?.id||null;
+      const s=source(id);state.activePageId=s.pageIds[0]||null;state.activeLayoutId=(s.layouts?.find(l=>!l.isModel)||s.layouts?.[0])?.id||null;
       renderAll();
     };
   });
