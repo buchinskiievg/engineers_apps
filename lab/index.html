@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>IECCalc LAB — Experimental Engineering Tools</title>
+<meta name="description" content="IECCalc LAB hosts experimental engineering tools under active development and testing." />
+<link rel="stylesheet" href="/_lib/design.css?v=metal10" />
+<link rel="stylesheet" href="/_lib/mobile.css" />
+<style>
+body{margin:0;background:var(--paper);color:var(--ink)}
+.lab{max-width:1280px;margin:0 auto;padding:26px 16px 54px}
+.lab-head{display:flex;justify-content:space-between;gap:24px;align-items:flex-start;border-bottom:1px solid var(--line);padding-bottom:18px;margin-bottom:18px}
+.lab-kicker{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--red)}
+.lab h1{font-family:var(--display);font-size:38px;line-height:1;margin:5px 0 8px;text-transform:uppercase}
+.lab-sub{max-width:760px;color:var(--muted);font-size:13px}
+.lab-badge{background:var(--red);color:#fff;padding:7px 10px;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
+.lab-note{border-left:3px solid var(--red);background:var(--panel);padding:10px 12px;margin-bottom:18px;font-size:12px;color:var(--ink-soft)}
+.lab-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:14px}
+.lab-card{border:1px solid var(--line);background:var(--panel);padding:18px;text-decoration:none;color:var(--ink);display:flex;flex-direction:column;min-height:245px}
+.lab-card:hover{border-color:var(--red)}
+.lab-num{font:800 10px var(--mono);color:var(--red);letter-spacing:.08em}
+.lab-card h2{font-family:var(--display);font-size:21px;line-height:1.05;margin:18px 0 8px;text-transform:uppercase}
+.lab-card p{font-size:12px;color:var(--muted);line-height:1.55;margin:0 0 18px}
+.lab-tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:auto}
+.lab-tags span{background:var(--ink);color:var(--paper);font-size:9px;font-weight:800;padding:4px 6px;letter-spacing:.06em}
+.lab-cta{margin-top:14px;font-size:11px;font-weight:800;color:var(--red)}
+@media(max-width:640px){.lab-head{flex-direction:column}.lab h1{font-size:30px}}
+</style>
+</head>
+<body>
+<div class="lab">
+  <div class="lab-head">
+    <div>
+      <div class="lab-kicker">/ IECCALC LAB</div>
+      <h1>Experimental Tools</h1>
+      <div class="lab-sub">Tools in active development. Interfaces, calculations and workflows may change while they are being tested. Production calculators remain in the main Toolbox.</div>
+    </div>
+    <div class="lab-badge">BETA / TESTING</div>
+  </div>
+  <div class="lab-note"><b>LAB policy:</b> tools shown here are not yet part of the production toolbox. Use them for testing and feedback only.</div>
+  <div class="lab-grid">
+    <a class="lab-card" href="/lab/005/">
+      <div class="lab-num">LAB 005</div>
+      <h2>Engineering Document Studio</h2>
+      <p>DWG layout preflight and preview workflow, PDF composition, page reorder, rotate, delete, merge and engineering submission assembly.</p>
+      <div class="lab-tags"><span>DWG</span><span>PDF</span><span>WORD</span><span>PREVIEW</span></div>
+      <div class="lab-cta">OPEN LAB TOOL →</div>
+    </a>
+  </div>
+</div>
+<script src="/_lib/api.js"></script>
+<script src="/_lib/chrome.js"></script>
+</body>
+</html>
