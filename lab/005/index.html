@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Engineering Document Studio · DWG / Word / PDF · IECCalc</title>
+<meta name="description" content="Engineering document studio for DWG layout preflight, PDF composition, page reordering, rotation, deletion and merged engineering submissions." />
+<link rel="stylesheet" href="/_lib/design.css?v=metal10" />
+<link rel="stylesheet" href="/_lib/mobile.css" />
+<link rel="stylesheet" href="/_lib/calc-skin.css" />
+<style>
+  * { box-sizing:border-box; }
+  body { margin:0; }
+  .container { max-width:1480px !important; padding:20px 16px 48px !important; }
+  .doc-head { display:flex; justify-content:space-between; gap:24px; align-items:flex-start; margin-bottom:14px; }
+  .doc-head h1 { margin:3px 0 4px; font-size:28px; }
+  .doc-head .sub { max-width:850px; color:var(--muted); font-size:13px; }
+  .head-badges { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px; }
+  .head-badge { padding:4px 8px; background:var(--ink); color:var(--paper); font-size:10px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+  .head-badge.red { background:var(--red); color:#fff; }
+
+  .studio-toolbar {
+    display:flex; align-items:center; flex-wrap:wrap; gap:8px; padding:9px;
+    border:1px solid var(--line); background:var(--panel); margin-bottom:10px;
+  }
+  .studio-toolbar .grow { flex:1; }
+  .studio-toolbar .tool-sep { width:1px; height:26px; background:var(--line); margin:0 2px; }
+  .studio-toolbar button, .studio-toolbar label.btn { min-height:32px; display:inline-flex; align-items:center; gap:6px; }
+  .file-input { display:none; }
+
+  .dropzone {
+    border:2px dashed var(--line); background:var(--panel); min-height:96px; padding:16px;
+    display:flex; align-items:center; justify-content:center; text-align:center; margin-bottom:12px;
+    transition:.15s border-color,.15s background;
+  }
+  .dropzone.drag { border-color:var(--red); background:#f8e7e5; }
+  .dropzone strong { display:block; font-size:15px; margin-bottom:3px; }
+  .dropzone span { font-size:12px; color:var(--muted); }
+
+  .workspace { display:grid; grid-template-columns:340px minmax(0,1fr); gap:12px; align-items:start; }
+  .side, .mainpanel { border:1px solid var(--line); background:var(--panel); }
+  .section-head {
+    min-height:38px; padding:8px 10px; border-bottom:1px solid var(--line);
+    display:flex; align-items:center; gap:8px; background:var(--bg-soft);
+  }
+  .section-head b { font-family:var(--display); font-size:11px; letter-spacing:.08em; text-transform:uppercase; }
+  .section-head .count { margin-left:auto; font:700 11px var(--mono); color:var(--muted); }
+  .source-list { padding:8px; display:flex; flex-direction:column; gap:7px; max-height:calc(100vh - 325px); overflow:auto; min-height:340px; }
+  .source {
+    border:1px solid var(--line); background:var(--panel-2); padding:9px; cursor:pointer;
+  }
+  .source.active { border-left:4px solid var(--red); padding-left:6px; }
+  .source-top { display:flex; gap:8px; align-items:flex-start; }
+  .source-icon {
+    width:34px; height:34px; flex:0 0 34px; display:grid; place-items:center;
+    border:1px solid var(--line); background:var(--bg-soft); font:800 9px var(--mono);
+  }
+  .source-main { min-width:0; flex:1; }
+  .source-name { font-size:12px; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .source-meta { font-size:10.5px; color:var(--muted); margin-top:2px; }
+  .status { display:inline-flex; align-items:center; gap:4px; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; margin-top:5px; }
+  .status.ready { color:var(--ok-ink); }
+  .status.pending { color:var(--warn-ink); }
+  .status.error { color:var(--err-ink); }
+  .dot { width:6px; height:6px; border-radius:50%; background:currentColor; }
+  .source-actions { display:flex; gap:4px; margin-top:7px; }
+  .source-actions button { padding:4px 7px; font-size:10.5px; }
+
+  .mainpanel { min-height:540px; }
+  .page-toolbar {
+    display:flex; align-items:center; flex-wrap:wrap; gap:6px; padding:8px 10px;
+    border-bottom:1px solid var(--line); background:var(--panel-2);
+  }
+  .page-toolbar .grow { flex:1; }
+  .page-toolbar button { padding:5px 9px; font-size:11px; }
+  .page-toolbar .zoom { font:700 11px var(--mono); min-width:42px; text-align:center; }
+  .pages {
+    padding:12px; display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:12px;
+    min-height:440px; align-content:start;
+  }
+  .empty-pages { grid-column:1/-1; padding:70px 20px; text-align:center; color:var(--muted); }
+  .empty-pages svg { opacity:.5; margin-bottom:10px; }
+  .page-card {
+    border:1px solid var(--line); background:var(--panel-2); position:relative;
+    min-width:0; cursor:grab; user-select:none;
+  }
+  .page-card.dragging { opacity:.35; }
+  .page-card.drop-before { box-shadow:-4px 0 0 var(--red); }
+  .page-card.selected { outline:2px solid var(--red); outline-offset:1px; }
+  .page-preview {
+    aspect-ratio:1 / 1.414; background:#d8d5ce; display:flex; align-items:center; justify-content:center;
+    overflow:hidden; position:relative; border-bottom:1px solid var(--line);
+  }
+  .page-preview canvas, .page-preview img { max-width:100%; max-height:100%; display:block; object-fit:contain; }
+  .page-placeholder { padding:18px; text-align:center; color:var(--muted); font-size:11px; }
+  .page-placeholder b { display:block; color:var(--ink); margin-bottom:4px; }
+  .page-no {
+    position:absolute; top:5px; left:5px; min-width:24px; height:22px; padding:0 5px;
+    display:grid; place-items:center; background:rgba(42,40,35,.9); color:#fff; font:700 10px var(--mono);
+  }
+  .page-type {
+    position:absolute; top:5px; right:5px; background:rgba(236,233,226,.92);
+    border:1px solid var(--line); padding:3px 5px; font:800 9px var(--mono);
+  }
+  .page-info { padding:7px 8px 8px; }
+  .page-title { font-size:11px; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .page-sub { font:10px var(--mono); color:var(--muted); margin-top:2px; }
+  .page-actions { display:flex; gap:3px; margin-top:6px; }
+  .page-actions button { padding:3px 6px; font-size:10px; flex:1; }
+
+  .preflight { display:none; border-top:1px solid var(--line); }
+  .preflight.on { display:block; }
+  .preflight-grid { display:grid; grid-template-columns:260px minmax(0,1fr); min-height:480px; }
+  .pf-left { border-right:1px solid var(--line); background:var(--panel); }
+  .pf-settings { padding:10px; border-bottom:1px solid var(--line); }
+  .pf-check { display:flex; align-items:center; gap:7px; font-size:11.5px; font-weight:700; margin:0 0 7px; }
+  .pf-check input { width:auto; }
+  .layouts { max-height:420px; overflow:auto; padding:7px; }
+  .layout-row {
+    display:grid; grid-template-columns:24px 1fr auto; gap:7px; align-items:center;
+    padding:7px; border:1px solid transparent; cursor:pointer;
+  }
+  .layout-row:hover { background:var(--bg-soft); }
+  .layout-row.active { border-color:var(--red); background:var(--panel-2); }
+  .layout-row input { width:auto; }
+  .layout-name { min-width:0; font-size:11.5px; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .layout-meta { font:9.5px var(--mono); color:var(--muted); }
+  .pf-right { min-width:0; display:flex; flex-direction:column; }
+  .pf-preview-toolbar {
+    display:flex; gap:6px; align-items:center; flex-wrap:wrap; min-height:39px; padding:6px 9px;
+    border-bottom:1px solid var(--line); background:var(--panel-2);
+  }
+  .pf-preview-toolbar .grow { flex:1; }
+  .pf-preview-wrap {
+    flex:1; min-height:390px; padding:18px; overflow:auto; background:#aaa69d;
+    display:flex; align-items:flex-start; justify-content:center;
+  }
+  .sheet {
+    position:relative; background:white; box-shadow:0 4px 18px rgba(0,0,0,.18);
+    width:min(100%,920px); aspect-ratio:1.414 / 1;
+    transform-origin:top center;
+  }
+  .sheet.portrait { aspect-ratio:1 / 1.414; max-width:620px; }
+  .sheet img { width:100%; height:100%; object-fit:contain; display:block; }
+  .plot-boundary {
+    position:absolute; left:3.5%; right:3.5%; top:4.5%; bottom:4.5%;
+    border:2px dashed var(--red); pointer-events:none;
+  }
+  .plot-label {
+    position:absolute; right:4%; top:4%; transform:translateY(-110%);
+    background:var(--red); color:#fff; padding:3px 5px; font:800 9px var(--mono);
+  }
+  .pf-placeholder {
+    width:min(100%,900px); min-height:360px; border:1px dashed rgba(0,0,0,.35); background:#d8d5ce;
+    display:grid; place-items:center; text-align:center; padding:30px; color:#4a4640; font-size:12px;
+  }
+  .pf-footer {
+    padding:9px; border-top:1px solid var(--line); display:flex; gap:8px; align-items:center; flex-wrap:wrap; background:var(--panel-2);
+  }
+  .pf-footer .grow { flex:1; }
+  .warning {
+    padding:8px 10px; border-left:3px solid #b07a00; background:#fff8e0; color:#5a3a00; font-size:11px;
+  }
+
+  .progressbar { width:120px; height:5px; background:var(--line-soft); overflow:hidden; }
+  .progressbar i { display:block; height:100%; width:0; background:var(--red); transition:width .2s; }
+
+  .modal {
+    position:fixed; inset:0; background:rgba(25,24,21,.72); z-index:9999; display:none; padding:24px;
+    align-items:center; justify-content:center;
+  }
+  .modal.on { display:flex; }
+  .modal-box { width:min(1100px,100%); max-height:92vh; background:var(--paper); border:1px solid var(--ink); display:flex; flex-direction:column; }
+  .modal-head { display:flex; gap:8px; align-items:center; padding:8px 10px; border-bottom:1px solid var(--line); }
+  .modal-head b { font-size:12px; }
+  .modal-head .grow { flex:1; }
+  .modal-body { overflow:auto; padding:16px; background:#aaa69d; display:flex; justify-content:center; }
+  .modal-body img, .modal-body canvas { max-width:100%; height:auto; background:#fff; }
+
+  @media (max-width:900px) {
+    .workspace { grid-template-columns:1fr; }
+    .source-list { max-height:none; min-height:0; }
+    .preflight-grid { grid-template-columns:1fr; }
+    .pf-left { border-right:0; border-bottom:1px solid var(--line); }
+    .layouts { max-height:230px; }
+    .doc-head { flex-direction:column; }
+  }
+  @media (max-width:560px) {
+    .container { padding-left:8px !important; padding-right:8px !important; }
+    .pages { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; padding:8px; }
+    .studio-toolbar .tool-sep { display:none; }
+    .page-actions { flex-wrap:wrap; }
+    .page-actions button { flex:1 1 40%; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="doc-head">
+    <div>
+      <div class="head-badges">
+        <span class="head-badge red">NEW / 005</span>
+        <span class="head-badge">DWG</span>
+        <span class="head-badge">PDF</span>
+        <span class="head-badge">WORD</span>
+      </div>
+      <h1>ENGINEERING DOCUMENT STUDIO</h1>
+      <div class="sub">Preflight DWG layouts before conversion, verify plot boundaries, then combine, reorder, rotate and export engineering documents as one PDF.</div>
+    </div>
+    <div style="font-size:11px;color:var(--muted);text-align:right">
+      <b style="color:var(--ink)">IECCalc Document Tools</b><br>
+      Browser-side PDF composition<br>
+      DWG rendering via server engine
+    </div>
+  </div>
+
+  <div class="studio-toolbar">
+    <label class="btn btn-primary" for="fileInput">+ ADD FILES</label>
+    <input id="fileInput" class="file-input" type="file" multiple accept=".pdf,.dwg,.doc,.docx,.png,.jpg,.jpeg,.zip" />
+    <button id="clearBtn" class="btn btn-ghost">CLEAR</button>
+    <span class="tool-sep"></span>
+    <button id="rotateBtn" class="btn btn-ghost">ROTATE 90°</button>
+    <button id="deleteBtn" class="btn btn-ghost">DELETE SELECTED</button>
+    <span class="tool-sep"></span>
+    <button id="selectAllBtn" class="btn btn-ghost">SELECT ALL</button>
+    <button id="deselectBtn" class="btn btn-ghost">DESELECT</button>
+    <span class="grow"></span>
+    <div id="exportProgress" class="progressbar" hidden><i></i></div>
+    <button id="exportBtn" class="btn btn-primary">EXPORT PDF</button>
+  </div>
+
+  <div id="dropzone" class="dropzone">
+    <div>
+      <strong>DROP PROJECT FILES HERE</strong>
+      <span>PDF · DWG · DOC/DOCX · JPG/PNG · ZIP with DWG dependencies (XREF / SHX / CTB)</span>
+    </div>
+  </div>
+
+  <div class="workspace">
+    <aside class="side">
+      <div class="section-head"><b>/ SOURCE FILES</b><span id="sourceCount" class="count">0 FILES</span></div>
+      <div id="sourceList" class="source-list">
+        <div id="sourceEmpty" style="padding:28px 12px;text-align:center;color:var(--muted);font-size:11px">No files loaded.</div>
+      </div>
+    </aside>
+
+    <main class="mainpanel">
+      <div class="section-head"><b>/ DOCUMENT</b><span id="pageCount" class="count">0 PAGES</span></div>
+      <div class="page-toolbar">
+        <button id="moveFirstBtn" class="btn btn-ghost">⇤ FIRST</button>
+        <button id="moveLastBtn" class="btn btn-ghost">LAST ⇥</button>
+        <span class="grow"></span>
+        <span style="font-size:10px;color:var(--muted)">THUMBNAILS</span>
+        <button id="zoomOutBtn" class="btn btn-ghost">−</button>
+        <span id="zoomLabel" class="zoom">100%</span>
+        <button id="zoomInBtn" class="btn btn-ghost">+</button>
+      </div>
+      <div id="pages" class="pages">
+        <div class="empty-pages">
+          <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 3h10l4 4v14H5z"/><path d="M15 3v5h5M8 12h8M8 16h8"/></svg>
+          <div><b>Add PDF, DWG, Word or image files.</b><br>PDF pages can already be reordered and merged entirely in your browser.</div>
+        </div>
+      </div>
+
+      <section id="preflight" class="preflight">
+        <div class="section-head"><b>/ DWG PREFLIGHT</b><span id="pfFileName" class="count"></span></div>
+        <div class="preflight-grid">
+          <div class="pf-left">
+            <div class="pf-settings">
+              <label class="pf-check"><input id="includeModel" type="checkbox"> Include Model Space</label>
+              <label class="pf-check"><input id="usePlotSettings" type="checkbox" checked> Use saved layout plot settings</label>
+              <div class="warning">Final PDF conversion is allowed only after preview. Missing XREF, SHX or CTB dependencies must be reported here before publishing.</div>
+            </div>
+            <div id="layoutList" class="layouts"></div>
+          </div>
+          <div class="pf-right">
+            <div class="pf-preview-toolbar">
+              <b id="pfLayoutTitle" style="font-size:11px">SELECT A LAYOUT</b>
+              <span id="pfPaperMeta" style="font:10px var(--mono);color:var(--muted)"></span>
+              <span class="grow"></span>
+              <button id="pfZoomOut" class="btn btn-ghost">−</button>
+              <span id="pfZoomLabel" style="font:700 11px var(--mono)">100%</span>
+              <button id="pfZoomIn" class="btn btn-ghost">+</button>
+              <button id="pfOpenLarge" class="btn btn-ghost">OPEN LARGE</button>
+            </div>
+            <div id="pfPreviewWrap" class="pf-preview-wrap">
+              <div class="pf-placeholder">DWG preview will appear here after the server-side preflight renderer returns layout thumbnails and plot metadata.</div>
+            </div>
+            <div class="pf-footer">
+              <span id="pfSummary" style="font-size:11px;color:var(--muted)">No layouts detected yet.</span>
+              <span class="grow"></span>
+              <button id="pfRefresh" class="btn btn-ghost">REFRESH PREFLIGHT</button>
+              <button id="pfAddSelected" class="btn btn-primary">ADD SELECTED LAYOUTS TO DOCUMENT</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<div id="previewModal" class="modal" role="dialog" aria-modal="true">
+  <div class="modal-box">
+    <div class="modal-head">
+      <b id="modalTitle">PREVIEW</b>
+      <span class="grow"></span>
+      <button id="modalClose" class="btn btn-ghost">CLOSE</button>
+    </div>
+    <div id="modalBody" class="modal-body"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs" type="module"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script>
+window.DOC_STUDIO_CONFIG = {
+  dwgPreflightUrl: "/api/document-studio/dwg/preflight",
+  dwgConvertUrl: "/api/document-studio/dwg/convert",
+  officeConvertUrl: "/api/document-studio/office/convert"
+};
+</script>
+<script type="module">
+import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs";
+pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs";
+
+const $ = s => document.querySelector(s);
+const state = {
+  sources: new Map(),
+  pages: [],
+  activeSourceId: null,
+  selected: new Set(),
+  thumbScale: 1,
+  pfZoom: 1,
+  activeLayoutId: null
+};
+
+function id(prefix="id"){ return prefix + "-" + Math.random().toString(36).slice(2,10); }
+function ext(name){ return (name.split(".").pop() || "").toLowerCase(); }
+function humanBytes(n){
+  if(n < 1024) return n + " B";
+  if(n < 1048576) return (n/1024).toFixed(1) + " KB";
+  return (n/1048576).toFixed(1) + " MB";
+}
+function esc(s){
+  return String(s??"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]));
+}
+function setStatus(src, status, text){
+  src.status = status; src.statusText = text;
+  renderSources();
+}
+function addSource(file, type){
+  const source = {
+    id:id("src"), file, name:file.name, size:file.size, type,
+    status:"pending", statusText:"Queued", pdfBytes:null, pdfDoc:null,
+    pageIds:[], layouts:[], dependencies:[], preflightError:null
+  };
+  state.sources.set(source.id, source);
+  state.activeSourceId = source.id;
+  renderSources();
+  return source;
+}
+
+async function acceptFiles(fileList){
+  const files=[...fileList];
+  for(const file of files){
+    const e=ext(file.name);
+    if(e==="pdf") await ingestPdf(file);
+    else if(["png","jpg","jpeg"].includes(e)) await ingestImage(file);
+    else if(e==="dwg" || e==="zip") await ingestDwgPackage(file);
+    else if(["doc","docx"].includes(e)) await ingestOffice(file);
+    else {
+      const s=addSource(file,"other");
+      setStatus(s,"error","Unsupported file");
+    }
+  }
+  renderAll();
+}
+
+async function ingestPdf(file){
+  const src=addSource(file,"pdf");
+  try{
+    setStatus(src,"pending","Reading PDF");
+    const bytes=await file.arrayBuffer();
+    src.pdfBytes=bytes.slice(0);
+    src.pdfDoc=await pdfjsLib.getDocument({data:bytes.slice(0)}).promise;
+    for(let n=1;n<=src.pdfDoc.numPages;n++){
+      const p={
+        id:id("page"), sourceId:src.id, sourceType:"pdf", sourcePage:n-1,
+        label:file.name+" — "+n, rotation:0, selected:false, thumb:null
+      };
+      state.pages.push(p); src.pageIds.push(p.id);
+      queuePdfThumb(src,p,n);
+    }
+    setStatus(src,"ready",src.pdfDoc.numPages+" pages ready");
+  }catch(err){
+    console.error(err); setStatus(src,"error","PDF read failed");
+  }
+  renderAll();
+}
+
+async function queuePdfThumb(src,p,pageNo){
+  try{
+    const page=await src.pdfDoc.getPage(pageNo);
+    const vp=page.getViewport({scale:.32});
+    const canvas=document.createElement("canvas");
+    canvas.width=Math.ceil(vp.width); canvas.height=Math.ceil(vp.height);
+    await page.render({canvasContext:canvas.getContext("2d"),viewport:vp}).promise;
+    p.thumb=canvas.toDataURL("image/jpeg",.82);
+    renderPages();
+  }catch(err){ console.warn("thumb",err); }
+}
+
+async function ingestImage(file){
+  const src=addSource(file,"image");
+  const url=URL.createObjectURL(file);
+  const p={id:id("page"),sourceId:src.id,sourceType:"image",sourcePage:0,label:file.name,rotation:0,thumb:url,imageFile:file};
+  state.pages.push(p); src.pageIds.push(p.id);
+  setStatus(src,"ready","1 image page");
+  renderAll();
+}
+
+async function ingestOffice(file){
+  const src=addSource(file,"office");
+  setStatus(src,"pending","Waiting for Word renderer");
+  try{
+    const fd=new FormData(); fd.append("file",file);
+    const r=await fetch(window.DOC_STUDIO_CONFIG.officeConvertUrl,{method:"POST",body:fd});
+    if(!r.ok) throw new Error("Office API "+r.status);
+    const blob=await r.blob();
+    await ingestConvertedPdf(blob,file.name.replace(/\.(docx?|DOCX?)$/,".pdf"),src);
+  }catch(err){
+    console.info("Office renderer not connected yet",err);
+    src.preflightError="Server-side Office renderer is not connected yet.";
+    setStatus(src,"pending","Renderer not connected");
+  }
+}
+
+async function ingestConvertedPdf(blob,name,originalSource){
+  const file=new File([blob],name,{type:"application/pdf"});
+  const bytes=await file.arrayBuffer();
+  originalSource.pdfBytes=bytes.slice(0);
+  originalSource.pdfDoc=await pdfjsLib.getDocument({data:bytes.slice(0)}).promise;
+  for(let n=1;n<=originalSource.pdfDoc.numPages;n++){
+    const p={id:id("page"),sourceId:originalSource.id,sourceType:"pdf",sourcePage:n-1,label:name+" — "+n,rotation:0,thumb:null};
+    state.pages.push(p); originalSource.pageIds.push(p.id); queuePdfThumb(originalSource,p,n);
+  }
+  originalSource.type="pdf";
+  setStatus(originalSource,"ready",originalSource.pdfDoc.numPages+" pages ready");
+  renderAll();
+}
+
+async function ingestDwgPackage(file){
+  const src=addSource(file,"dwg");
+  setStatus(src,"pending","Running DWG preflight");
+  await runDwgPreflight(src);
+  renderAll();
+}
+
+async function runDwgPreflight(src){
+  src.preflightError=null; src.layouts=[];
+  try{
+    const fd=new FormData(); fd.append("file",src.file);
+    fd.append("includeModel","false");
+    const r=await fetch(window.DOC_STUDIO_CONFIG.dwgPreflightUrl,{method:"POST",body:fd});
+    if(!r.ok) throw new Error("DWG preflight API "+r.status);
+    const data=await r.json();
+    src.layouts=(data.layouts||[]).map((l,i)=>({
+      id:l.id||("layout-"+i), name:l.name||("Layout "+(i+1)), isModel:!!l.isModel,
+      selected:l.isModel?false:(l.selected!==false), paper:l.paper||"Unknown",
+      orientation:l.orientation||"landscape", widthMm:l.widthMm||null, heightMm:l.heightMm||null,
+      previewUrl:l.previewUrl||null, plotBounds:l.plotBounds||null, plotStyle:l.plotStyle||null,
+      warning:l.warning||null
+    }));
+    src.dependencies=data.dependencies||[];
+    setStatus(src,"ready",src.layouts.length+" layouts detected");
+    openPreflight(src.id);
+  }catch(err){
+    console.info("DWG preflight renderer not connected yet",err);
+    src.preflightError="DWG preflight renderer endpoint is not connected yet. UI and API contract are ready.";
+    setStatus(src,"pending","Preflight renderer not connected");
+    openPreflight(src.id);
+  }
+}
+
+function renderSources(){
+  const list=$("#sourceList");
+  const all=[...state.sources.values()];
+  $("#sourceCount").textContent=all.length+" FILE"+(all.length===1?"":"S");
+  if(!all.length){ list.innerHTML='<div style="padding:28px 12px;text-align:center;color:var(--muted);font-size:11px">No files loaded.</div>'; return; }
+  list.innerHTML=all.map(s=>{
+    const badge=s.type==="dwg"?"DWG":s.type==="office"?"WORD":s.type==="image"?"IMG":s.type==="pdf"?"PDF":"FILE";
+    return '<div class="source '+(state.activeSourceId===s.id?"active":"")+'" data-src="'+s.id+'">'+
+      '<div class="source-top"><div class="source-icon">'+badge+'</div><div class="source-main">'+
+      '<div class="source-name" title="'+esc(s.name)+'">'+esc(s.name)+'</div>'+
+      '<div class="source-meta">'+humanBytes(s.size)+' · '+esc(s.type.toUpperCase())+'</div>'+
+      '<div class="status '+s.status+'"><i class="dot"></i>'+esc(s.statusText)+'</div>'+
+      '</div></div>'+
+      '<div class="source-actions">'+
+      (s.type==="dwg"?'<button data-act="preflight" class="btn btn-ghost">PREFLIGHT</button>':'')+
+      '<button data-act="remove" class="btn btn-ghost">REMOVE</button></div></div>';
+  }).join("");
+  list.querySelectorAll(".source").forEach(el=>{
+    el.addEventListener("click",ev=>{
+      const sid=el.dataset.src; state.activeSourceId=sid;
+      if(ev.target.dataset.act==="remove"){ removeSource(sid); return; }
+      if(ev.target.dataset.act==="preflight"){ openPreflight(sid); return; }
+      renderSources();
+    });
+  });
+}
+
+function renderPages(){
+  const root=$("#pages");
+  $("#pageCount").textContent=state.pages.length+" PAGE"+(state.pages.length===1?"":"S");
+  const min=Math.max(105,Math.round(160*state.thumbScale));
+  root.style.gridTemplateColumns="repeat(auto-fill,minmax("+min+"px,1fr))";
+  if(!state.pages.length){
+    root.innerHTML='<div class="empty-pages"><svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 3h10l4 4v14H5z"/><path d="M15 3v5h5M8 12h8M8 16h8"/></svg><div><b>Add PDF, DWG, Word or image files.</b><br>PDF pages can already be reordered and merged entirely in your browser.</div></div>';
+    return;
+  }
+  root.innerHTML=state.pages.map((p,i)=>{
+    const src=state.sources.get(p.sourceId);
+    const preview=p.thumb?'<img src="'+p.thumb+'" style="transform:rotate('+p.rotation+'deg)"/>':
+      '<div class="page-placeholder"><b>PREVIEW</b>Generating thumbnail…</div>';
+    return '<article class="page-card '+(state.selected.has(p.id)?"selected":"")+'" draggable="true" data-id="'+p.id+'">'+
+      '<div class="page-preview">'+preview+'<span class="page-no">'+(i+1)+'</span><span class="page-type">'+esc((src?.type||p.sourceType).toUpperCase())+'</span></div>'+
+      '<div class="page-info"><div class="page-title" title="'+esc(p.label)+'">'+esc(p.label)+'</div>'+
+      '<div class="page-sub">source page '+(p.sourcePage+1)+' · rot '+p.rotation+'°</div>'+
+      '<div class="page-actions"><button data-act="left" class="btn btn-ghost">←</button><button data-act="rotate" class="btn btn-ghost">↻</button><button data-act="delete" class="btn btn-ghost">×</button><button data-act="right" class="btn btn-ghost">→</button></div></div></article>';
+  }).join("");
+  wirePageCards();
+}
+
+function wirePageCards(){
+  document.querySelectorAll(".page-card").forEach(card=>{
+    const pid=card.dataset.id;
+    card.addEventListener("click",ev=>{
+      const act=ev.target.dataset.act;
+      if(act){ ev.stopPropagation(); pageAction(pid,act); return; }
+      if(ev.ctrlKey||ev.metaKey) state.selected.has(pid)?state.selected.delete(pid):state.selected.add(pid);
+      else { state.selected.clear(); state.selected.add(pid); }
+      renderPages();
+    });
+    card.addEventListener("dragstart",ev=>{ card.classList.add("dragging"); ev.dataTransfer.setData("text/plain",pid); ev.dataTransfer.effectAllowed="move"; });
+    card.addEventListener("dragend",()=>document.querySelectorAll(".page-card").forEach(x=>x.classList.remove("dragging","drop-before")));
+    card.addEventListener("dragover",ev=>{ ev.preventDefault(); card.classList.add("drop-before"); });
+    card.addEventListener("dragleave",()=>card.classList.remove("drop-before"));
+    card.addEventListener("drop",ev=>{
+      ev.preventDefault(); card.classList.remove("drop-before");
+      const from=ev.dataTransfer.getData("text/plain"); if(from===pid)return;
+      const fi=state.pages.findIndex(p=>p.id===from), ti=state.pages.findIndex(p=>p.id===pid);
+      if(fi<0||ti<0)return;
+      const [p]=state.pages.splice(fi,1);
+      state.pages.splice(fi<ti?ti-1:ti,0,p);
+      renderPages();
+    });
+  });
+}
+
+function pageAction(pid,act){
+  const i=state.pages.findIndex(p=>p.id===pid); if(i<0)return;
+  const p=state.pages[i];
+  if(act==="delete"){ state.pages.splice(i,1); state.selected.delete(pid); }
+  if(act==="rotate"){ p.rotation=(p.rotation+90)%360; }
+  if(act==="left"&&i>0){ [state.pages[i-1],state.pages[i]]=[state.pages[i],state.pages[i-1]]; }
+  if(act==="right"&&i<state.pages.length-1){ [state.pages[i+1],state.pages[i]]=[state.pages[i],state.pages[i+1]]; }
+  renderPages();
+}
+function removeSource(sid){
+  const s=state.sources.get(sid); if(!s)return;
+  state.pages=state.pages.filter(p=>p.sourceId!==sid);
+  for(const pid of s.pageIds||[]) state.selected.delete(pid);
+  state.sources.delete(sid);
+  if(state.activeSourceId===sid) state.activeSourceId=null;
+  closePreflight(); renderAll();
+}
+function renderAll(){ renderSources(); renderPages(); }
+
+function openPreflight(sid){
+  const src=state.sources.get(sid); if(!src||src.type!=="dwg")return;
+  state.activeSourceId=sid;
+  $("#preflight").classList.add("on");
+  $("#pfFileName").textContent=src.name;
+  renderSources(); renderLayouts(src);
+  setTimeout(()=>$("#preflight").scrollIntoView({behavior:"smooth",block:"start"}),20);
+}
+function closePreflight(){ $("#preflight").classList.remove("on"); }
+
+function renderLayouts(src){
+  const root=$("#layoutList");
+  if(src.preflightError){
+    root.innerHTML='<div class="warning">'+esc(src.preflightError)+'</div>';
+    $("#pfSummary").textContent="Preflight service required for DWG layout detection.";
+    $("#pfPreviewWrap").innerHTML='<div class="pf-placeholder"><div><b>DWG PREVIEW ENGINE NOT CONNECTED</b><br><br>The front-end is ready for layout thumbnails, paper size, orientation, plot area, CTB/STB and dependency warnings.<br><br>Expected endpoint: <code>/api/document-studio/dwg/preflight</code></div></div>';
+    return;
+  }
+  if(!src.layouts.length){
+    root.innerHTML='<div style="padding:14px;color:var(--muted);font-size:11px">No layouts returned.</div>'; return;
+  }
+  root.innerHTML=src.layouts.map((l,i)=>{
+    if(l.isModel && !$("#includeModel").checked) return "";
+    return '<label class="layout-row '+(state.activeLayoutId===l.id?"active":"")+'" data-lid="'+l.id+'">'+
+      '<input type="checkbox" '+(l.selected?"checked":"")+'>'+
+      '<div><div class="layout-name">'+esc(l.name)+'</div><div class="layout-meta">'+esc(l.paper)+(l.plotStyle?" · "+esc(l.plotStyle):"")+'</div></div>'+
+      '<span class="layout-meta">'+(l.isModel?"MODEL":"LAYOUT")+'</span></label>';
+  }).join("");
+  root.querySelectorAll(".layout-row").forEach(row=>{
+    const l=src.layouts.find(x=>x.id===row.dataset.lid);
+    row.querySelector("input").addEventListener("click",ev=>{ ev.stopPropagation(); l.selected=ev.target.checked; updatePfSummary(src); });
+    row.addEventListener("click",()=>{ state.activeLayoutId=l.id; showLayoutPreview(src,l); renderLayouts(src); });
+  });
+  if(!state.activeLayoutId){
+    const first=src.layouts.find(l=>!l.isModel)||src.layouts[0];
+    if(first){ state.activeLayoutId=first.id; showLayoutPreview(src,first); }
+  }
+  updatePfSummary(src);
+}
+function updatePfSummary(src){
+  const n=src.layouts.filter(l=>l.selected && (!l.isModel||$("#includeModel").checked)).length;
+  const warns=src.layouts.filter(l=>l.warning).length+(src.dependencies||[]).filter(d=>d.status==="missing").length;
+  $("#pfSummary").textContent=n+" selected layout"+(n===1?"":"s")+(warns?" · "+warns+" warning(s)":" · no reported warnings");
+}
+function showLayoutPreview(src,l){
+  $("#pfLayoutTitle").textContent=l.name;
+  $("#pfPaperMeta").textContent=[l.paper,l.widthMm&&l.heightMm?(l.widthMm+" × "+l.heightMm+" mm"):null,l.orientation].filter(Boolean).join(" · ");
+  const wrap=$("#pfPreviewWrap");
+  if(l.previewUrl){
+    wrap.innerHTML='<div class="sheet '+(l.orientation==="portrait"?"portrait":"")+'" style="transform:scale('+state.pfZoom+')"><img src="'+esc(l.previewUrl)+'"><div class="plot-boundary"></div><div class="plot-label">PLOT BOUNDARY</div></div>';
+  } else {
+    wrap.innerHTML='<div class="pf-placeholder"><div><b>'+esc(l.name)+'</b><br>'+esc(l.paper)+'<br><br>No preview image returned by renderer.</div></div>';
+  }
+}
+function activeDwg(){ const s=state.sources.get(state.activeSourceId); return s&&s.type==="dwg"?s:null; }
+
+async function addSelectedDwgLayouts(){
+  const src=activeDwg(); if(!src)return;
+  const selected=src.layouts.filter(l=>l.selected && (!l.isModel||$("#includeModel").checked));
+  if(!selected.length){ alert("Select at least one DWG layout."); return; }
+  try{
+    $("#pfAddSelected").disabled=true; $("#pfAddSelected").textContent="CONVERTING…";
+    const fd=new FormData(); fd.append("file",src.file);
+    fd.append("layouts",JSON.stringify(selected.map(l=>l.id)));
+    fd.append("includeModel",String($("#includeModel").checked));
+    const r=await fetch(window.DOC_STUDIO_CONFIG.dwgConvertUrl,{method:"POST",body:fd});
+    if(!r.ok) throw new Error("DWG convert API "+r.status);
+    const blob=await r.blob();
+    src.pageIds.forEach(pid=>{ state.pages=state.pages.filter(p=>p.id!==pid); }); src.pageIds=[];
+    await ingestConvertedPdf(blob,src.name.replace(/\.dwg$/i,".pdf"),src);
+    closePreflight();
+  }catch(err){
+    console.error(err);
+    alert("DWG conversion engine is not connected yet. The preflight and document UI are ready; connect the server endpoint next.");
+  }finally{
+    $("#pfAddSelected").disabled=false; $("#pfAddSelected").textContent="ADD SELECTED LAYOUTS TO DOCUMENT";
+  }
+}
+
+async function exportPdf(){
+  if(!state.pages.length){ alert("There are no pages to export."); return; }
+  if(!window.PDFLib){ alert("PDF engine failed to load."); return; }
+  const bar=$("#exportProgress"), inner=bar.querySelector("i"); bar.hidden=false; inner.style.width="2%";
+  $("#exportBtn").disabled=true;
+  try{
+    const {PDFDocument,degrees}=PDFLib;
+    const out=await PDFDocument.create();
+    const loaded=new Map();
+    for(let i=0;i<state.pages.length;i++){
+      const p=state.pages[i], src=state.sources.get(p.sourceId);
+      if(p.sourceType==="pdf" && src?.pdfBytes){
+        let doc=loaded.get(src.id);
+        if(!doc){ doc=await PDFDocument.load(src.pdfBytes.slice(0)); loaded.set(src.id,doc); }
+        const [copied]=await out.copyPages(doc,[p.sourcePage]);
+        if(p.rotation) copied.setRotation(degrees((copied.getRotation().angle+p.rotation)%360));
+        out.addPage(copied);
+      } else if(p.sourceType==="image" && p.imageFile){
+        const bytes=await p.imageFile.arrayBuffer();
+        const isPng=ext(p.imageFile.name)==="png";
+        const img=isPng?await out.embedPng(bytes):await out.embedJpg(bytes);
+        const dpi=96, w=img.width*72/dpi, h=img.height*72/dpi;
+        const landscape=p.rotation===90||p.rotation===270;
+        const page=out.addPage([landscape?h:w,landscape?w:h]);
+        if(!landscape) page.drawImage(img,{x:0,y:0,width:w,height:h});
+        else page.drawImage(img,{x:0,y:w,width:w,height:h,rotate:degrees(90)});
+      }
+      inner.style.width=Math.round((i+1)/state.pages.length*90)+"%";
+    }
+    const bytes=await out.save();
+    inner.style.width="100%";
+    const blob=new Blob([bytes],{type:"application/pdf"});
+    const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="IECCalc_Engineering_Document.pdf"; a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+  }catch(err){
+    console.error(err); alert("Export failed: "+err.message);
+  }finally{
+    $("#exportBtn").disabled=false; setTimeout(()=>{bar.hidden=true;inner.style.width="0"},700);
+  }
+}
+
+$("#fileInput").addEventListener("change",e=>{ acceptFiles(e.target.files); e.target.value=""; });
+const dz=$("#dropzone");
+["dragenter","dragover"].forEach(n=>dz.addEventListener(n,e=>{e.preventDefault();dz.classList.add("drag")}));
+["dragleave","drop"].forEach(n=>dz.addEventListener(n,e=>{e.preventDefault();dz.classList.remove("drag")}));
+dz.addEventListener("drop",e=>acceptFiles(e.dataTransfer.files));
+dz.addEventListener("click",()=>$("#fileInput").click());
+
+$("#clearBtn").addEventListener("click",()=>{ if(state.sources.size && !confirm("Remove all loaded files and pages?"))return; state.sources.clear();state.pages=[];state.selected.clear();state.activeSourceId=null;closePreflight();renderAll(); });
+$("#rotateBtn").addEventListener("click",()=>{ state.pages.forEach(p=>{if(state.selected.has(p.id))p.rotation=(p.rotation+90)%360});renderPages(); });
+$("#deleteBtn").addEventListener("click",()=>{ state.pages=state.pages.filter(p=>!state.selected.has(p.id));state.selected.clear();renderPages(); });
+$("#selectAllBtn").addEventListener("click",()=>{state.pages.forEach(p=>state.selected.add(p.id));renderPages();});
+$("#deselectBtn").addEventListener("click",()=>{state.selected.clear();renderPages();});
+$("#moveFirstBtn").addEventListener("click",()=>{ const a=state.pages.filter(p=>state.selected.has(p.id)), b=state.pages.filter(p=>!state.selected.has(p.id));state.pages=[...a,...b];renderPages(); });
+$("#moveLastBtn").addEventListener("click",()=>{ const a=state.pages.filter(p=>!state.selected.has(p.id)), b=state.pages.filter(p=>state.selected.has(p.id));state.pages=[...a,...b];renderPages(); });
+$("#zoomInBtn").addEventListener("click",()=>{state.thumbScale=Math.min(1.8,state.thumbScale+.15);$("#zoomLabel").textContent=Math.round(state.thumbScale*100)+"%";renderPages();});
+$("#zoomOutBtn").addEventListener("click",()=>{state.thumbScale=Math.max(.65,state.thumbScale-.15);$("#zoomLabel").textContent=Math.round(state.thumbScale*100)+"%";renderPages();});
+$("#exportBtn").addEventListener("click",exportPdf);
+
+$("#includeModel").addEventListener("change",()=>{const s=activeDwg();if(s)renderLayouts(s);});
+$("#pfRefresh").addEventListener("click",async()=>{const s=activeDwg();if(s)await runDwgPreflight(s);});
+$("#pfAddSelected").addEventListener("click",addSelectedDwgLayouts);
+$("#pfZoomIn").addEventListener("click",()=>{state.pfZoom=Math.min(1.6,state.pfZoom+.1);$("#pfZoomLabel").textContent=Math.round(state.pfZoom*100)+"%";const s=activeDwg(),l=s?.layouts.find(x=>x.id===state.activeLayoutId);if(s&&l)showLayoutPreview(s,l);});
+$("#pfZoomOut").addEventListener("click",()=>{state.pfZoom=Math.max(.5,state.pfZoom-.1);$("#pfZoomLabel").textContent=Math.round(state.pfZoom*100)+"%";const s=activeDwg(),l=s?.layouts.find(x=>x.id===state.activeLayoutId);if(s&&l)showLayoutPreview(s,l);});
+$("#pfOpenLarge").addEventListener("click",()=>{
+  const s=activeDwg(),l=s?.layouts.find(x=>x.id===state.activeLayoutId); if(!l?.previewUrl)return;
+  $("#modalTitle").textContent=s.name+" — "+l.name; $("#modalBody").innerHTML='<img src="'+esc(l.previewUrl)+'">'; $("#previewModal").classList.add("on");
+});
+$("#modalClose").addEventListener("click",()=>$("#previewModal").classList.remove("on"));
+$("#previewModal").addEventListener("click",e=>{if(e.target.id==="previewModal")$("#previewModal").classList.remove("on")});
+
+renderAll();
+</script>
+<script src="/_lib/api.js"></script>
+<script src="/_lib/chrome.js"></script>
+</body>
+</html>
