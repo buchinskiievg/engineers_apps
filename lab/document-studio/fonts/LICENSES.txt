@@ -1,0 +1,21 @@
+Fonts bundled with the Engineering Document Studio (lab/document-studio)
+
+They are served from this site and embedded into the PDFs the studio makes, so
+a drawing converts the same on every computer, whatever fonts it has installed.
+
+Arimo  (Regular, Bold, Italic, Bold Italic)   SIL Open Font License 1.1
+       metrically compatible with Arial — stands in for Arial and the other sans
+       TrueType fonts of a drawing (Tahoma, Verdana, Trebuchet, Segoe UI, ...)
+Tinos  (Regular, Bold, Italic, Bold Italic)   SIL Open Font License 1.1
+       metrically compatible with Times New Roman — the serif fonts
+Cousine (Regular, Bold)                       SIL Open Font License 1.1
+       metrically compatible with Courier New — the monospaced fonts
+       Arimo, Tinos, Cousine: Copyright Google LLC / Ascender Corporation;
+       files from the @expo-google-fonts npm packages (Google Fonts builds).
+       License text: https://openfontlicense.org
+
+osifont                                        GNU LGPL v3 with the GPL font exception
+       an ISO 3098 technical lettering font — stands in for the AutoCAD SHX
+       fonts (romans, simplex, isocp, txt, ...). https://github.com/hikikomori82/osifont
+       The font exception: embedding the font in a document does not by itself
+       make the document subject to the licence.

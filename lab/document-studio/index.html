@@ -415,7 +415,7 @@ window.DOC_STUDIO_CONFIG = {
 </script>
 <script type="module">
 import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs";
-import { parseDwg, svgToPng, sheetPdf } from "./libredwg-engine.js?v=vec1";
+import { parseDwg, svgToPng, sheetsPdf } from "./libredwg-engine.js?v=r2b";
 pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs";
 
 const $ = s => document.querySelector(s);
@@ -948,6 +948,13 @@ async function renderPreview(){
   const url=p.sourceType==="image"?baseThumb(p):p.sourceType==="dwg-svg"&&p.svg?svgUrl(p):null;
   if(!url){ root.innerHTML='<div class="preview-empty">Preview unavailable.</div>'; return; }
   if(!p.rotation){
+    /* a DWG sheet is put into the page itself, not as an <img>: an image cannot
+       reach the page's fonts, and the sheet is set in the bundled ones */
+    if(p.sourceType==="dwg-svg"&&/data-ds="r2"/.test((p.orig||p).svg.slice(0,400))){
+      root.innerHTML='<div class="preview-paper" '+width+'>'+(p.orig||p).svg.replace(/^\s*<\?xml[^>]*>/,"")+boundary+'</div>';
+      const s=root.querySelector(".preview-paper > svg"); if(s){ s.removeAttribute("width"); s.removeAttribute("height"); s.style.cssText="display:block;width:100%;height:auto"; }
+      return;
+    }
     root.innerHTML='<div class="preview-paper" '+width+'><img draggable="false" alt="" src="'+esc(url)+'">'+boundary+'</div>';
     return;
   }
@@ -974,6 +981,17 @@ async function exportPdf(d, btn){
   const {PDFDocument,degrees}=PDFLib,out=await PDFDocument.create(), loaded=new Map();
   const label=btn?.textContent; if(btn){ btn.disabled=true; btn.textContent="0%"; }
   try{
+    /* All DWG sheets of the document go through one vector PDF (sheetsPdf in
+       the engine), so each bundled font is embedded once for the whole file,
+       then their pages are copied in where they belong. */
+    const dwg=d.pages.filter(p=>p.sourceType==="dwg-svg"&&p.svg);
+    const sheetPage=new Map();
+    if(dwg.length){
+      if(btn) btn.textContent="DWG…";
+      const vec=await PDFDocument.load(await sheetsPdf(dwg.map(p=>(p.orig||p).layout)));
+      const copied=await out.copyPages(vec,dwg.map((p,k)=>k));
+      dwg.forEach((p,k)=>sheetPage.set(p,copied[k]));
+    }
     for(let i=0;i<d.pages.length;i++){
       const p=d.pages[i],s=source(p.sourceId);
       if(p.sourceType==="pdf"&&s?.pdfBytes){
@@ -984,11 +1002,8 @@ async function exportPdf(d, btn){
         const w=im.width*.75,h=im.height*.75,pg=out.addPage([w,h]);pg.drawImage(im,{x:0,y:0,width:w,height:h});
         if(p.rotation)pg.setRotation(degrees(p.rotation));
       }else if(p.sourceType==="dwg-svg"&&p.svg){
-        // a vector page of the sheet's own size (see sheetPdf in the engine),
-        // made once per sheet and shared with merged documents
-        const o=p.orig||p; if(!o.vectorPdf)o.vectorPdf=await sheetPdf(o.layout);
-        const one=await PDFDocument.load(o.vectorPdf.slice(0));
-        const [pg]=await out.copyPages(one,[0]); out.addPage(pg);
+        const pg=sheetPage.get(p); if(!pg) continue;
+        out.addPage(pg);
         if(p.rotation)pg.setRotation(degrees(p.rotation));
       }
       if(btn) btn.textContent=Math.round((i+1)/d.pages.length*100)+"%";

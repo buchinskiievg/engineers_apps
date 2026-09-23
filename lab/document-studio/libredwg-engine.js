@@ -24,6 +24,7 @@
 // turned a 3.8 km route plan into a single pixel.
 
 import { Dwg_File_Type, LibreDwg } from "https://cdn.jsdelivr.net/npm/@mlightcad/libredwg-web@0.7.14/dist/libredwg-web.js";
+import { makeRenderer, SCREEN_STYLE, setShxEm } from "./dwg-render.js?v=r2b";
 
 // The folder this module lives in, without its trailing slash. (The first
 // version had a doubled backslash in this regular expression; the engine read
@@ -504,12 +505,357 @@ function meta(svg) {
   return { width, height, orientation: width && height && width < height ? "portrait" : "landscape" };
 }
 
+/* ── bundled fonts ───────────────────────────────────────────────────────
+   Served from fonts/ next to this module (licences in fonts/LICENSES.txt),
+   registered with the page for the preview and for measuring text, and
+   embedded into the PDF — so a drawing converts the same on every computer. */
+const FONT_BASE = new URL("./fonts/", import.meta.url).href;
+const FONT_FILES = {
+  dssans: { "400": "Arimo_400Regular.ttf", "700": "Arimo_700Bold.ttf", "400i": "Arimo_400Regular_Italic.ttf", "700i": "Arimo_700Bold_Italic.ttf" },
+  dsserif: { "400": "Tinos_400Regular.ttf", "700": "Tinos_700Bold.ttf", "400i": "Tinos_400Regular_Italic.ttf", "700i": "Tinos_700Bold_Italic.ttf" },
+  dsmono: { "400": "Cousine_400Regular.ttf", "700": "Cousine_700Bold.ttf" },
+  dscad: { "400": "osifont.ttf" }
+};
+function fontFile(fam, bold, italic) {
+  const set = FONT_FILES[fam] || FONT_FILES.dssans, w = bold ? "700" : "400";
+  return set[w + (italic ? "i" : "")] || set[w] || set["400"];
+}
+const fontBytes = new Map();
+function bytesOf(file) {
+  if (!fontBytes.has(file)) fontBytes.set(file, fetch(FONT_BASE + file).then(r => { if (!r.ok) throw new Error("font " + file + ": HTTP " + r.status); return r.arrayBuffer(); }));
+  return fontBytes.get(file);
+}
+const facesLoaded = new Map();                 // "fam|bold|italic" → file
+async function ensureFace(fam, bold, italic) {
+  const key = fam + "|" + (bold ? 1 : 0) + "|" + (italic ? 1 : 0);
+  if (facesLoaded.has(key)) return;
+  const file = fontFile(fam, bold, italic);
+  facesLoaded.set(key, file);
+  try {
+    const face = new FontFace(fam, await bytesOf(file), { weight: bold ? "700" : "400", style: italic ? "italic" : "normal" });
+    await face.load(); document.fonts.add(face);
+  } catch (e) { facesLoaded.delete(key); console.warn(e); }
+}
+/* which faces a drawing uses: its text styles, and the \f font codes of MTEXT */
+function facesNeeded(db) {
+  const need = new Set(["dssans|0|0", "dssans|1|0", "dscad|0|0"]);
+  const cls = (name, file) => {
+    const n = String(name || file || "").toLowerCase();
+    if (/\.shx$/.test(n) || (file && !/\.(ttf|ttc|otf)$/i.test(file))) return "dscad";
+    if (/times|roman|bookman|bookos|georgia|garamond|bell|cambria/.test(n)) return "dsserif";
+    if (/cour|consol|mono/.test(n)) return "dsmono";
+    return "dssans";
+  };
+  for (const s of (db?.tables?.STYLE?.entries || [])) {
+    const fam = cls(null, s.font); const b = /bd|b\.ttf$/i.test(s.font || ""), it = /i\.ttf$|bi\.ttf$/i.test(s.font || "");
+    need.add(fam + "|" + (b ? 1 : 0) + "|" + (it && fam !== "dscad" ? 1 : 0));
+  }
+  const scan = t => { for (const m of String(t || "").matchAll(/\\f([^|;]*)((?:\|[^;]*)?);/g)) {
+    const fam = cls(m[1]); need.add(fam + "|" + (/\|b1/.test(m[2]) ? 1 : 0) + "|" + (/\|i1/.test(m[2]) ? 1 : 0)); } };
+  for (const r of blockRecords(db)) for (const e of (r.entities || [])) { if (e.type === "MTEXT") scan(e.text); if (e.attribs) for (const a of e.attribs) scan(a.mtext?.text); }
+  return [...need].map(k => { const [f, b, i] = k.split("|"); return [f, b === "1", i === "1"]; });
+}
+async function ensureFonts(db) {
+  await Promise.all(facesNeeded(db).map(([f, b, i]) => ensureFace(f, b, i)));
+  // the SHX stand-in is set so that its capitals are as tall as the SHX text
+  try {
+    const cx = document.createElement("canvas").getContext("2d");
+    cx.font = "100px dscad"; const m = cx.measureText("H");
+    if (m.actualBoundingBoxAscent > 20) setShxEm(100 / m.actualBoundingBoxAscent);
+  } catch {}
+}
+
+/* ── the drawing, drawn by dwg-render.js ─────────────────────────────────── */
+const ENTITY_SKIP = new Set(["VIEWPORT"]);
+function assemble(defs, body, ext, extraClass) {
+  if (!ext) ext = { minX: 0, minY: 0, maxX: 420, maxY: 297 };
+  const w = ext.maxX - ext.minX, h = ext.maxY - ext.minY, pad = 0.02;
+  const vb = [ext.minX - w * pad, -(ext.maxY + h * pad), w * (1 + 2 * pad), h * (1 + 2 * pad)];
+  const W = 1200, H = Math.max(1, Math.round(W * vb[3] / vb[2]));
+  return '<?xml version="1.0"?>\n<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" data-ds="r2"' +
+    ' width="' + W + '" height="' + H + '" viewBox="' + vb.map(v => +v.toFixed(4)).join(" ") + '" preserveAspectRatio="xMidYMid meet"' +
+    ' font-family="dssans, Arial, Helvetica, sans-serif" stroke-linecap="round" stroke-linejoin="round">' + SCREEN_STYLE +
+    "<defs>" + defs + '</defs><g transform="matrix(1,0,0,-1,0,0)">' + body + "</g></svg>";
+}
+const sheetUnitMm = ext => (ext && Math.max(ext.maxX - ext.minX, ext.maxY - ext.minY) < 60 ? 25.4 : 1);
+function fitA1(ext) {
+  const w = ext.maxX - ext.minX, h = ext.maxY - ext.minY, land = w >= h, page = land ? A1 : [A1[1], A1[0]];
+  return Math.min(page[0] / w, page[1] / h);
+}
+/* An OLE object (a pasted logo, a picture) carries a picture of itself for
+   display. In the drawings seen so far it is a Windows DIB — a bitmap without
+   its file header — inside the OLE stream; it is found by its header, given a
+   BMP file header, and turned into a PNG the SVG and the PDF can both use. */
+function hexBytes(hex) {
+  const n = hex.length >> 1, u = new Uint8Array(n);
+  for (let i = 0; i < n; i++) u[i] = parseInt(hex.substr(i * 2, 2), 16);
+  return u;
+}
+function dibToBmp(u, maxOffset = Infinity) {
+  const dv = new DataView(u.buffer, u.byteOffset, u.byteLength);
+  for (let o = 0; o + 40 < u.length && o <= maxOffset; o++) {
+    if (u[o] !== 40 || u[o + 1] || u[o + 2] || u[o + 3]) continue;
+    const w = dv.getInt32(o + 4, true), h = dv.getInt32(o + 8, true), planes = dv.getUint16(o + 12, true), bpp = dv.getUint16(o + 14, true), comp = dv.getUint32(o + 16, true);
+    if (planes !== 1 || ![1, 4, 8, 16, 24, 32].includes(bpp) || !(comp === 0 || comp === 3) || w < 1 || w > 12000 || !h || Math.abs(h) > 12000) continue;
+    const used = dv.getUint32(o + 32, true), pal = (used || (bpp <= 8 ? 1 << bpp : 0)) * 4, masks = comp === 3 ? 12 : 0;
+    const pix = Math.floor((bpp * w + 31) / 32) * 4 * Math.abs(h), total = 40 + masks + pal + pix;
+    if (o + total > u.length) continue;
+    const f = new Uint8Array(14 + total), fv = new DataView(f.buffer);
+    f[0] = 0x42; f[1] = 0x4d; fv.setUint32(2, 14 + total, true); fv.setUint32(10, 14 + 40 + masks + pal, true);
+    f.set(u.subarray(o, o + total), 14);
+    return f;
+  }
+  return null;
+}
+/* The OLE data is a Compound File (the container of .doc/.xls), and its
+   streams are stored in 512-byte sectors chained through a table — a picture
+   cannot be cut out of it in one piece. This reads the streams back whole. */
+function readCfb(u, base) {
+  const dv = new DataView(u.buffer, u.byteOffset, u.byteLength);
+  const u32 = o => dv.getUint32(base + o, true), u16 = o => dv.getUint16(base + o, true);
+  const ssz = 1 << u16(0x1e), msz = 1 << u16(0x20), cutoff = u32(0x38);
+  const sec = n => base + (n + 1) * ssz;
+  const END = 0xfffffffe;
+  const difat = [];
+  for (let i = 0; i < 109; i++) { const s = u32(0x4c + i * 4); if (s < END) difat.push(s); }
+  let dif = u32(0x44), ndif = u32(0x48);
+  while (ndif-- > 0 && dif < END) { for (let i = 0; i < ssz / 4 - 1; i++) { const s = dv.getUint32(sec(dif) + i * 4, true); if (s < END) difat.push(s); } dif = dv.getUint32(sec(dif) + ssz - 4, true); }
+  const fat = [];
+  for (const s of difat) for (let i = 0; i < ssz / 4; i++) fat.push(dv.getUint32(sec(s) + i * 4, true));
+  const chain = (start, max = 1e6) => { const out = []; for (let s = start; s < END && out.length < max; s = fat[s]) out.push(s); return out; };
+  const readChain = (start, size) => { const out = new Uint8Array(size); let k = 0; for (const s of chain(start)) { const n = Math.min(ssz, size - k); if (n <= 0) break; out.set(u.subarray(sec(s), sec(s) + n), k); k += n; } return out; };
+  const dirBytes = []; for (const s of chain(u32(0x30))) dirBytes.push(u.subarray(sec(s), sec(s) + ssz));
+  const entries = [];
+  for (const blk of dirBytes) for (let o = 0; o + 128 <= blk.length; o += 128) {
+    const e = new DataView(blk.buffer, blk.byteOffset + o, 128);
+    const nlen = e.getUint16(64, true); if (!nlen) continue;
+    let name = ""; for (let i = 0; i < nlen / 2 - 1; i++) name += String.fromCharCode(e.getUint16(i * 2, true));
+    entries.push({ name, type: e.getUint8(66), start: e.getUint32(116, true), size: e.getUint32(120, true) });
+  }
+  const root = entries.find(e => e.type === 5);
+  const mini = root ? readChain(root.start, root.size) : new Uint8Array(0);
+  const minifat = []; for (const s of chain(u32(0x3c))) for (let i = 0; i < ssz / 4; i++) minifat.push(dv.getUint32(sec(s) + i * 4, true));
+  const readMini = (start, size) => { const out = new Uint8Array(size); let k = 0; for (let s = start; s < END && k < size; s = minifat[s]) { const n = Math.min(msz, size - k); out.set(mini.subarray(s * msz, s * msz + n), k); k += n; } return out; };
+  const streams = new Map();
+  for (const e of entries) if (e.type === 2) streams.set(e.name, e.size < cutoff ? readMini(e.start, e.size) : readChain(e.start, e.size));
+  return streams;
+}
+let metaLibs = null;
+async function metafileLibs() {
+  if (!metaLibs) metaLibs = (async () => {
+    if (!window.EMFJS) await script("https://cdn.jsdelivr.net/npm/rtf.js@3.0.9/dist/EMFJS.bundle.min.js");
+    if (!window.WMFJS) await script("https://cdn.jsdelivr.net/npm/rtf.js@3.0.9/dist/WMFJS.bundle.min.js");
+  })().catch(e => { metaLibs = null; throw e; });
+  return metaLibs;
+}
+async function svgElToPng(el, w, h) {
+  const s = new XMLSerializer().serializeToString(el);
+  const im = new Image(); im.src = URL.createObjectURL(new Blob([s], { type: "image/svg+xml" })); await im.decode();
+  const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+  const x = cv.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, w, h); x.drawImage(im, 0, 0, w, h);
+  URL.revokeObjectURL(im.src);
+  return cv.toDataURL("image/png");
+}
+/* Office writes its picture as a WMF that carries the full EMF cut into
+   ~8 KB pieces inside comment records (META_ESCAPE / MFCOMMENT, "WMFC").
+   The pieces are put back together; the EMF is the better picture. */
+function emfFromWmf(p) {
+  const dv = new DataView(p.buffer, p.byteOffset, p.byteLength);
+  for (let h = 0; h + 18 <= p.length && h < 512; h++) {
+    const t = dv.getUint16(h, true);
+    if (!((t === 1 || t === 2) && dv.getUint16(h + 2, true) === 9 && (dv.getUint16(h + 4, true) === 0x300 || dv.getUint16(h + 4, true) === 0x100))) continue;
+    const parts = []; let total = 0, o = h + 18;
+    while (o + 6 <= p.length) {
+      const words = dv.getUint32(o, true), fn = dv.getUint16(o + 4, true);
+      if (words < 3 || fn === 0) break;
+      if (fn === 0x0626 && dv.getUint16(o + 6, true) === 0x000f) {
+        const d = o + 10;
+        if (dv.getUint32(d, true) === 0x43464d57 && dv.getUint32(d + 4, true) === 1) {
+          const cur = dv.getUint32(d + 22, true); total = dv.getUint32(d + 30, true);
+          parts.push(p.subarray(d + 34, d + 34 + cur));
+        }
+      }
+      o += words * 2;
+    }
+    if (parts.length && total) {
+      const emf = new Uint8Array(total); let k = 0;
+      for (const q of parts) { emf.set(q.subarray(0, Math.min(q.length, total - k)), k); k += q.length; if (k >= total) break; }
+      if (k >= total) return emf;
+    }
+    return null;
+  }
+  return null;
+}
+/* an EMF (Excel and Word objects paste as one), a WMF, or a DIB → PNG */
+/* A pasted logo can be a 4 MB bitmap for a few centimetres of paper. It is
+   brought down to 1400 px on its long side — 300 dpi up to 12 cm — and, being
+   a bitmap without transparency, stored as JPEG (quality 0.9). */
+async function bitmapUrl(bmp) {
+  const bm = await createImageBitmap(new Blob([bmp], { type: "image/bmp" }));
+  const k = Math.min(1, 1400 / Math.max(bm.width, bm.height));
+  const cv = document.createElement("canvas"); cv.width = Math.max(1, Math.round(bm.width * k)); cv.height = Math.max(1, Math.round(bm.height * k));
+  const x = cv.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, cv.width, cv.height); x.imageSmoothingQuality = "high"; x.drawImage(bm, 0, 0, cv.width, cv.height);
+  return cv.toDataURL("image/jpeg", 0.9);
+}
+async function presentationPng(p) {
+  // a bitmap presentation: the DIB right after the presentation header
+  const early = dibToBmp(p, 64);
+  if (early) return bitmapUrl(early);
+  /* A WMF is drawn by WMFJS (rtf.js, MIT). The EMF Office hides inside it is
+     not used: EMFJS draws Excel's EMF with none of its text (world
+     transforms), while the WMF gives the text. Cell fills and grid lines that
+     Excel writes as pattern blits (META_DIBBITBLT) are not drawn by WMFJS. */
+  {
+    const dv = new DataView(p.buffer, p.byteOffset, p.byteLength);
+    for (let h = 0; h + 18 <= p.length && h < 512; h++) {
+      const t = dv.getUint16(h, true);
+      if (!((t === 1 || t === 2) && dv.getUint16(h + 2, true) === 9 && (dv.getUint16(h + 4, true) === 0x300 || dv.getUint16(h + 4, true) === 0x100))) continue;
+      let ex = 0, ey = 0, o = h + 18;
+      while (o + 6 <= p.length) { const words = dv.getUint32(o, true), fn = dv.getUint16(o + 4, true); if (words < 3 || fn === 0) break; if (fn === 0x020c) { ey = Math.abs(dv.getInt16(o + 6, true)); ex = Math.abs(dv.getInt16(o + 8, true)); break; } o += words * 2; }
+      if (!(ex > 0 && ey > 0)) break;
+      await metafileLibs();
+      const k = Math.min(4, 2400 / Math.max(ex, ey)), W = Math.round(ex * k), H = Math.round(ey * k);
+      const el = new window.WMFJS.Renderer(p.slice(h).buffer).render({ width: W + "px", height: H + "px", xExt: ex, yExt: ey, mapMode: 8 });
+      return svgElToPng(el, W, H);
+    }
+  }
+  const inner = emfFromWmf(p);
+  if (inner) p = inner;
+  const dv = new DataView(p.buffer, p.byteOffset, p.byteLength);
+  for (let i = 40; i + 4 <= p.length; i++) {                       // EMF: " EMF" at offset 40 of its header
+    if (p[i] === 0x20 && p[i + 1] === 0x45 && p[i + 2] === 0x4d && p[i + 3] === 0x46 && dv.getUint32(i - 40, true) === 1) {
+      const st = i - 40, n = Math.min(dv.getUint32(st + 48, true), p.length - st);
+      const b = [dv.getInt32(st + 8, true), dv.getInt32(st + 12, true), dv.getInt32(st + 16, true), dv.getInt32(st + 20, true)];
+      const w = Math.max(1, b[2] - b[0]), h = Math.max(1, b[3] - b[1]), k = Math.min(4, 2400 / Math.max(w, h));
+      await metafileLibs();
+      const el = new window.EMFJS.Renderer(p.slice(st, st + n).buffer).render({ width: Math.round(w * k) + "px", height: Math.round(h * k) + "px", wExt: w, hExt: h, xExt: w, yExt: h, mapMode: 8 });
+      return svgElToPng(el, Math.round(w * k), Math.round(h * k));
+    }
+  }
+  const bmp = dibToBmp(p);
+  if (bmp) return bitmapUrl(bmp);
+  for (let i = 0; i + 18 <= p.length; i++) {                       // WMF: placeable key, or a standard header
+    const place = dv.getUint32(i, true) === 0x9ac6cdd7;
+    const std = !place && (dv.getUint16(i, true) === 1 || dv.getUint16(i, true) === 2) && dv.getUint16(i + 2, true) === 9 && (dv.getUint16(i + 4, true) === 0x300 || dv.getUint16(i + 4, true) === 0x100);
+    if (!place && !std) continue;
+    await metafileLibs();
+    const w = 1600, h = 1200;
+    const el = new window.WMFJS.Renderer(p.slice(i).buffer).render({ width: w + "px", height: h + "px", xExt: w, yExt: h, mapMode: 8 });
+    return svgElToPng(el, w, h);
+  }
+  return null;
+}
+async function decodeOle(db) {
+  const jobs = [];
+  for (const r of blockRecords(db)) for (const e of (r.entities || [])) {
+    if (e.type !== "OLE2FRAME" || !e.binaryData || e._png !== undefined) continue;
+    e._png = null;
+    jobs.push((async () => {
+      try {
+        const u = hexBytes(e.binaryData);
+        let at = -1;
+        for (let i = 0; i + 8 < u.length && i < 4096; i++) if (u[i] === 0xd0 && u[i + 1] === 0xcf && u[i + 2] === 0x11 && u[i + 3] === 0xe0 && u[i + 4] === 0xa1 && u[i + 5] === 0xb1) { at = i; break; }
+        if (at >= 0) {
+          const streams = readCfb(u, at);
+          const pres = [...streams.keys()].filter(n => /OlePres/i.test(n)).sort();
+          for (const n of pres) { e._png = await presentationPng(streams.get(n)); if (e._png) return; }
+        }
+        e._png = await presentationPng(u);                             // no compound file: the raw data
+      } catch (err) { console.warn("OLE picture:", err); }
+    })());
+  }
+  await Promise.all(jobs);
+}
+
+/* The page a layout plots on. Where its limits are a standard sheet (A4 …
+   A0, ANSI A … E) AutoCAD's plot puts the layout origin at the corner of the
+   paper: the limits start a few millimetres below zero only to show the
+   device's margins (C107: limits −4.2…292.8 × −6.0…204.0 = A4, plotted on
+   0…297 × 0…210). Other limits are the page themselves. */
+const SHEETS = [[1189, 841], [841, 594], [594, 420], [420, 297], [297, 210], [279.4, 215.9], [431.8, 279.4], [558.8, 431.8], [863.6, 558.8], [1117.6, 863.6]];
+function paperFrame(ext) {
+  if (!ext) return ext;
+  const w = ext.maxX - ext.minX, h = ext.maxY - ext.minY, u = sheetUnitMm(ext);
+  for (const [a, b] of SHEETS) for (const [W, H] of [[a, b], [b, a]]) {
+    if (Math.abs(w * u - W) < 1.5 && Math.abs(h * u - H) < 1.5 && ext.minX <= 0 && ext.minY <= 0 && ext.minX * u > -30 && ext.minY * u > -30)
+      return { minX: 0, minY: 0, maxX: W / u, maxY: H / u };
+  }
+  return ext;
+}
+
+function parseRendered(db) {
+  const R = makeRenderer(db);
+  const blocks = blockRecords(db);
+  const model = blocks.find(isModel), papers = blocks.filter(isPaper);
+  const byHandle = new Map(layoutObjects(db).map(l => [String(l.handle), l]));
+  const visible = layerFilter(db);
+  const layouts = [];
+  const modelEnts = (model?.entities || []).filter(e => !ENTITY_SKIP.has(e.type));
+  const drawable = modelEnts.filter(visible);
+  if (model) {
+    const n = drawable.length;
+    let ext = n ? extentsFor(drawable, db.header) : null;
+    const k = ext ? fitA1(ext) : 1;
+    const r = R.render(modelEnts, { s: k, ltK: 1, idp: "m" });
+    let svg = assemble(r.defs, r.body, ext);
+    if (n) { ext = intersect(ext, drawnBox(svg)); svg = assemble(r.defs, r.body, ext); }
+    layouts.push({ id: "model", name: "Model", isModel: true, selected: false, empty: n === 0, entityCount: n, skippedTables: 0,
+                   recordName: model.name, svg, previewUrl: svgUrl(svg), paper: "Model Space", ext, unitMm: k, ...meta(svg) });
+  }
+  const ordered = papers.map(br => ({ br, lo: byHandle.get(String(br.layout)) })).sort((a, b) => (a.lo?.tabOrder ?? 999) - (b.lo?.tabOrder ?? 999));
+  ordered.forEach(({ br, lo }, i) => {
+    const vps = modelViewports(db, br, lo);
+    const own = (br.entities || []).filter(e => !ENTITY_SKIP.has(e.type));
+    const n = own.filter(visible).length + (drawable.length ? vps.length : 0);
+    const ext = n ? paperFrame(sheetExtents(lo, own, vps)) : null;
+    const u = sheetUnitMm(ext);
+    let defs = "", body = "";
+    // the model through each viewport, under the sheet's own drawing; only
+    // what the viewport's window can show is drawn (a sheet of seven
+    // viewports on one model used to carry the whole model seven times)
+    vps.forEach((v, j) => {
+      const s = v.height / v.viewHeight;
+      const cx = v.viewportCenter.x, cy = v.viewportCenter.y, w = v.width, h = v.height;
+      const mx = (v.targetPoint?.x || 0) + (v.displayCenter?.x || 0), my = (v.targetPoint?.y || 0) + (v.displayCenter?.y || 0);
+      const tw = v.viewTwistAngle || 0, hw = w / 2 / s, hh = h / 2 / s;
+      const ax = Math.abs(Math.cos(tw)) * hw + Math.abs(Math.sin(tw)) * hh, ay = Math.abs(Math.sin(tw)) * hw + Math.abs(Math.cos(tw)) * hh;
+      const r = R.render(modelEnts, { s: u * s, ltK: R.PSLTSCALE ? 1 / s : 1, idp: "v" + j + "_", window: [mx - ax * 1.02, my - ay * 1.02, mx + ax * 1.02, my + ay * 1.02] });
+      const deg = tw * 180 / Math.PI, id = "vpc" + j;
+      defs += r.defs + '<clipPath id="' + id + '" clipPathUnits="userSpaceOnUse"><rect x="' + num(cx - w / 2) + '" y="' + num(cy - h / 2) + '" width="' + num(w) + '" height="' + num(h) + '"/></clipPath>';
+      body += '<g clip-path="url(#' + id + ')"><g transform="translate(' + num(cx) + "," + num(cy) + ") scale(" + num(s) + ")" + (deg ? " rotate(" + num(deg) + ")" : "") +
+              " translate(" + num(-mx) + "," + num(-my) + ')">' + r.body + "</g></g>";
+    });
+    const p = R.render(own, { s: u, ltK: 1, idp: "p" });
+    defs += p.defs; body += p.body;
+    const svg = assemble(defs, body, ext);
+    layouts.push({ id: "layout-" + i, name: lo?.layoutName || lo?.name || ("Layout " + (i + 1)), isModel: false,
+                   selected: n > 0, empty: n === 0, entityCount: n, viewports: vps.length, skippedTables: 0,
+                   recordName: br.name, svg, previewUrl: svgUrl(svg), paper: "Paper Space", ext, unitMm: u, ...meta(svg) });
+  });
+  const paperWithContent = layouts.filter(l => !l.isModel && !l.empty).length;
+  const modelOnly = !!model && paperWithContent === 0 && !layouts[0]?.empty;
+  if (modelOnly) layouts[0].selected = true;
+  return { layouts, modelOnly, renderer: "r2" };
+}
+
 export async function parseDwg(file) {
   const lib = await freshEngine();
   const ptr = lib.dwg_read_data(await file.arrayBuffer(), Dwg_File_Type.DWG);
   if (!ptr) throw new Error("LibreDWG could not open this DWG.");
   let db;
   try { db = lib.convert(ptr); } finally { try { lib.dwg_free(ptr); } catch {} }
+  if (!blockRecords(db).some(b => isModel(b) || isPaper(b))) {
+    const tables = Object.keys(db?.tables || {}).join(", ") || "none";
+    throw new Error("No Model/Paper Space block records in this DWG (tables found: " + tables + ").");
+  }
+  await ensureFonts(db);
+  await decodeOle(db);
+  try { return parseRendered(db); }
+  catch (err) { console.warn("studio renderer failed, falling back to LibreDWG's SVG:", err); return parseLegacy(lib, db); }
+}
+
+/* LibreDWG's own SVG writer, kept as the fallback */
+function parseLegacy(lib, db) {
 
   const blocks = blockRecords(db);
   const model = blocks.find(isModel);
@@ -596,11 +942,46 @@ function printGeometry(layout) {
     return { e, pageW: page[0], pageH: page[1], unitMm: k, fitted: true };
   }
   const unitMm = Math.max(w, h) < 60 ? 25.4 : 1;
-  return { e, pageW: w * unitMm, pageH: h * unitMm, unitMm, fitted: false };
+  /* limits a little off a standard sheet (FEWA: 878 × 620 for an A1) are
+     fitted onto that sheet, as AutoCAD plotted them (scale 0.958) */
+  const W = w * unitMm, H = h * unitMm;
+  for (const [a, b] of SHEETS) { const [sw, sh] = W >= H ? [a, b] : [b, a]; const k = Math.min(sw / W, sh / H);
+    if (k < 0.999 && k > 0.88 && Math.abs(W / H - sw / sh) < 0.03) return { e, pageW: sw, pageH: sh, unitMm, fitted: true }; }
+  return { e, pageW: W, pageH: H, unitMm, fitted: false };
+}
+/* <use> of a block definition → the definition itself, in place */
+function inlineUses(svg) {
+  const defs = new Map();
+  for (const m of svg.matchAll(/<g id="([^"]+)">/g)) {
+    const start = m.index, open = start + m[0].length;
+    let depth = 1, i = open; const re = /<(\/?)g\b[^>]*?(\/?)>/g; re.lastIndex = open; let t;
+    while (depth && (t = re.exec(svg))) { if (t[2] === "/") continue; depth += t[1] ? -1 : 1; i = re.lastIndex; }
+    defs.set(m[1], svg.slice(open, i - 4));
+  }
+  const expand = (s, depth) => depth > 20 ? s : s.replace(/<use href="#([^"]+)"(?: transform="([^"]*)")?\/>/g, (m, id, tr) => {
+    const body = defs.get(id); if (body == null) return m;
+    return "<g" + (tr ? ' transform="' + tr + '"' : "") + ">" + expand(body, depth + 1) + "</g>";
+  });
+  const a = svg.indexOf("</defs>");
+  return svg.slice(0, a) + expand(svg.slice(a), 0);
 }
 export function printSvg(layout) {
   const g = printGeometry(layout), lw = PRINT_LW / g.unitMm; // in drawing units
   let s = layout.svg;
+  if (/<svg\b[^>]*data-ds="r2"/.test(s)) {
+    // the studio renderer writes plotted widths already; only the screen style goes
+    s = s.replace(/<style id="ds-screen">[\s\S]*?<\/style>/, "");
+    /* blocks are placed in the PDF as drawings in place, not as <use>: svg2pdf
+       turns a <use> into a PDF form whose box it computes from the untransformed
+       content, and a block turned inside another (C107's north arrow, 236°)
+       got a box of zero size and was clipped away entirely. Same file size. */
+    s = inlineUses(s);
+    const e = g.e, vb = [e.minX, -e.maxY, e.maxX - e.minX, e.maxY - e.minY].map(v => +v.toFixed(4)).join(" ");
+    s = s.replace(/<svg\b[^>]*>/, tag => tag
+      .replace(/\s(width|height|viewBox)\s*=\s*("[^"]*"|'[^']*')/g, "")
+      .replace(/^<svg\b/, '<svg width="' + num(g.pageW) + 'mm" height="' + num(g.pageH) + 'mm" viewBox="' + vb + '"'));
+    return { svg: s, pageW: g.pageW, pageH: g.pageH };
+  }
   // one line width for everything, set on the root; viewports get theirs
   s = s.replace(/\sstroke-width="0\.1%"/g, "");
   s = s.replace(/<g data-ds-scale="([^"]+)"/g, (m, k) => '<g stroke-width="' + num(lw / (+k || 1)) + '"');
@@ -625,21 +1006,52 @@ async function vectorLibs() {
   })().catch(e => { pdfLibs = null; throw e; });
   return pdfLibs;
 }
-/* One sheet → the bytes of a one-page vector PDF, for pdf-lib to copy in. */
-export async function sheetPdf(layout) {
+function b64(buf) {
+  const u = new Uint8Array(buf); let s = "";
+  for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+/* Every bundled face the sheets use goes into the PDF once, under the family
+   name the SVG carries, so svg2pdf sets the text in it. */
+async function embedFonts(doc, svgs) {
+  const used = new Set();
+  for (const s of svgs) for (const m of s.matchAll(/font-family="(ds[a-z]+)/g)) used.add(m[1]);
+  used.add("dssans");
+  const styles = [["normal", false, false], ["bold", true, false], ["italic", false, true], ["bolditalic", true, true]];
+  for (const fam of used) {
+    const added = new Set();
+    for (const [style, bold, italic] of styles) {
+      const file = fontFile(fam, bold, italic);
+      if (!added.has(file)) { doc.addFileToVFS(file, b64(await bytesOf(file))); added.add(file); }
+      doc.addFont(file, fam, style);
+    }
+  }
+}
+/* Sheets → one vector PDF, a page per sheet in the order given. One jsPDF
+   document for all of them, so each font is embedded once, not once a page. */
+export async function sheetsPdf(layouts) {
   const { jsPDF } = await vectorLibs();
-  const p = printSvg(layout);
-  const doc = new jsPDF({ unit: "mm", format: [p.pageW, p.pageH], orientation: p.pageW >= p.pageH ? "landscape" : "portrait", compress: true });
-  const el = new DOMParser().parseFromString(p.svg, "image/svg+xml").documentElement;
-  if (el.nodeName !== "svg") throw new Error("sheet SVG is not well-formed");
-  // svg2pdf measures text and resolves <use> against a live tree
+  const prints = layouts.map(printSvg);
+  const first = prints[0];
+  const doc = new jsPDF({ unit: "mm", format: [first.pageW, first.pageH], orientation: first.pageW >= first.pageH ? "landscape" : "portrait", compress: true });
+  await embedFonts(doc, prints.map(p => p.svg));
   const host = document.createElement("div");
   host.style.cssText = "position:absolute;left:-100000px;top:0;width:10px;height:10px;overflow:hidden;visibility:hidden";
-  host.appendChild(document.importNode(el, true)); document.body.appendChild(host);
-  try { await doc.svg(host.firstElementChild, { x: 0, y: 0, width: p.pageW, height: p.pageH }); }
-  finally { host.remove(); }
+  document.body.appendChild(host);
+  try {
+    for (let i = 0; i < prints.length; i++) {
+      const p = prints[i];
+      if (i) doc.addPage([p.pageW, p.pageH], p.pageW >= p.pageH ? "landscape" : "portrait");
+      const el = new DOMParser().parseFromString(p.svg, "image/svg+xml").documentElement;
+      if (el.nodeName !== "svg") throw new Error("sheet SVG is not well-formed");
+      // svg2pdf measures text and resolves <use> against a live tree
+      host.replaceChildren(document.importNode(el, true));
+      await doc.svg(host.firstElementChild, { x: 0, y: 0, width: p.pageW, height: p.pageH });
+    }
+  } finally { host.remove(); }
   return doc.output("arraybuffer");
 }
+export async function sheetPdf(layout) { return sheetsPdf([layout]); }
 
 /* Raster of one sheet for the PDF. The long side is fixed at 4000 px (about
    240 dpi on an A3 sheet) and the short side follows the aspect ratio. The
@@ -661,3 +1073,4 @@ export async function svgToPng(svg, longSide = 4000) {
     img.src = svgUrl(svg);
   });
 }
+
