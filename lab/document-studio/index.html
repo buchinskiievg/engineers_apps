@@ -253,15 +253,15 @@
   .pg-card { position:relative; border:1px solid var(--line); background:var(--panel-2); min-width:0; cursor:grab; touch-action:none; }
   .pg-card:hover { border-color:var(--ink); }
   .pg-card.mine .pg-no { background:var(--bg-soft, #E4E0D6); }
-  .pg-card.active { outline:2px solid var(--red); outline-offset:1px; }
-  .pg-card.selected { box-shadow:inset 0 0 0 2px var(--red); }
+  .pg-card.active { outline:3px solid var(--red); outline-offset:0; }
+  .pg-card.selected { box-shadow:inset 0 0 0 3px var(--red); }
   .pg-card.out { cursor:pointer; }
   .pg-card.out .pg-img { opacity:.45; }
   .pg-img { aspect-ratio:1/1.414; background:#fff; display:flex; align-items:center; justify-content:center; overflow:hidden; }
   .pg-card.landscape .pg-img { aspect-ratio:1.414/1; }
   .pg-img img { width:100%; height:100%; object-fit:contain; display:block; pointer-events:none; }
   .pg-wait { font-size:10px; color:var(--muted); }
-  .pg-no { height:15px; line-height:15px; text-align:center; font:700 9.5px var(--mono); color:var(--ink); border-top:1px solid var(--line); }
+  .pg-no { height:12px; line-height:12px; overflow:hidden; white-space:nowrap; text-align:center; font:700 8px/12px var(--mono); color:var(--ink); border-top:1px solid var(--line); }
   .pg-card.out .pg-no { color:var(--muted); font-weight:400; }
   .pg-acts { position:absolute; top:3px; right:3px; display:flex; gap:2px; opacity:0; transition:opacity .12s; }
   .pg-card:hover .pg-acts, .pg-card.selected .pg-acts, .pg-card.out .pg-acts { opacity:1; }
@@ -337,7 +337,6 @@
   <div class="workspace-v2">
     <aside class="pane tree-pane">
       <div class="section-head"><b>/ FILES &amp; PAGES</b><span id="docCount" class="count">0 FILES</span></div>
-      <div class="pg-hint"><b>+</b> opens a file's pages: drag to reorder, ↻ rotate, ✕ remove, + put back; Ctrl/Shift-click selects several, Del / R act on them.<br>Drag a file onto another to <b>merge</b> them into a new document, onto its top or bottom edge to reorder. <b>⤓ PDF</b> downloads a document.</div>
       <div id="tree" class="pane-body tree">
         <div class="thumb-empty">Drop files above to start.</div>
       </div>
@@ -416,7 +415,7 @@ window.DOC_STUDIO_CONFIG = {
 </script>
 <script type="module">
 import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs";
-import { parseDwg, svgToPng } from "./libredwg-engine.js?v=wasm10";
+import { parseDwg, svgToPng, sheetPdf } from "./libredwg-engine.js?v=vec1";
 pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs";
 
 const $ = s => document.querySelector(s);
@@ -985,14 +984,11 @@ async function exportPdf(d, btn){
         const w=im.width*.75,h=im.height*.75,pg=out.addPage([w,h]);pg.drawImage(im,{x:0,y:0,width:w,height:h});
         if(p.rotation)pg.setRotation(degrees(p.rotation));
       }else if(p.sourceType==="dwg-svg"&&p.svg){
-        const o=p.orig||p; if(!o.pngDataUrl)o.pngDataUrl=await svgToPng(o.svg);
-        const png=await fetch(o.pngDataUrl).then(r=>r.arrayBuffer());
-        const im=await out.embedPng(png);
-        const landscape=(p.layout?.orientation||"landscape")==="landscape";
-        const mm=landscape?[841,594]:[594,841];
-        const pg=out.addPage(mm.map(x=>x*72/25.4));
-        const f=im.scaleToFit(pg.getWidth(),pg.getHeight());
-        pg.drawImage(im,{x:(pg.getWidth()-f.width)/2,y:(pg.getHeight()-f.height)/2,width:f.width,height:f.height});
+        // a vector page of the sheet's own size (see sheetPdf in the engine),
+        // made once per sheet and shared with merged documents
+        const o=p.orig||p; if(!o.vectorPdf)o.vectorPdf=await sheetPdf(o.layout);
+        const one=await PDFDocument.load(o.vectorPdf.slice(0));
+        const [pg]=await out.copyPages(one,[0]); out.addPage(pg);
         if(p.rotation)pg.setRotation(degrees(p.rotation));
       }
       if(btn) btn.textContent=Math.round((i+1)/d.pages.length*100)+"%";
