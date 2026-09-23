@@ -73,12 +73,26 @@ const rgbHex = n => "#" + (n & 0xffffff).toString(16).padStart(6, "0");
 const SERIF = /^(times|timesbd|timesi|timesbi|bookos|bookosb|bookosi|cambria|cambriab|georgia|garamond|bell|belmt|constan|pala|palab)/;
 const MONO = /^(cour|courbd|consola|lucon|monotxt|simplex_mono)/;
 const NARROW = /^(arialn|arialnb|arialni|arialnbi|swissck|isocpeur|isocteur|gost)/;
-export const FAMILIES = ["dssans", "dsserif", "dsmono", "dscad"];
+export const FAMILIES = ["dssans", "dsserif", "dsmono", "dscad", "dsgothic"];
+/* The stand-in keeps the original's line length: its width relative to the
+   family it is set in (Arial for sans, Times for serif, Courier for mono),
+   measured on Windows' own fonts over a mixed engineering string. */
+const WIDTH = [
+  [/^(tahoma)/, 0.966], [/^(verdana)/, 1.106], [/^(trebuc)/, 0.953], [/^(calibri)/, 0.878], [/^(segoe|segui)/, 0.959],
+  [/^(framd|franklingothic)/, 0.927], [/^(gil|gillsans)/, 0.915], [/^(lsans|lucidasans)/, 1.06],
+  [/^(candara)/, 0.91], [/^(corbel)/, 0.911], [/^(arialn|arialnarrow|swissck)/, 0.82],
+  [/^(bookos|bookman)/, 1.16], [/^(bell)/, 1.024], [/^(century|cent)/, 1.116], [/^(georgia)/, 1.07], [/^(gara|garamond)/, 0.972], [/^(pala|palatino)/, 1.057],
+  [/^(consola)/, 0.916]
+];
 function classify(name, bold, italic, forceShx) {
   const n = name.toLowerCase().replace(/\s+/g, "");
-  const shx = forceShx;
-  const fam = shx ? "dscad" : SERIF.test(n) || /times|roman|bookman|georgia|garamond|bell|cambria/.test(n) ? "dsserif" : MONO.test(n) || /courier|consol|mono/.test(n) ? "dsmono" : "dssans";
-  return { family: fam, weight: bold && !shx ? 700 : 400, italic: italic && !shx ? 1 : 0, wfK: NARROW.test(n) ? 0.82 : 1, shx };
+  // ISOCPEUR / ISOCTEUR are the TrueType cuts of the ISO lettering: set as it
+  const shx = forceShx || /^(isocpeur|isocteur|isocp|isoct|isocpeui)/.test(n);
+  const gothic = !shx && /^(gothic|centurygothic|avantgarde|avantgard|itcavantgarde|urwgothic)/.test(n);
+  const fam = shx ? "dscad" : gothic ? "dsgothic" : SERIF.test(n) || /times|roman|bookman|georgia|garamond|bell|cambria|century(?!gothic)/.test(n) ? "dsserif" : MONO.test(n) || /courier|consol|mono/.test(n) ? "dsmono" : "dssans";
+  let wfK = 1;
+  if (!shx) for (const [re, k] of WIDTH) if (re.test(n)) { wfK = k; break; }
+  return { family: fam, weight: bold && !shx ? 700 : 400, italic: italic && !shx ? 1 : 0, wfK, shx };
 }
 function fontFromFile(file) {
   const base = String(file || "").split(/[\\/]/).pop().toLowerCase();
@@ -90,7 +104,7 @@ function fontFromFile(file) {
 function fontFromName(name, bold, italic) {        // MTEXT \fArial|b1|i0;
   return classify(String(name || "arial").trim(), !!bold, !!italic, false);
 }
-const FALLBACK = { dssans: "Arial, Helvetica, sans-serif", dsserif: "'Times New Roman', Times, serif", dsmono: "'Courier New', Courier, monospace", dscad: "'Arial Narrow', Arial, sans-serif" };
+const FALLBACK = { dssans: "Arial, Helvetica, sans-serif", dsserif: "'Times New Roman', Times, serif", dsmono: "'Courier New', Courier, monospace", dscad: "'Arial Narrow', Arial, sans-serif", dsgothic: "'Century Gothic', 'URW Gothic', sans-serif" };
 const familyAttr = f => f.family + ", " + FALLBACK[f.family];
 
 /* number formatting: enough digits for survey coordinates and for 1/1000 mm */
@@ -139,7 +153,9 @@ function parseMText(src, base) {
       }
       case "H": { flush(); const a = readArg(); const v = parseFloat(a); if (v > 0) st.h = /x$/i.test(a) ? st.h * v : v; break; }
       case "W": { flush(); const v = parseFloat(readArg()); if (v > 0) st.wf = v; break; }
-      case "C": { flush(); const v = parseInt(readArg(), 10); if (v >= 1 && v <= 255) st.color = v === 7 ? "#000000" : ACI[v]; else if (v === 256) st.color = base.color; break; }
+      // \C256 is ByLayer and \C0 ByBlock — the layer's / the block's colour, not
+      // the entity's (Senan: red MTEXT whose text is \C256 on layer 0, black)
+      case "C": { flush(); const v = parseInt(readArg(), 10); if (v >= 1 && v <= 255) st.color = v === 7 ? "#000000" : ACI[v]; else if (v === 256) st.color = base.byLayer || base.color; else if (v === 0) st.color = base.byBlock || base.color; break; }
       case "c": { flush(); const v = parseInt(readArg(), 10); if (Number.isFinite(v)) st.color = rgbHex(v); break; }
       case "S": { const a = readArg(); buf += a.replace(/[\^#]/g, "/").replace(/\/\s*$/, ""); break; }
       case "p": { const a = readArg(); const q = /q([lcrjd])/.exec(a); if (q) { flush(); st.palign = q[1]; paras[paras.length - 1].palign = q[1]; } break; }
@@ -305,10 +321,10 @@ export function makeRenderer(db) {
     const dot = 0.02 / c.s;                                           // a dot is 0.02 mm on paper
     return seq.map((v, j) => f(j % 2 === 0 && v === 0 ? dot : v)).join(" ");
   }
-  const lwClass = mm => mm <= 0.3 ? "a" : mm <= 0.5 ? "b" : mm <= 0.8 ? "c" : "d";
+  const lwClass = mm => "dsw" + Math.round(mm * 100);
   function strokeAttrs(e, c, fillNone = true) {
     const mm = lwOf(e, c), da = dashOf(e, c);
-    return (fillNone ? ' fill="none"' : "") + ' stroke="' + colorOf(e, c) + '" stroke-width="' + f(mm / c.s) + '" class="w' + lwClass(mm) + '"' +
+    return (fillNone ? ' fill="none"' : "") + ' stroke="' + colorOf(e, c) + '" stroke-width="' + f(mm / c.s) + '" class="' + lwClass(mm) + '"' +
       (da ? ' stroke-dasharray="' + da + '"' : "");
   }
   const mirrored = e => (e.extrusionDirection?.z ?? 1) < 0;
@@ -329,7 +345,7 @@ export function makeRenderer(db) {
   function textSpan(font, color, strokeW) {
     return ' font-family="' + familyAttr(font) + '"' + (font.weight > 400 ? ' font-weight="bold"' : "") +
       (font.italic ? ' font-style="italic"' : "") + ' fill="' + color + '"' +
-      (strokeW > 0 ? ' stroke="' + color + '" stroke-width="' + f(strokeW * 0.85) + '" stroke-linejoin="round" class="wt"' : ' stroke="none"');
+      (strokeW > 0 ? ' stroke="' + color + '" stroke-width="' + f(strokeW * 0.85) + '" stroke-linejoin="round" class="dswt"' : ' stroke="none"');
   }
   function textEl(e, c, t) {                                          // TEXT, ATTRIB, ATTDEF
     const str = decodeText(t.text ?? t);
@@ -359,13 +375,15 @@ export function makeRenderer(db) {
     const h = e.textHeight || st?.fixedTextHeight || 2.5;
     const color = colorOf(e, c), lwmm = lwOf(e, c);
     const baseWf = (st?.widthFactor > 0 ? st.widthFactor : 1) * (font.wfK || 1);
-    const paras = parseMText(e.text, { font, h, wf: baseWf, color });
+    const paras = parseMText(e.text, { font, h, wf: baseWf, color, byLayer: layerColor(layerOf(e, c)), byBlock: c.byColor || "#000000" });
     const width = e.rectWidth > 0 ? e.rectWidth : 0;
     // word wrap across runs
     const lines = [];
     for (const runs of paras) {
       let line = [], lw = 0;
-      const push = () => { line.palign = runs.palign; lines.push(line); line = []; lw = 0; };
+      // trailing spaces do not count for alignment in AutoCAD (Senan "…/ 3 }",
+      // right-attached: the space pushed the line off its drawn radical signs)
+      const push = () => { while (line.length && !line[line.length - 1].t.trim()) line.pop(); line.palign = runs.palign; lines.push(line); line = []; lw = 0; };
       const tokens = [];
       for (const r of runs) for (const part of r.t.split(/(\s+)/)) if (part) tokens.push({ ...r, t: part });
       if (!tokens.length) { const l = []; l.palign = runs.palign; lines.push(l); continue; }
@@ -522,7 +540,7 @@ export function makeRenderer(db) {
     }
     const id = c.idp + "h" + (clipN++);
     defs.push('<clipPath id="' + id + '" clipPathUnits="userSpaceOnUse"><path d="' + d + '" clip-rule="' + rule + '"/></clipPath>');
-    return '<g clip-path="url(#' + id + ')"><path d="' + segs + '" fill="none" stroke="' + color + '" stroke-width="' + f(mm / c.s) + '" class="w' + lwClass(mm) + '"/></g>';
+    return '<g clip-path="url(#' + id + ')"><path d="' + segs + '" fill="none" stroke="' + color + '" stroke-width="' + f(mm / c.s) + '" class="' + lwClass(mm) + '"/></g>';
   }
 
   /* ── polylines with width ── */
@@ -758,9 +776,12 @@ export function makeRenderer(db) {
   };
 }
 
-/* screen-only line weights: on screen a plotted 0.25 mm is a quarter of a
-   pixel at 100 %; this style, dropped for the PDF, draws each weight class at
-   a legible, zoom-independent width instead */
+/* Line weights on screen. A plotted 0.25 mm is a quarter of a pixel on an
+   A1 sheet shown 1000 px wide, so on screen each weight is drawn at its
+   width on paper for the zoom it is seen at — --ds-pxmm, screen pixels per
+   paper millimetre, which the page sets on the sheet — but never under 0.7
+   px. The PDF drops this style and plots the widths as written. */
+const SCREEN_W = [4, 5, 9, 13, 15, 18, 20, 25, 30, 35, 40, 50, 53, 60, 70, 80, 90, 100, 106, 120, 140, 158, 200, 211];
 export const SCREEN_STYLE = '<style id="ds-screen">' +
-  ".wa,.wb,.wc,.wd{vector-effect:non-scaling-stroke}.wa{stroke-width:.9px}.wb{stroke-width:1.5px}.wc{stroke-width:2.2px}.wd{stroke-width:3px}" +
+  SCREEN_W.map(n => ".dsw" + n + "{vector-effect:non-scaling-stroke;stroke-width:max(.7px,calc(var(--ds-pxmm,1.4px)*" + (n / 100) + "))}").join("") +
   "</style>";

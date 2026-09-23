@@ -19,3 +19,10 @@ osifont                                        GNU LGPL v3 with the GPL font exc
        fonts (romans, simplex, isocp, txt, ...). https://github.com/hikikomori82/osifont
        The font exception: embedding the font in a document does not by itself
        make the document subject to the licence.
+
+URW Gothic (Book, Demi, Book Oblique, Demi Oblique)
+       GNU AGPL v3 with the font exception (embedding in PDF/PostScript
+       documents is permitted regardless of the document's licence).
+       (URW)++ / Artifex, from https://github.com/ArtifexSoftware/urw-base35-fonts
+       Metrics of ITC Avant Garde Gothic, which Century Gothic was drawn to
+       match — stands in for Century Gothic (GOTHIC.TTF).

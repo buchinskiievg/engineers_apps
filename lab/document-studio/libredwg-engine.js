@@ -24,7 +24,7 @@
 // turned a 3.8 km route plan into a single pixel.
 
 import { Dwg_File_Type, LibreDwg } from "https://cdn.jsdelivr.net/npm/@mlightcad/libredwg-web@0.7.14/dist/libredwg-web.js";
-import { makeRenderer, SCREEN_STYLE, setShxEm } from "./dwg-render.js?v=r2b";
+import { makeRenderer, SCREEN_STYLE, setShxEm } from "./dwg-render.js?v=r2c";
 
 // The folder this module lives in, without its trailing slash. (The first
 // version had a doubled backslash in this regular expression; the engine read
@@ -514,7 +514,9 @@ const FONT_FILES = {
   dssans: { "400": "Arimo_400Regular.ttf", "700": "Arimo_700Bold.ttf", "400i": "Arimo_400Regular_Italic.ttf", "700i": "Arimo_700Bold_Italic.ttf" },
   dsserif: { "400": "Tinos_400Regular.ttf", "700": "Tinos_700Bold.ttf", "400i": "Tinos_400Regular_Italic.ttf", "700i": "Tinos_700Bold_Italic.ttf" },
   dsmono: { "400": "Cousine_400Regular.ttf", "700": "Cousine_700Bold.ttf" },
-  dscad: { "400": "osifont.ttf" }
+  dscad: { "400": "osifont.ttf" },
+  // metrics of Century Gothic (which was drawn to the metrics of ITC Avant Garde)
+  dsgothic: { "400": "URWGothic-Book.ttf", "700": "URWGothic-Demi.ttf", "400i": "URWGothic-BookOblique.ttf", "700i": "URWGothic-DemiOblique.ttf" }
 };
 function fontFile(fam, bold, italic) {
   const set = FONT_FILES[fam] || FONT_FILES.dssans, w = bold ? "700" : "400";
@@ -542,6 +544,7 @@ function facesNeeded(db) {
   const cls = (name, file) => {
     const n = String(name || file || "").toLowerCase();
     if (/\.shx$/.test(n) || (file && !/\.(ttf|ttc|otf)$/i.test(file))) return "dscad";
+    if (/gothic|avant/.test(n) && !/franklin|framd/.test(n)) return "dsgothic";
     if (/times|roman|bookman|bookos|georgia|garamond|bell|cambria/.test(n)) return "dsserif";
     if (/cour|consol|mono/.test(n)) return "dsmono";
     return "dssans";
@@ -567,12 +570,15 @@ async function ensureFonts(db) {
 
 /* ── the drawing, drawn by dwg-render.js ─────────────────────────────────── */
 const ENTITY_SKIP = new Set(["VIEWPORT"]);
-function assemble(defs, body, ext, extraClass) {
+function assemble(defs, body, ext, unitMm = 1) {
   if (!ext) ext = { minX: 0, minY: 0, maxX: 420, maxY: 297 };
   const w = ext.maxX - ext.minX, h = ext.maxY - ext.minY, pad = 0.02;
   const vb = [ext.minX - w * pad, -(ext.maxY + h * pad), w * (1 + 2 * pad), h * (1 + 2 * pad)];
   const W = 1200, H = Math.max(1, Math.round(W * vb[3] / vb[2]));
-  return '<?xml version="1.0"?>\n<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" data-ds="r2"' +
+  // paper millimetres across the view, for the screen line weights (SCREEN_STYLE)
+  const mmw = vb[2] * unitMm;
+  return '<?xml version="1.0"?>\n<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" data-ds="r2" data-mmw="' + num(mmw) + '"' +
+    ' style="--ds-pxmm:' + num(W / mmw) + 'px"' +
     ' width="' + W + '" height="' + H + '" viewBox="' + vb.map(v => +v.toFixed(4)).join(" ") + '" preserveAspectRatio="xMidYMid meet"' +
     ' font-family="dssans, Arial, Helvetica, sans-serif" stroke-linecap="round" stroke-linejoin="round">' + SCREEN_STYLE +
     "<defs>" + defs + '</defs><g transform="matrix(1,0,0,-1,0,0)">' + body + "</g></svg>";
@@ -797,10 +803,27 @@ function parseRendered(db) {
     let ext = n ? extentsFor(drawable, db.header) : null;
     const k = ext ? fitA1(ext) : 1;
     const r = R.render(modelEnts, { s: k, ltK: 1, idp: "m" });
-    let svg = assemble(r.defs, r.body, ext);
-    if (n) { ext = intersect(ext, drawnBox(svg)); svg = assemble(r.defs, r.body, ext); }
-    layouts.push({ id: "model", name: "Model", isModel: true, selected: false, empty: n === 0, entityCount: n, skippedTables: 0,
-                   recordName: model.name, svg, previewUrl: svgUrl(svg), paper: "Model Space", ext, unitMm: k, ...meta(svg) });
+    let svg = assemble(r.defs, r.body, ext, k);
+    if (n) { ext = intersect(ext, drawnBox(svg)); svg = assemble(r.defs, r.body, ext, k); }
+    const lay = { id: "model", name: "Model", isModel: true, selected: false, empty: n === 0, entityCount: n, skippedTables: 0,
+                  recordName: model.name, svg, previewUrl: svgUrl(svg), paper: "Model Space", ext, unitMm: k, sheet: "A1", ...meta(svg) };
+    /* A drawing kept only in Model Space has no sheet of its own; the user can
+       pick one: a window on the model (two corners, drawing coordinates) and a
+       paper size. The model is drawn again for it — only what the window
+       holds, at the line widths that paper scale needs — and printed on that
+       sheet in the window's orientation. */
+    lay.reframe = (win, sheet = "A1") => {
+      const w = win.maxX - win.minX, h = win.maxY - win.minY;
+      if (!(w > 0 && h > 0)) return false;
+      const [a, b] = SHEET_SIZES[sheet] || SHEET_SIZES.A1, page = w >= h ? [a, b] : [b, a];
+      const kk = Math.min(page[0] / w, page[1] / h);
+      const rr = R.render(modelEnts, { s: kk, ltK: 1, idp: "m", window: [win.minX, win.minY, win.maxX, win.maxY] });
+      const s2 = assemble(rr.defs, rr.body, win, kk);
+      Object.assign(lay, { svg: s2, previewUrl: svgUrl(s2), ext: { ...win }, unitMm: kk, sheet, framed: true, ...meta(s2) });
+      return true;
+    };
+    lay.resetFrame = () => { const r0 = R.render(modelEnts, { s: k, ltK: 1, idp: "m" }); Object.assign(lay, { svg: assemble(r0.defs, r0.body, ext, k), ext, unitMm: k, sheet: "A1", framed: false }); lay.previewUrl = svgUrl(lay.svg); Object.assign(lay, meta(lay.svg)); return true; };
+    layouts.push(lay);
   }
   const ordered = papers.map(br => ({ br, lo: byHandle.get(String(br.layout)) })).sort((a, b) => (a.lo?.tabOrder ?? 999) - (b.lo?.tabOrder ?? 999));
   ordered.forEach(({ br, lo }, i) => {
@@ -827,7 +850,7 @@ function parseRendered(db) {
     });
     const p = R.render(own, { s: u, ltK: 1, idp: "p" });
     defs += p.defs; body += p.body;
-    const svg = assemble(defs, body, ext);
+    const svg = assemble(defs, body, ext, u);
     layouts.push({ id: "layout-" + i, name: lo?.layoutName || lo?.name || ("Layout " + (i + 1)), isModel: false,
                    selected: n > 0, empty: n === 0, entityCount: n, viewports: vps.length, skippedTables: 0,
                    recordName: br.name, svg, previewUrl: svgUrl(svg), paper: "Paper Space", ext, unitMm: u, ...meta(svg) });
@@ -838,12 +861,52 @@ function parseRendered(db) {
   return { layouts, modelOnly, renderer: "r2" };
 }
 
+/* Draw order. AutoCAD draws a space's entities in the order of their handles
+   unless a SORTENTSTABLE (DRAWORDER) gives some of them another sort handle —
+   which is how a white hatch behind a symbol stays behind its lines (Senan:
+   the breaker symbols, whose fills covered their own lines when drawn in file
+   order). libredwg-web does not convert these tables; they are read here from
+   the LibreDWG objects directly, while the drawing is still in memory. */
+function readDrawOrder(lib, ptr) {
+  const out = new Map();                       // block record handle (hex) → Map(entity hex → sort key)
+  try {
+    const n = lib.dwg_get_num_objects(ptr);
+    for (let i = 0; i < n; i++) {
+      const o = lib.dwg_get_object(ptr, i);
+      if (lib.dwg_object_get_fixedtype(o) !== 714) continue;        // DWG_TYPE_SORTENTSTABLE
+      const t = lib.dwg_object_to_object_tio(o);
+      const num = lib.dwg_dynapi_entity_data(t, "num_ents");
+      if (!(num > 0)) continue;
+      const owner = lib.dwg_ref_get_absref(lib.dwg_dynapi_entity_data(t, "block_owner"));
+      const ents = lib.dwg_ptr_to_object_ref_ptr_array(lib.dwg_dynapi_entity_data(t, "ents"), num);
+      const sorts = lib.dwg_ptr_to_object_ref_ptr_array(lib.dwg_dynapi_entity_data(t, "sort_ents"), num);
+      const m = new Map();
+      for (let k = 0; k < num; k++) {
+        const e = lib.dwg_ref_get_absref(ents[k]), s = lib.dwg_ref_get_absref(sorts[k]);
+        if (e != null && s != null) m.set(BigInt(e).toString(16).toUpperCase(), BigInt(s));
+      }
+      if (owner != null) out.set(BigInt(owner).toString(16).toUpperCase(), m);
+    }
+  } catch (err) { console.warn("draw order not read:", err); }
+  return out;
+}
+function applyDrawOrder(db, order) {
+  if (!order.size) return;
+  const key = (m, h) => { const s = String(h || "0"); return m.get(s.toUpperCase()) ?? (/^[0-9a-f]+$/i.test(s) ? BigInt("0x" + s) : 0n); };
+  for (const r of blockRecords(db)) {
+    const m = order.get(String(r.handle).toUpperCase());
+    if (!m || !Array.isArray(r.entities)) continue;
+    r.entities = r.entities.map((e, i) => [e, key(m, e.handle), i]).sort((a, b) => (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : a[2] - b[2])).map(x => x[0]);
+  }
+}
+
 export async function parseDwg(file) {
   const lib = await freshEngine();
   const ptr = lib.dwg_read_data(await file.arrayBuffer(), Dwg_File_Type.DWG);
   if (!ptr) throw new Error("LibreDWG could not open this DWG.");
-  let db;
-  try { db = lib.convert(ptr); } finally { try { lib.dwg_free(ptr); } catch {} }
+  let db, order = new Map();
+  try { db = lib.convert(ptr); order = readDrawOrder(lib, ptr); } finally { try { lib.dwg_free(ptr); } catch {} }
+  applyDrawOrder(db, order);
   if (!blockRecords(db).some(b => isModel(b) || isPaper(b))) {
     const tables = Object.keys(db?.tables || {}).join(", ") || "none";
     throw new Error("No Model/Paper Space block records in this DWG (tables found: " + tables + ").");
@@ -933,11 +996,13 @@ function parseLegacy(lib, db) {
    Space, which has no paper, is fitted onto A1 in its own orientation. */
 const PRINT_LW = 0.18;                       // mm on paper
 const A1 = [841, 594];
+const SHEET_SIZES = { A0: [1189, 841], A1: [841, 594], A2: [594, 420], A3: [420, 297], A4: [297, 210] };
 function printGeometry(layout) {
   const e = layout.ext || { minX: 0, minY: 0, maxX: 420, maxY: 297 };
   const w = e.maxX - e.minX, h = e.maxY - e.minY;
   if (layout.isModel) {
-    const land = w >= h, page = land ? A1 : [A1[1], A1[0]];
+    const sz = SHEET_SIZES[layout.sheet] || A1;
+    const land = w >= h, page = land ? sz : [sz[1], sz[0]];
     const k = Math.min(page[0] / w, page[1] / h);           // mm per drawing unit
     return { e, pageW: page[0], pageH: page[1], unitMm: k, fitted: true };
   }

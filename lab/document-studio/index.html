@@ -287,15 +287,23 @@
 
   .preview-toolbar-v2 { min-height:42px; border-bottom:1px solid var(--line); background:var(--panel-2); padding:7px 9px; display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
   .preview-toolbar-v2 .grow { flex:1; }
-  .preview-stage { flex:1; min-height:520px; overflow:auto; background:#aaa69d; padding:22px; display:flex; justify-content:center; align-items:flex-start; }
-  .preview-paper { position:relative; background:#fff; box-shadow:0 5px 22px rgba(0,0,0,.24); max-width:100%; transform-origin:top center; }
-  .preview-paper canvas,.preview-paper img,.preview-paper svg { display:block; max-width:100%; height:auto; }
+  /* the preview is a CAD-style viewport: the sheet is placed and scaled by a
+     transform (wheel = zoom at the cursor, drag = pan, double-click = fit) */
+  .preview-stage { flex:1; min-height:520px; position:relative; overflow:hidden; background:#aaa69d; cursor:grab; touch-action:none; user-select:none; -webkit-user-select:none; }
+  .preview-stage.panning { cursor:grabbing; }
+  .preview-stage.framing { cursor:crosshair; }
+  .preview-stage > .preview-empty { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px; }
+  .preview-paper { position:absolute; left:0; top:0; background:#fff; box-shadow:0 5px 22px rgba(0,0,0,.24); transform-origin:0 0; }
+  .preview-paper.moving { will-change:transform; }
+  .preview-paper canvas,.preview-paper img,.preview-paper svg { display:block; width:100%; height:auto; }
+  .frame-box { position:absolute; border:2px dashed var(--red); background:rgba(163,14,24,.08); pointer-events:none; z-index:5; }
+  .frame-tools { display:inline-flex; align-items:center; gap:5px; padding-right:6px; margin-right:2px; border-right:1px solid var(--line); }
+  .frame-tools[hidden] { display:none; }
+  .frame-tools select { min-height:0; height:28px; padding:2px 6px; font:700 11px var(--mono); border:1px solid var(--line); background:#fff; }
   .preview-empty { color:#55514a; text-align:center; padding:100px 20px; }
   .boundary { position:absolute; inset:3.5%; border:2px dashed var(--red); pointer-events:none; display:none; }
   .boundary.on { display:block; }
 
-  .preview-paper[style*="width"] { max-width:none; }
-  .preview-stage { justify-content:safe center; }
   .preview-paper img { width:100%; }
 
   @media(max-width:760px){ .workspace-v2{grid-template-columns:1fr; gap:10px;} .splitter{display:none;} .preview-stage{min-height:420px;} }
@@ -352,6 +360,14 @@
         <b id="previewTitle" style="font-size:11px">NO PAGE SELECTED</b>
         <span id="previewMeta" style="font:10px var(--mono);color:var(--muted)"></span>
         <span class="grow"></span>
+        <span id="frameTools" class="frame-tools" hidden>
+          <button id="frameBtn" class="btn btn-ghost" title="Model Space has no sheet: drag a rectangle on the drawing to make the page">PAGE FRAME</button>
+          <select id="frameSheet" title="Paper size of the page">
+            <option>A0</option><option selected>A1</option><option>A2</option><option>A3</option><option>A4</option>
+          </select>
+          <button id="frameReset" class="btn btn-ghost" title="Back to the whole drawing on A1">RESET</button>
+        </span>
+        <button id="previewFit" class="btn btn-ghost" title="Fit the sheet (double-click)">FIT</button>
         <button id="previewZoomOut" class="btn btn-ghost">−</button>
         <span id="previewZoomLabel" style="font:700 11px var(--mono)">100%</span>
         <button id="previewZoomIn" class="btn btn-ghost">+</button>
@@ -415,7 +431,7 @@ window.DOC_STUDIO_CONFIG = {
 </script>
 <script type="module">
 import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs";
-import { parseDwg, svgToPng, sheetsPdf } from "./libredwg-engine.js?v=r2b";
+import { parseDwg, svgToPng, sheetsPdf } from "./libredwg-engine.js?v=r2c";
 pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs";
 
 const $ = s => document.querySelector(s);
@@ -915,62 +931,200 @@ $("#mergeOk").onclick=()=>{
   }
 })();
 
-/* ── preview ───────────────────────────────────────────────────────────── */
+/* ── preview ─────────────────────────────────────────────────────────────
+   A viewport, as in CAD: the sheet sits in the pane at a fixed base width and
+   is moved and scaled by a CSS transform only — nothing is redrawn while the
+   wheel turns, so zooming a 5 MB sheet costs one composited frame. The wheel
+   zooms about the point under the cursor, a drag pans, a double-click fits.
+   When the movement stops, the sheet is repainted sharp at the new scale (the
+   screen line weights follow the zoom; a PDF page is rendered again at the
+   resolution now needed). */
 let previewToken=0;
+const BASE=1200;                                   // sheet width in px at scale 1
+const view={k:1,kFit:1,tx:0,ty:0,pageId:null};
 function svgUrl(p){ const o=p.orig||p; return o._svgUrl||(o._svgUrl=URL.createObjectURL(new Blob([o.svg],{type:"image/svg+xml"}))); }
+const stage=()=>$("#previewStage"), paperEl=()=>$("#previewStage .preview-paper");
+function applyView(moving){
+  const el=paperEl(); if(!el) return;
+  el.style.transform="translate("+view.tx.toFixed(1)+"px,"+view.ty.toFixed(1)+"px) scale("+view.k.toFixed(5)+")";
+  if(moving){ el.classList.add("moving"); settleSoon(); }
+  $("#previewZoomLabel").textContent=Math.round(view.k/view.kFit*100)+"%";
+}
+let settleT=0;
+function settleSoon(){ clearTimeout(settleT); settleT=setTimeout(settle,170); }
+function settle(){
+  const el=paperEl(); if(!el) return;
+  el.classList.remove("moving");
+  const s=el.querySelector("svg[data-mmw]");
+  if(s){ const mmw=+s.getAttribute("data-mmw"); if(mmw>0) s.style.setProperty("--ds-pxmm",(BASE*view.k/mmw)+"px"); }
+  sharpenPdf();
+}
+function fitView(){
+  const el=paperEl(), st=stage(); if(!el||!st) return;
+  const r=st.getBoundingClientRect(), pad=22, w=el.offsetWidth||BASE, h=el.offsetHeight||BASE*0.7;
+  const k=Math.max(0.01,Math.min((r.width-2*pad)/w,(r.height-2*pad)/h));
+  view.k=view.kFit=k; view.tx=(r.width-w*k)/2; view.ty=Math.max(pad,(r.height-h*k)/2);
+  applyView(false); settle();
+}
+function zoomAt(cx,cy,f){
+  const k2=Math.max(view.kFit*0.25,Math.min(view.kFit*80,view.k*f)), q=k2/view.k;
+  view.tx=cx-(cx-view.tx)*q; view.ty=cy-(cy-view.ty)*q; view.k=k2; applyView(true);
+}
+function zoomCentre(f){ const r=stage().getBoundingClientRect(); zoomAt(r.width/2,r.height/2,f); }
+
 function renderPreviewMeta(){
   const p=page(state.activePageId); if(!p) return;
-  const d=docOfPage(p), n=d?d.pages.indexOf(p)+1:0, l=p.layout;
+  const d=docOfPage(p), n=d?d.pages.indexOf(p)+1:0, l=(p.orig||p).layout;
   $("#previewTitle").textContent=p.label;
-  $("#previewMeta").textContent=[n?"page "+n+" of "+d.pages.length+" · "+d.name:"not in the PDF",l?.paper,l?.empty?"empty layout":null,p.rotation?"rotated "+p.rotation+"°":null].filter(Boolean).join(" · ");
+  $("#previewMeta").textContent=[n?"page "+n+" of "+d.pages.length+" · "+d.name:"not in the PDF",l?.paper,l?.isModel?(l.sheet||"A1")+(l.framed?" · framed":""):null,l?.empty?"empty layout":null,p.rotation?"rotated "+p.rotation+"°":null].filter(Boolean).join(" · ");
 }
+/* the page-frame tools belong to a Model Space sheet only */
+function syncFrameTools(){
+  const p=page(state.activePageId), l=p&&(p.orig||p).layout, on=!!(l&&l.isModel&&l.reframe&&!p.rotation);
+  $("#frameTools").hidden=!on;
+  if(on) $("#frameSheet").value=l.sheet||"A1";
+  if(!on&&framing) setFraming(false);
+}
+let pdfShown=null;                                 // {p, scale} of the PDF page on screen
 async function renderPreview(){
-  const p=page(state.activePageId), root=$("#previewStage"), token=++previewToken;
+  const p=page(state.activePageId), root=stage(), token=++previewToken;
+  syncFrameTools();
   if(!p){
-    $("#previewTitle").textContent="NO PAGE SELECTED";$("#previewMeta").textContent="";
+    $("#previewTitle").textContent="NO PAGE SELECTED";$("#previewMeta").textContent="";pdfShown=null;
     root.innerHTML='<div class="preview-empty"><b>Open a file with + and pick a page.</b><br><br>This pane shows what will go to the PDF.</div>';return;
   }
   renderPreviewMeta();
-  const s=source(p.sourceId);
+  const s=source(p.sourceId), keep=view.pageId===p.id;
   const boundary='<div class="boundary '+(state.showBoundary?"on":"")+'"></div>';
-  const width='style="width:'+Math.round(state.previewZoom*100)+'%"';
+  const paper='<div class="preview-paper" style="width:'+BASE+'px"></div>';
+  const done=()=>{ if(keep&&paperEl()){ applyView(false); settle(); } else { view.pageId=p.id; fitView(); } };
   if(p.sourceType==="pdf"&&s?.pdfDoc){
     try{
       const pg=await s.pdfDoc.getPage(p.sourcePage+1);
-      const vp=pg.getViewport({scale:Math.max(.7,1.25*state.previewZoom),rotation:p.rotation});
-      const cv=document.createElement("canvas");cv.width=Math.ceil(vp.width);cv.height=Math.ceil(vp.height);
-      await pg.render({canvasContext:cv.getContext("2d"),viewport:vp}).promise;
+      const scale=BASE/pg.getViewport({scale:1,rotation:p.rotation}).width*Math.min(2,window.devicePixelRatio||1);
+      const cv=await pdfCanvas(pg,scale,p.rotation);
       if(token!==previewToken) return;
-      root.innerHTML='<div class="preview-paper"></div>';root.firstElementChild.append(cv);root.firstElementChild.insertAdjacentHTML("beforeend",boundary);
-      return;
+      root.innerHTML=paper; root.firstElementChild.append(cv); root.firstElementChild.insertAdjacentHTML("beforeend",boundary);
+      pdfShown={p,pg,scale}; done(); return;
     }catch(e){console.error(e);}
   }
-  const url=p.sourceType==="image"?baseThumb(p):p.sourceType==="dwg-svg"&&p.svg?svgUrl(p):null;
+  pdfShown=null;
+  const o=p.orig||p;
+  const url=p.sourceType==="image"?baseThumb(p):p.sourceType==="dwg-svg"&&o.svg?svgUrl(p):null;
   if(!url){ root.innerHTML='<div class="preview-empty">Preview unavailable.</div>'; return; }
   if(!p.rotation){
     /* a DWG sheet is put into the page itself, not as an <img>: an image cannot
        reach the page's fonts, and the sheet is set in the bundled ones */
-    if(p.sourceType==="dwg-svg"&&/data-ds="r2"/.test((p.orig||p).svg.slice(0,400))){
-      root.innerHTML='<div class="preview-paper" '+width+'>'+(p.orig||p).svg.replace(/^\s*<\?xml[^>]*>/,"")+boundary+'</div>';
-      const s=root.querySelector(".preview-paper > svg"); if(s){ s.removeAttribute("width"); s.removeAttribute("height"); s.style.cssText="display:block;width:100%;height:auto"; }
-      return;
+    if(p.sourceType==="dwg-svg"&&/data-ds="r2"/.test(o.svg.slice(0,400))){
+      root.innerHTML=paper; root.firstElementChild.innerHTML=o.svg.replace(/^\s*<\?xml[^>]*>/,"")+boundary;
+      const sv=root.querySelector(".preview-paper > svg");
+      if(sv){ sv.removeAttribute("width"); sv.removeAttribute("height"); sv.style.display="block"; sv.style.width="100%"; sv.style.height="auto"; }
+      done(); return;
     }
-    root.innerHTML='<div class="preview-paper" '+width+'><img draggable="false" alt="" src="'+esc(url)+'">'+boundary+'</div>';
-    return;
+    root.innerHTML=paper; root.firstElementChild.innerHTML='<img draggable="false" alt="" src="'+esc(url)+'">'+boundary;
+    const im=root.querySelector(".preview-paper img"); if(im&&!im.complete) im.onload=()=>{ if(token===previewToken) done(); };
+    done(); return;
   }
   // rotated: drawn onto a canvas turned by the page's rotation; a vector sheet
   // is rasterised at the size it is shown
   const im=new Image(); im.src=url;
   try{ await im.decode(); }catch{ return; }
   if(token!==previewToken) return;
-  const long=2400, k=long/Math.max(im.naturalWidth,im.naturalHeight), w=im.naturalWidth*k, h=im.naturalHeight*k;
+  const long=2600, k=long/Math.max(im.naturalWidth,im.naturalHeight), w=im.naturalWidth*k, h=im.naturalHeight*k;
   const q=p.rotation%180!==0, cv=document.createElement("canvas");
   cv.width=Math.round(q?h:w); cv.height=Math.round(q?w:h);
   const x=cv.getContext("2d"); x.fillStyle="#fff"; x.fillRect(0,0,cv.width,cv.height);
   x.translate(cv.width/2,cv.height/2); x.rotate(p.rotation*Math.PI/180); x.drawImage(im,-w/2,-h/2,w,h);
   cv.style.width="100%";
-  root.innerHTML='<div class="preview-paper" '+width+'></div>'; root.firstElementChild.append(cv); root.firstElementChild.insertAdjacentHTML("beforeend",boundary);
+  root.innerHTML=paper; root.firstElementChild.append(cv); root.firstElementChild.insertAdjacentHTML("beforeend",boundary);
+  done();
 }
+async function pdfCanvas(pg,scale,rotation){
+  const vp=pg.getViewport({scale,rotation});
+  const cv=document.createElement("canvas");cv.width=Math.ceil(vp.width);cv.height=Math.ceil(vp.height);cv.style.width="100%";
+  await pg.render({canvasContext:cv.getContext("2d"),viewport:vp}).promise;
+  return cv;
+}
+/* a PDF page is a bitmap: after a zoom, render it again at the resolution shown */
+let sharpening=false;
+async function sharpenPdf(){
+  if(!pdfShown||sharpening) return;
+  const need=BASE*view.k*(window.devicePixelRatio||1);
+  const pgW=pdfShown.pg.getViewport({scale:1,rotation:pdfShown.p.rotation}).width, cur=pgW*pdfShown.scale;
+  if(need<=cur*1.15) return;
+  const target=Math.min(need,9000)/pgW;
+  sharpening=true;
+  try{
+    const shown=pdfShown, cv=await pdfCanvas(shown.pg,target,shown.p.rotation);
+    const el=paperEl(); if(!el||pdfShown!==shown) return;
+    const old=el.querySelector("canvas"); if(old) old.replaceWith(cv);
+    shown.scale=target;
+  }finally{ sharpening=false; }
+}
+
+/* ── page frame for a Model Space sheet: two corners dragged on the drawing ── */
+let framing=false;
+function setFraming(on){
+  framing=on; stage().classList.toggle("framing",on); $("#frameBtn").classList.toggle("btn-active",on);
+  $("#frameBtn").textContent=on?"DRAG A RECTANGLE…":"PAGE FRAME";
+}
+function toDrawing(sv,clientX,clientY){
+  const pt=sv.createSVGPoint(); pt.x=clientX; pt.y=clientY;
+  const u=pt.matrixTransform(sv.getScreenCTM().inverse());
+  return {x:u.x,y:-u.y};                           // the sheet's content is drawn y-up under a flip
+}
+async function frameChanged(p){
+  const o=p.orig||p, l=o.layout;
+  if(o._svgUrl){ URL.revokeObjectURL(o._svgUrl); o._svgUrl=null; }
+  o.svg=l.svg; o.orient=l.orientation||o.orient; o.thumb=null;
+  view.pageId=null; await renderPreview();
+  const d=docOfPage(p); if(d) renderDoc(d);
+  queueThumbs(async()=>{ try{ o.thumb=await svgToPng(o.svg,420); }catch{} updateCard(o); });
+}
+$("#frameBtn").onclick=()=>setFraming(!framing);
+$("#frameReset").onclick=async()=>{ const p=page(state.activePageId), l=p&&(p.orig||p).layout; if(!l?.resetFrame) return; setFraming(false); l.resetFrame(); await frameChanged(p); };
+$("#frameSheet").onchange=async()=>{ const p=page(state.activePageId), l=p&&(p.orig||p).layout; if(!l?.reframe||!l.ext) return; l.reframe(l.ext,$("#frameSheet").value); await frameChanged(p); };
+
+(function viewport(){
+  const st=stage();
+  st.addEventListener("wheel",e=>{
+    if(!paperEl()) return; e.preventDefault();
+    const r=st.getBoundingClientRect(), d=e.deltaMode===1?e.deltaY*16:e.deltaMode===2?e.deltaY*400:e.deltaY;
+    zoomAt(e.clientX-r.left,e.clientY-r.top,Math.exp(-d*0.0016));
+  },{passive:false});
+  let drag=null;
+  st.addEventListener("pointerdown",e=>{
+    if(!paperEl()||(e.button!==0&&e.button!==1)) return;
+    e.preventDefault(); try{ st.setPointerCapture(e.pointerId); }catch{}
+    const r=st.getBoundingClientRect();
+    if(framing&&e.button===0){
+      const box=document.createElement("div"); box.className="frame-box"; st.appendChild(box);
+      drag={mode:"frame",x0:e.clientX,y0:e.clientY,box,r};
+    } else { drag={mode:"pan",x:e.clientX,y:e.clientY}; st.classList.add("panning"); }
+  });
+  st.addEventListener("pointermove",e=>{
+    if(!drag) return;
+    if(drag.mode==="pan"){ view.tx+=e.clientX-drag.x; view.ty+=e.clientY-drag.y; drag.x=e.clientX; drag.y=e.clientY; applyView(true); return; }
+    const x=Math.min(drag.x0,e.clientX)-drag.r.left, y=Math.min(drag.y0,e.clientY)-drag.r.top;
+    Object.assign(drag.box.style,{left:x+"px",top:y+"px",width:Math.abs(e.clientX-drag.x0)+"px",height:Math.abs(e.clientY-drag.y0)+"px"});
+  });
+  const end=async e=>{
+    if(!drag) return; const d=drag; drag=null; st.classList.remove("panning");
+    try{ st.releasePointerCapture(e.pointerId); }catch{}
+    if(d.mode==="pan"){ settle(); return; }
+    d.box.remove();
+    if(Math.abs(e.clientX-d.x0)<6||Math.abs(e.clientY-d.y0)<6) return;
+    const p=page(state.activePageId), l=p&&(p.orig||p).layout, sv=paperEl()?.querySelector("svg");
+    if(!l?.reframe||!sv) return;
+    const a=toDrawing(sv,d.x0,d.y0), b=toDrawing(sv,e.clientX,e.clientY);
+    const win={minX:Math.min(a.x,b.x),minY:Math.min(a.y,b.y),maxX:Math.max(a.x,b.x),maxY:Math.max(a.y,b.y)};
+    setFraming(false);
+    if(l.reframe(win,$("#frameSheet").value)) await frameChanged(p);
+  };
+  st.addEventListener("pointerup",end); st.addEventListener("pointercancel",end);
+  st.addEventListener("dblclick",e=>{ if(!framing) fitView(); });
+  window.addEventListener("resize",()=>{ if(paperEl()) fitView(); });
+})();
 
 function renderAll(){renderTree();renderPreview();}
 
@@ -1038,8 +1192,9 @@ document.addEventListener("drop",e=>{
 });
 $("#clearBtn").onclick=()=>{state.sources.clear();state.docs=[];state.all.clear();state.selected.clear();state.activeDocId=null;state.activePageId=null;renderAll();};
 const zoomLabel=()=>{$("#previewZoomLabel").textContent=Math.round(state.previewZoom*100)+"%";};
-$("#previewZoomIn").onclick=()=>{state.previewZoom=Math.min(3,+(state.previewZoom+.25).toFixed(2));zoomLabel();renderPreview();};
-$("#previewZoomOut").onclick=()=>{state.previewZoom=Math.max(.5,+(state.previewZoom-.25).toFixed(2));zoomLabel();renderPreview();};
+$("#previewZoomIn").onclick=()=>zoomCentre(1.4);
+$("#previewZoomOut").onclick=()=>zoomCentre(1/1.4);
+$("#previewFit").onclick=()=>fitView();
 $("#toggleBoundary").onclick=()=>{state.showBoundary=!state.showBoundary;$("#toggleBoundary").classList.toggle("btn-active",state.showBoundary);document.querySelectorAll("#previewStage .boundary").forEach(b=>b.classList.toggle("on",state.showBoundary));};
 /* The file list is as wide as the user drags it; remembered in this browser. */
 (function splitter(){
