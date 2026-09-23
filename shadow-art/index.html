@@ -1,102 +1,29 @@
-<!doctype html>
-<html lang="ru">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<title>Shadow Trash Lab</title>
-<style>
-html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101114;color:#eee;font-family:-apple-system,BlinkMacSystemFont,Arial,sans-serif}
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-#cv{position:fixed;inset:0;width:100%;height:100%;touch-action:none}
-#top{position:fixed;z-index:5;top:calc(8px + env(safe-area-inset-top));left:8px;right:8px;display:flex;justify-content:space-between;pointer-events:none}
-.pill{background:rgba(0,0,0,.68);border:1px solid #ffffff25;border-radius:12px;padding:8px 10px;font-size:12px}
-#bar{position:fixed;z-index:10;left:7px;right:7px;bottom:calc(7px + env(safe-area-inset-bottom));display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
-button,select,input{font:inherit;color:#eee;background:#292b30;border:1px solid #ffffff25;border-radius:12px}
-#bar button{height:58px;font-size:12px}.green{background:#17633e!important}
-#shade{display:none;position:fixed;z-index:20;inset:0;background:#0008}#shade.on{display:block}
-.panel{position:fixed;z-index:30;left:0;right:0;bottom:0;max-height:78vh;overflow:auto;background:#1a1c20;border-radius:20px 20px 0 0;padding:10px 14px calc(18px + env(safe-area-inset-bottom));transform:translateY(105%);transition:.2s}.panel.on{transform:translateY(0)}
-.handle{width:48px;height:5px;background:#666;border-radius:4px;margin:0 auto 10px}.x{float:right;width:42px;height:42px;font-size:20px}h2{font-size:17px;margin:7px 0 12px}h3{font-size:13px;color:#aaa;margin:15px 0 7px}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}.grid button,.wide{min-height:46px;width:100%;margin-bottom:7px}
-label{display:block;font-size:11px;color:#aaa;margin:9px 0}input,select{display:block;width:100%;height:42px;margin-top:4px;padding:5px}input[type=range]{padding:0}
-.note{font-size:12px;color:#aaa;line-height:1.4}.red{background:#5a2929}
-</style>
-</head>
-<body>
-<canvas id="cv"></canvas>
-<div id="top"><div class="pill" id="st">Объектов: 0</div><div class="pill" id="md">MOVE</div></div>
-<div id="bar"><button id="bObj">♻️<br>Объекты</button><button id="bAuto" class="green">✨<br>Auto</button><button id="bMode">↔️<br>Move</button><button id="bSet">💡<br>Свет</button></div>
-<div id="shade"></div>
-<div class="panel" id="pObj"><div class="handle"></div><button class="x">×</button><h2>Мусор</h2><div class="grid" id="types"></div><h3>Выбранный объект</h3><button class="wide red" id="del">Удалить</button><p class="note">Тап по предмету — выбрать. Перетаскивай пальцем. Кнопка Move переключает MOVE → ROTATE → SCALE.</p></div>
-<div class="panel" id="pAuto"><div class="handle"></div><button class="x">×</button><h2>Auto Compose</h2><label>Силуэт<select id="target"><option value="tree">🌳 Дерево</option><option value="fish">🐟 Рыба</option><option value="earth">🌍 Планета</option><option value="leaf">🍃 Лист</option><option value="turtle">🐢 Черепаха</option></select></label><label>Количество предметов <span id="nTxt">24</span><input id="n" type="range" min="10" max="42" value="24"></label><button class="wide green" id="gen">Собрать вариант</button><button class="wide" id="gen5">Следующий вариант</button><p class="note">Алгоритм сам расставляет и поворачивает предметы так, чтобы их проекция на стену формировала выбранный экологический силуэт.</p></div>
-<div class="panel" id="pSet"><div class="handle"></div><button class="x">×</button><h2>Источник света</h2><label>Слева / справа <span id="lxT"></span><input id="lx" type="range" min="-220" max="220" value="-120"></label><label>Высота <span id="lyT"></span><input id="ly" type="range" min="80" max="500" value="360"></label><label>Расстояние <span id="lzT"></span><input id="lz" type="range" min="80" max="420" value="260"></label><label>Размер тени <input id="mag" type="range" min="60" max="180" value="110"></label><button class="wide" id="view">Сбросить вид</button><p class="note">Жёлтая точка — лампа. Тени рассчитываются без WebGL, поэтому редактор работает и на старых версиях iOS Safari.</p></div>
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><title>Shadow Art</title>
+<style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101114;color:#fff;font-family:Arial,sans-serif}*{box-sizing:border-box}#c{position:absolute;left:0;top:0;width:100%;height:100%}#stat{position:absolute;top:calc(10px + env(safe-area-inset-top));left:10px;background:#000c;border:1px solid #555;border-radius:12px;padding:10px;z-index:4}.bar{position:absolute;z-index:5;left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom));display:table;width:calc(100% - 16px);border-spacing:5px}.bar b{display:table-cell;text-align:center;background:#292b30;border:1px solid #555;border-radius:14px;padding:15px 3px;font-weight:normal}.bar b.auto{background:#17633e}.panel{display:none;position:absolute;z-index:9;left:8px;right:8px;bottom:calc(78px + env(safe-area-inset-bottom));background:#1d1f23;border:1px solid #555;border-radius:16px;padding:12px;max-height:65%;overflow:auto}.panel.on{display:block}button,select,input{font-size:16px;background:#303238;color:#fff;border:1px solid #666;border-radius:10px;padding:10px;margin:4px}button{min-height:44px}.row{display:flex;flex-wrap:wrap}.row button{flex:1 0 29%}label{display:block;margin:9px 0}.close{float:right}.green{background:#17633e}</style></head>
+<body onload="boot()"><canvas id="c"></canvas><div id="stat">JS: ожидание…</div>
+<div id="objects" class="panel"><button class="close" onclick="hidePanels()">×</button><b>Добавить мусор</b><div class="row"><button onclick="add('bottle')">Бутылка</button><button onclick="add('can')">Банка</button><button onclick="add('box')">Коробка</button><button onclick="add('bag')">Пакет</button><button onclick="add('cup')">Стакан</button><button onclick="add('stick')">Палочка</button></div><button onclick="removeSelected()">Удалить выбранный</button></div>
+<div id="auto" class="panel"><button class="close" onclick="hidePanels()">×</button><b>Auto Compose</b><label>Силуэт <select id="target"><option value="tree">Дерево</option><option value="fish">Рыба</option><option value="earth">Планета</option><option value="leaf">Лист</option></select></label><label>Предметов <input id="count" type="range" min="10" max="40" value="24"></label><button class="green" onclick="compose();hidePanels()">Собрать новый вариант</button></div>
+<div id="light" class="panel"><button class="close" onclick="hidePanels()">×</button><b>Свет</b><label>X <input id="lx" type="range" min="-200" max="200" value="-100" oninput="readLight()"></label><label>Высота <input id="ly" type="range" min="80" max="500" value="340" oninput="readLight()"></label><label>Увеличение тени <input id="lm" type="range" min="60" max="180" value="110" oninput="readLight()"></label></div>
+<div class="bar"><b onclick="showPanel('objects')">♻️<br>Объекты</b><b class="auto" onclick="showPanel('auto')">✨<br>Auto</b><b onclick="cycleMode()">↔️<br><span id="mode">Move</span></b><b onclick="showPanel('light')">💡<br>Свет</b></div>
 <script>
-(function(){
-'use strict';
-var C=document.getElementById('cv'),X=C.getContext('2d'),W=0,H=0,DPR=1,objs=[],sel=-1,mode=0,seed=1;
-var light={x:-120,y:360,z:260,mag:1.1}, cam={x:0,y:0,zoom:1};
-var names=[['bottle','Бутылка'],['can','Банка'],['box','Коробка'],['cup','Стакан'],['bag','Пакет'],['wire','Проволока'],['cap','Крышка'],['stick','Палочка']];
-var colors=['#496b72','#8b6c48','#687a4c','#6b617e','#795c5c','#516579'];
-function rnd(){seed=(seed*9301+49297)%233280;return seed/233280}
-function resize(){DPR=Math.min(window.devicePixelRatio||1,2);W=innerWidth;H=innerHeight;C.width=W*DPR;C.height=H*DPR;C.style.width=W+'px';C.style.height=H+'px';X.setTransform(DPR,0,0,DPR,0,0);draw()}
-window.addEventListener('resize',resize);
-function wall(){return {x:W*.60,y:H*.09,w:W*.36,h:H*.68}}
-function floorY(){return H*.80}
-function screen(o){var s=cam.zoom, baseX=W*.32+cam.x, fy=floorY()+cam.y;return {x:baseX+o.x*s,y:fy-o.y*s-o.z*.18*s,z:o.z*s}}
-function shadow(o){var w=wall(), k=(1.55+o.z/240)*light.mag;var sx=w.x+w.w*.48+(o.x-light.x*.28)*k;var sy=w.y+w.h*.72-(o.y+(o.z-light.z*.15)*.23)*k;return{x:sx,y:sy,k:k}}
-function add(t,x,y,z,r,s){objs.push({t:t,x:x==null?(rnd()*160-80):x,y:y==null?(15+rnd()*90):y,z:z==null?(rnd()*120):z,r:r||0,s:s||(.7+rnd()*.7),c:colors[(rnd()*colors.length)|0]});sel=objs.length-1;status();draw()}
-function shape(ctx,t,x,y,s,r,fill,shadowMode){
- ctx.save();ctx.translate(x,y);ctx.rotate(r);ctx.scale(s,s);ctx.fillStyle=fill;ctx.strokeStyle=fill;ctx.lineWidth=6;ctx.lineCap='round';ctx.lineJoin='round';
- if(t==='bottle'){ctx.fillRect(-8,-26,16,42);ctx.fillRect(-4,-36,8,12);ctx.beginPath();ctx.arc(0,15,8,0,Math.PI*2);ctx.fill()}
- else if(t==='can'){ctx.beginPath();ctx.ellipse(0,0,10,22,0,0,Math.PI*2);ctx.fill()}
- else if(t==='box'){ctx.fillRect(-17,-16,34,32)}
- else if(t==='cup'){ctx.beginPath();ctx.moveTo(-13,-18);ctx.lineTo(13,-18);ctx.lineTo(9,18);ctx.lineTo(-9,18);ctx.closePath();ctx.fill()}
- else if(t==='bag'){ctx.beginPath();ctx.moveTo(-18,-16);ctx.quadraticCurveTo(0,-30,18,-15);ctx.lineTo(14,20);ctx.quadraticCurveTo(0,28,-16,18);ctx.closePath();ctx.fill()}
- else if(t==='wire'){ctx.beginPath();ctx.moveTo(-24,14);ctx.bezierCurveTo(-5,-30,10,30,25,-12);ctx.stroke()}
- else if(t==='cap'){ctx.beginPath();ctx.arc(0,0,13,0,Math.PI*2);ctx.fill()}
- else {ctx.fillRect(-25,-4,50,8)}
- ctx.restore()
-}
-function draw(){
- X.setTransform(DPR,0,0,DPR,0,0);X.clearRect(0,0,W,H);
- var g=X.createLinearGradient(0,0,0,H);g.addColorStop(0,'#111318');g.addColorStop(1,'#1c1a17');X.fillStyle=g;X.fillRect(0,0,W,H);
- var w=wall();X.fillStyle='#ddd7ca';X.fillRect(w.x,w.y,w.w,w.h);X.fillStyle='#25221e';X.fillRect(0,floorY(),W,H-floorY());
- X.strokeStyle='#4b4640';X.lineWidth=2;X.beginPath();X.moveTo(0,floorY());X.lineTo(w.x,w.y+w.h);X.stroke();
- X.save();X.beginPath();X.rect(w.x,w.y,w.w,w.h);X.clip();
- for(var i=0;i<objs.length;i++){var o=objs[i],q=shadow(o);shape(X,o.t,q.x,q.y,o.s*q.k*.72,o.r,'rgba(24,25,24,.72)',true)}
- X.restore();
- for(var j=0;j<objs.length;j++){var a=objs[j],p=screen(a);shape(X,a.t,p.x,p.y,a.s,a.r,a.c,false);if(j===sel){X.strokeStyle='#67d99b';X.lineWidth=2;X.beginPath();X.arc(p.x,p.y,30*a.s,0,Math.PI*2);X.stroke()}}
- var lp={x:W*.18+light.x*.25,y:floorY()-light.y*.42};X.fillStyle='#ffd86b';X.shadowColor='#ffd86b';X.shadowBlur=18;X.beginPath();X.arc(lp.x,lp.y,7,0,Math.PI*2);X.fill();X.shadowBlur=0;X.strokeStyle='#ffd86b55';X.beginPath();X.moveTo(lp.x,lp.y);X.lineTo(w.x+w.w*.5,w.y+w.h*.5);X.stroke();
-}
-function status(){document.getElementById('st').innerHTML='Объектов: '+objs.length+(sel>=0?' · выбран '+(sel+1):'')}
-function close(){var ps=document.querySelectorAll('.panel');for(var i=0;i<ps.length;i++)ps[i].className='panel';document.getElementById('shade').className=''}
-function openP(id){close();document.getElementById(id).className='panel on';document.getElementById('shade').className='on'}
-document.getElementById('shade').onclick=close;var xs=document.querySelectorAll('.x');for(var i=0;i<xs.length;i++)xs[i].onclick=close;
-document.getElementById('bObj').onclick=function(){openP('pObj')};document.getElementById('bSet').onclick=function(){openP('pSet')};document.getElementById('bAuto').onclick=function(){openP('pAuto')};
-var tg=document.getElementById('types');for(var i=0;i<names.length;i++){(function(n){var b=document.createElement('button');b.innerHTML=n[1];b.onclick=function(){add(n[0]);close()};tg.appendChild(b)})(names[i])}
-document.getElementById('del').onclick=function(){if(sel>=0){objs.splice(sel,1);sel=Math.min(sel,objs.length-1);status();draw()}}
-document.getElementById('bMode').onclick=function(){mode=(mode+1)%3;var n=['MOVE','ROTATE','SCALE'][mode];document.getElementById('md').innerHTML=n;document.getElementById('bMode').innerHTML=(mode===0?'↔️<br>Move':mode===1?'↻<br>Rotate':'⤢<br>Scale')}
-var dragging=false,lastX=0,lastY=0;
-function pt(e){var t=e.touches&&e.touches.length?e.touches[0]:e;return{x:t.clientX,y:t.clientY}}
-function down(e){var p=pt(e),best=-1,bd=1e9;for(var i=0;i<objs.length;i++){var s=screen(objs[i]),d=(s.x-p.x)*(s.x-p.x)+(s.y-p.y)*(s.y-p.y);if(d<bd&&d<3600){bd=d;best=i}}sel=best;dragging=best>=0;lastX=p.x;lastY=p.y;status();draw();if(dragging)e.preventDefault()}
-function move(e){if(!dragging||sel<0)return;var p=pt(e),dx=p.x-lastX,dy=p.y-lastY,o=objs[sel];if(mode===0){o.x+=dx/cam.zoom;o.y-=dy/cam.zoom}else if(mode===1)o.r+=dx*.018;else o.s=Math.max(.25,Math.min(3,o.s+dx*.008));lastX=p.x;lastY=p.y;draw();e.preventDefault()}
-function up(){dragging=false}
-C.addEventListener('touchstart',down,{passive:false});C.addEventListener('touchmove',move,{passive:false});C.addEventListener('touchend',up,false);C.addEventListener('mousedown',down);window.addEventListener('mousemove',move);window.addEventListener('mouseup',up);
-function targetPoints(t,n){
- var a=[],i,u,ang;
- if(t==='tree'){for(i=0;i<n;i++){u=rnd();if(u<.28)a.push({x:(rnd()-.5)*24,y:rnd()*120-5,r:1.57});else{ang=rnd()*Math.PI*2;a.push({x:Math.cos(ang)*(28+rnd()*55),y:82+Math.sin(ang)*(25+rnd()*45),r:ang})}} 
- else if(t==='fish'){for(i=0;i<n;i++){ang=rnd()*Math.PI*2;if(i<n*.78)a.push({x:Math.cos(ang)*(25+rnd()*70),y:55+Math.sin(ang)*(15+rnd()*35),r:ang});else a.push({x:-80-rnd()*35,y:55+(rnd()-.5)*70,r:(rnd()-.5)*1.2})}}
- else if(t==='earth'){for(i=0;i<n;i++){ang=rnd()*Math.PI*2;var rr=25+rnd()*65;a.push({x:Math.cos(ang)*rr,y:70+Math.sin(ang)*rr,r:ang+1.57})}}
- else if(t==='leaf'){for(i=0;i<n;i++){u=rnd()*2-1;a.push({x:u*90,y:65+(1-Math.abs(u))*55+(rnd()-.5)*20,r:-u*.8})}}
- else {for(i=0;i<n;i++){ang=rnd()*Math.PI*2;if(i<n*.7)a.push({x:Math.cos(ang)*(30+rnd()*55),y:55+Math.sin(ang)*(15+rnd()*35),r:ang});else a.push({x:(rnd()-.5)*150,y:20+rnd()*25,r:(rnd()-.5)*2})}}
- return a
-}
-function compose(){seed=(seed+137)%99991;objs=[];var t=document.getElementById('target').value,n=parseInt(document.getElementById('n').value,10),p=targetPoints(t,n);for(var i=0;i<p.length;i++){var nm=names[(rnd()*names.length)|0][0];objs.push({t:nm,x:p[i].x,y:p[i].y,z:25+rnd()*80,r:p[i].r+(rnd()-.5)*.5,s:.55+rnd()*.65,c:colors[(rnd()*colors.length)|0]})}sel=-1;status();draw();close()}
-document.getElementById('gen').onclick=compose;document.getElementById('gen5').onclick=compose;
-document.getElementById('n').oninput=function(){document.getElementById('nTxt').innerHTML=this.value};
-function bind(id,key,scale){var e=document.getElementById(id);function f(){light[key]=parseFloat(e.value)*(scale||1);document.getElementById(id+'T').innerHTML=Math.round(light[key]);draw()}e.oninput=f;f()}
-bind('lx','x');bind('ly','y');bind('lz','z');document.getElementById('mag').oninput=function(){light.mag=parseFloat(this.value)/100;draw()};
-document.getElementById('view').onclick=function(){cam={x:0,y:0,zoom:1};draw();close()};
-window.onerror=function(m){document.getElementById('st').innerHTML='Ошибка: '+m};
-resize();compose();
-})();
+var canvas,ctx,W,H,items=[],selected=-1,mode=0,drag=0,lastX=0,lastY=0,seed=1234,lightX=-100,lightY=340,lightM=1.1;
+function R(){seed=(seed*9301+49297)%233280;return seed/233280}
+function boot(){try{canvas=document.getElementById('c');ctx=canvas.getContext('2d');if(!ctx){document.getElementById('stat').innerHTML='Canvas не поддерживается';return}window.onresize=resize;resize();canvas.ontouchstart=touchStart;canvas.ontouchmove=touchMove;canvas.ontouchend=touchEnd;canvas.onmousedown=mouseDown;canvas.onmousemove=mouseMove;canvas.onmouseup=mouseUp;compose();document.getElementById('stat').innerHTML='JS OK · объектов: '+items.length}catch(e){document.getElementById('stat').innerHTML='ERR '+e.message}}
+function resize(){W=window.innerWidth;H=window.innerHeight;canvas.width=W;canvas.height=H;draw()}
+function showPanel(id){hidePanels();document.getElementById(id).className='panel on'}
+function hidePanels(){document.getElementById('objects').className='panel';document.getElementById('auto').className='panel';document.getElementById('light').className='panel'}
+function readLight(){lightX=parseInt(document.getElementById('lx').value,10);lightY=parseInt(document.getElementById('ly').value,10);lightM=parseInt(document.getElementById('lm').value,10)/100;draw()}
+function add(t){items.push({t:t,x:R()*150-75,y:20+R()*100,z:20+R()*80,r:R()*6.28,s:.7+R()*.6});selected=items.length-1;hidePanels();update();draw()}
+function removeSelected(){if(selected>=0){items.splice(selected,1);selected=-1;update();draw()}}
+function update(){document.getElementById('stat').innerHTML='JS OK · объектов: '+items.length}
+function shape(o,x,y,k,col){ctx.save();ctx.translate(x,y);ctx.rotate(o.r);ctx.scale(o.s*k,o.s*k);ctx.fillStyle=col;ctx.strokeStyle=col;ctx.lineWidth=6;ctx.lineCap='round';if(o.t=='bottle'){ctx.fillRect(-8,-24,16,40);ctx.fillRect(-4,-34,8,12)}else if(o.t=='can'){ctx.beginPath();ctx.arc(0,0,14,0,6.29);ctx.fill()}else if(o.t=='box'){ctx.fillRect(-18,-15,36,30)}else if(o.t=='bag'){ctx.beginPath();ctx.moveTo(-18,-15);ctx.lineTo(16,-20);ctx.lineTo(14,20);ctx.lineTo(-16,18);ctx.closePath();ctx.fill()}else if(o.t=='cup'){ctx.beginPath();ctx.moveTo(-14,-18);ctx.lineTo(14,-18);ctx.lineTo(9,18);ctx.lineTo(-9,18);ctx.fill()}else{ctx.fillRect(-27,-4,54,8)}ctx.restore()}
+function sx(o){return W*.30+o.x}function sy(o){return H*.78-o.y-o.z*.18}
+function draw(){if(!ctx)return;ctx.fillStyle='#111318';ctx.fillRect(0,0,W,H);var wx=W*.57,wy=H*.09,ww=W*.39,wh=H*.64;ctx.fillStyle='#ded8ca';ctx.fillRect(wx,wy,ww,wh);ctx.fillStyle='#28251f';ctx.fillRect(0,H*.78,W,H*.22);ctx.save();ctx.beginPath();ctx.rect(wx,wy,ww,wh);ctx.clip();var i,o,k,x,y;for(i=0;i<items.length;i++){o=items[i];k=(1.4+o.z/220)*lightM;x=wx+ww*.5+(o.x-lightX*.25)*k;y=wy+wh*.70-(o.y+(o.z-lightY*.12)*.22)*k;shape(o,x,y,k*.72,'rgba(20,20,20,.72)')}ctx.restore();for(i=0;i<items.length;i++){o=items[i];shape(o,sx(o),sy(o),1,['#657b70','#7b6954','#5d7180','#756278'][i%4]);if(i==selected){ctx.strokeStyle='#63e09b';ctx.beginPath();ctx.arc(sx(o),sy(o),28,0,6.29);ctx.stroke()}}ctx.fillStyle='#ffd86b';ctx.beginPath();ctx.arc(W*.17+lightX*.22,H*.78-lightY*.4,7,0,6.29);ctx.fill()}
+function compose(){items=[];seed=(seed+317)%230000;var t=document.getElementById('target').value,n=parseInt(document.getElementById('count').value,10),i,a,u,x,y,r,types=['bottle','can','box','bag','cup','stick'];for(i=0;i<n;i++){a=R()*6.283;if(t=='tree'){if(i<n*.28){x=(R()-.5)*22;y=R()*115;r=1.57}else{x=Math.cos(a)*(30+R()*48);y=80+Math.sin(a)*(25+R()*38);r=a}}else if(t=='fish'){if(i<n*.78){x=Math.cos(a)*(28+R()*62);y=55+Math.sin(a)*(18+R()*30);r=a}else{x=-75-R()*35;y=55+(R()-.5)*65;r=(R()-.5)}}else if(t=='earth'){u=25+R()*62;x=Math.cos(a)*u;y=70+Math.sin(a)*u;r=a}else{u=R()*2-1;x=u*85;y=55+(1-Math.abs(u))*58+(R()-.5)*18;r=-u*.8}items.push({t:types[Math.floor(R()*types.length)],x:x,y:y,z:20+R()*75,r:r,s:.55+R()*.65})}selected=-1;update();draw()}
+function cycleMode(){mode=(mode+1)%3;document.getElementById('mode').innerHTML=mode==0?'Move':mode==1?'Rotate':'Scale'}
+function pick(x,y){var i,dx,dy,b=-1,d=999999;for(i=0;i<items.length;i++){dx=sx(items[i])-x;dy=sy(items[i])-y;if(dx*dx+dy*dy<d&&dx*dx+dy*dy<3600){d=dx*dx+dy*dy;b=i}}selected=b;update();draw();return b>=0}
+function start(x,y){drag=pick(x,y)?1:0;lastX=x;lastY=y}
+function move(x,y){if(!drag||selected<0)return;var dx=x-lastX,dy=y-lastY,o=items[selected];if(mode==0){o.x+=dx;o.y-=dy}else if(mode==1){o.r+=dx*.02}else{o.s+=dx*.008;if(o.s<.25)o.s=.25;if(o.s>3)o.s=3}lastX=x;lastY=y;draw()}
+function touchStart(e){if(e.touches.length){start(e.touches[0].clientX,e.touches[0].clientY);e.preventDefault()}}function touchMove(e){if(e.touches.length){move(e.touches[0].clientX,e.touches[0].clientY);e.preventDefault()}}function touchEnd(e){drag=0}
+function mouseDown(e){start(e.clientX,e.clientY)}function mouseMove(e){move(e.clientX,e.clientY)}function mouseUp(e){drag=0}
 </script></body></html>
