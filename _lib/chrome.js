@@ -14,6 +14,7 @@
     landing: p === '/' || p === '',
     content: p.startsWith('/content/'),
     forum:   p.startsWith('/forum/'),
+    lab:     p.startsWith('/lab/'),
     pricing: false, // anchor on landing
   };
   function on(k) { return is[k] ? ' class="is-on"' : ''; }
@@ -40,6 +41,7 @@
   </a>
   <nav>
     <a href="/#tabs"${on('landing')}>TOOLBOX</a>
+    <a href="/lab/"${on('lab')}>LAB</a>
     <a href="/content/"${on('content')}>CONTENT</a>
     <a href="/forum/"${on('forum')}>FORUM</a>
     <a href="/#pricing">PRICING</a>
