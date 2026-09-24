@@ -471,6 +471,30 @@
   }
   :is(.workspace-v2,.modal) .pg-acts button { width:20px !important; height:20px !important; min-width:0 !important; padding:0 !important; font:700 11px/1 var(--mono) !important; }
   .vw-lay svg { width:14px !important; height:11px !important; }
+  /* ── markups ── */
+  .mk-bar { display:flex; flex-wrap:wrap; align-items:center; gap:4px; padding:4px 8px; border-bottom:1px solid var(--line); background:var(--panel-2); }
+  .mk-bar[hidden] { display:none; }
+  .mk-grp { display:inline-flex; align-items:center; gap:2px; padding-right:5px; margin-right:1px; border-right:1px solid var(--line); }
+  .mk-bar button svg { width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:1.4; stroke-linecap:round; stroke-linejoin:round; }
+  .workspace-v2 .mk-bar .mk-sw { width:18px !important; min-width:18px !important; height:18px !important; padding:0 !important; border:2px solid #fff !important; outline:1px solid var(--line); background:var(--c) !important; }
+  .workspace-v2 .mk-bar .mk-sw.on { outline:2px solid var(--ink); }
+  .mk-lab { display:inline-flex; align-items:center; gap:3px; font:700 9px var(--mono) !important; color:var(--muted); }
+  .workspace-v2 .mk-bar #mkRev { width:34px !important; text-align:center; }
+  .workspace-v2 .mk-bar #mkAuthor { width:104px !important; font-family:var(--sans,sans-serif) !important; }
+  .workspace-v2 .mk-bar #mkNote { flex:1 1 170px; min-width:120px; font:600 11px/22px var(--sans,sans-serif) !important; }
+  .workspace-v2 .mk-bar select { width:auto !important; flex:0 0 auto; }
+  .workspace-v2 .mk-bar #mkStamp { max-width:150px; }
+  .mk-info { font:10px var(--mono) !important; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+  .mk-layer { position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none; z-index:4; overflow:visible; }
+  .mk-layer.on { pointer-events:auto; cursor:crosshair; }
+  .mk-layer.on [data-mid] { cursor:move; }
+  .mk-layer [data-mid].sel { filter:drop-shadow(0 0 1.5px rgba(209,26,42,.95)); }
+  .mk-h { fill:#fff; stroke:var(--red); stroke-width:1.5px; vector-effect:non-scaling-stroke; cursor:pointer; }
+  .mk-edit.mk-edit-line { min-height:0; resize:horizontal; }
+  .mk-edit { position:absolute; z-index:8; min-width:180px; min-height:44px; padding:2px 4px; font-family:dssans,Arimo,Arial,sans-serif; line-height:1.22; border:2px solid var(--red); background:rgba(255,255,255,.97); resize:both; }
+  .cal-row { display:flex; gap:6px; margin:12px 0 8px; }
+  .cal-row input { width:130px; }
+  .cal-all { display:flex; align-items:center; gap:8px; font-size:11.5px; }
   #mergeName { font:600 12px/22px var(--sans,sans-serif) !important; letter-spacing:0 !important; }
   #previewZoomLabel { min-width:38px; text-align:center; font:700 10.5px var(--mono) !important; }
   /* the file row: checkbox, +/−, type, the name (as wide as it can be), actions */
@@ -579,6 +603,7 @@
         <b id="previewTitle" style="font-size:11px">NO PAGE SELECTED</b>
         <span id="previewMeta" style="font:10px var(--mono);color:var(--muted)"></span>
         <span class="grow"></span>
+        <button id="mkToggle" class="btn btn-ghost" title="Markups: text, callouts, clouds, stamps, measurements">✎ MARKUP</button>
         <span id="frameTools" class="frame-tools" hidden>
           <button id="frameBtn" class="btn btn-ghost" title="Cut a sheet out of Model Space: click two corners of its frame (Esc to stop)">SHEET BY 2 CORNERS</button>
           <button id="snapBtn" class="btn btn-ghost btn-active" title="Snap the corners to the drawing's vertices — line ends, polyline and frame corners (F3)">SNAP</button>
@@ -592,6 +617,42 @@
         <span id="previewZoomLabel" style="font:700 11px var(--mono)">100%</span>
         <button id="previewZoomIn" class="btn btn-ghost">+</button>
         <button id="previewFs" class="btn btn-ghost" title="Full screen (Esc to leave)" aria-label="Full screen">⛶</button>
+      </div>
+      <div id="mkBar" class="mk-bar" hidden>
+        <span class="mk-grp">
+          <button class="btn btn-ghost ico" data-tool="select" title="Select, move, edit (double-click) — Delete removes" aria-label="Select, move, edit (double-click) — Delete removes"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 2l9 6-4 1 2.5 4.5-1.6.9L6.4 10 3 13z" fill="currentColor" stroke="none"/></svg></button>
+          <button class="btn btn-ghost ico" data-tool="text" title="Text" aria-label="Text"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3h10M8 3v10M6 13h4"/></svg></button>
+          <button class="btn btn-ghost ico" data-tool="callout" title="Callout: press on the point, drag to where the text goes" aria-label="Callout: press on the point, drag to where the text goes"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="6.5" y="2.5" width="8" height="6"/><path d="M6.5 7L2 13"/></svg></button>
+          <button class="btn btn-ghost ico" data-tool="arrow" title="Arrow" aria-label="Arrow"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 14L13 3M13 3H8M13 3v5"/></svg></button>
+          <button class="btn btn-ghost ico" data-tool="line" title="Line (Shift: 0/45/90°)" aria-label="Line (Shift: 0/45/90°)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 13L14 3"/></svg></button>
+          <button class="btn btn-ghost ico" data-tool="rect" title="Rectangle" aria-label="Rectangle"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="3.5" width="11" height="9"/></svg></button>
+          <button class="btn btn-ghost ico" data-tool="ellipse" title="Ellipse" aria-label="Ellipse"><svg viewBox="0 0 16 16" aria-hidden="true"><ellipse cx="8" cy="8" rx="6" ry="4.5"/></svg></button>
+          <button class="btn btn-ghost ico" data-tool="cloud" title="Revision cloud with its revision triangle" aria-label="Revision cloud with its revision triangle"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 11a2 2 0 010-4 2.5 2.5 0 014-2 2.5 2.5 0 014.5 1 2 2 0 011.5 3.6 2 2 0 01-2.5 1.4H5A2 2 0 013 11z"/></svg></button>
+          <button class="btn btn-ghost ico" data-tool="highlight" title="Highlight" aria-label="Highlight"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="5" width="12" height="6" fill="currentColor" fill-opacity=".35" stroke="none"/><path d="M2 5h12M2 11h12"/></svg></button>
+          <button class="btn btn-ghost ico" data-tool="whiteout" title="Whiteout: cover part of the sheet (then write over it)" aria-label="Whiteout: cover part of the sheet (then write over it)"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="4.5" width="11" height="7" fill="#fff"/><path d="M4 8h8" stroke-dasharray="1.5 1.5"/></svg></button>
+          <button class="btn btn-ghost ico" data-tool="edittext" title="Edit the PDF's own text: click a line — it is covered and retyped in place, same size (PDF pages)" aria-label="Edit the PDF's own text"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h8M6 3v9M4 12h4"/><path d="M10.5 13.5l4-4-1.5-1.5-4 4-.5 2z"/></svg></button>
+          <button class="btn btn-ghost ico" data-tool="stamp" title="Review stamp" aria-label="Review stamp"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="4" width="12" height="8"/><path d="M4 7h8M4 9.5h5"/></svg></button>
+          <select id="mkStamp" title="Stamp"><option value="A">A — APPROVED</option><option value="AWC">AWC — APPROVED WITH COMMENTS</option><option value="RR">RR — REVISE AND RESUBMIT</option><option value="R">R — REJECTED</option><option value="FI">FI — FOR INFORMATION</option><option value="IFC">IFC — ISSUED FOR CONSTRUCTION</option></select>
+        </span>
+        <span class="mk-grp">
+          <button class="btn btn-ghost ico" data-tool="dist" title="Distance — on a DWG sheet in the model's units, through the viewport's scale" aria-label="Distance — on a DWG sheet in the model's units, through the viewport's scale"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 11h12M2 9v4M14 9v4"/><path d="M5 6h6" stroke-dasharray="1.5 1.5"/></svg></button>
+          <button class="btn btn-ghost ico" data-tool="path" title="Length along a route (clicks; double-click or Enter ends) — cable runs" aria-label="Length along a route (clicks; double-click or Enter ends) — cable runs"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 13l4-6 4 3 4-7"/><circle cx="2" cy="13" r="1" fill="currentColor"/><circle cx="14" cy="3" r="1" fill="currentColor"/></svg></button>
+          <button class="btn btn-ghost ico" data-tool="area" title="Area (clicks; double-click or Enter ends)" aria-label="Area (clicks; double-click or Enter ends)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 12l3-9 9 2-2 8z" fill="currentColor" fill-opacity=".18"/></svg></button>
+          <button class="btn btn-ghost ico" data-tool="calibrate" title="Calibrate: draw over a known length and give its real value" aria-label="Calibrate: draw over a known length and give its real value"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 12L12 2l2 2L4 14z"/><path d="M5 9l1.5 1.5M7 7l1.5 1.5M9 5l1.5 1.5"/></svg></button>
+        </span>
+        <span class="mk-grp mk-sws"><button class="btn btn-ghost mk-sw" data-c="#d11a2a" style="--c:#d11a2a" title="Red" aria-label="Red"></button><button class="btn btn-ghost mk-sw" data-c="#1f5fbf" style="--c:#1f5fbf" title="Blue" aria-label="Blue"></button><button class="btn btn-ghost mk-sw" data-c="#1d8a3a" style="--c:#1d8a3a" title="Green" aria-label="Green"></button><button class="btn btn-ghost mk-sw" data-c="#b0189a" style="--c:#b0189a" title="Magenta" aria-label="Magenta"></button><button class="btn btn-ghost mk-sw" data-c="#d9730d" style="--c:#d9730d" title="Orange" aria-label="Orange"></button><button class="btn btn-ghost mk-sw" data-c="#222222" style="--c:#222222" title="Black" aria-label="Black"></button></span>
+        <select id="mkPen" title="Pen width (ISO 128)"><option value="0.25">0.25 mm</option><option value="0.35">0.35 mm</option><option value="0.5">0.5 mm</option><option value="0.7">0.7 mm</option><option value="1">1 mm</option></select>
+        <select id="mkTh" title="Text height (ISO 3098)"><option value="2.5">h 2.5</option><option value="3.5">h 3.5</option><option value="5">h 5</option><option value="7">h 7</option></select>
+        <label class="mk-lab" title="Revision number the clouds carry">REV<input id="mkRev" type="text" value="1"></label>
+        <input id="mkAuthor" type="text" placeholder="Reviewer" title="Your name, on stamps and in the comment register">
+        <span class="mk-grp">
+          <button id="mkUndo" class="btn btn-ghost ico" title="Undo (Ctrl+Z)" aria-label="Undo">↶</button>
+          <button id="mkRedo" class="btn btn-ghost ico" title="Redo (Ctrl+Y)" aria-label="Redo">↷</button>
+          <button id="mkDel" class="btn btn-ghost ico" title="Delete the selected markup (Delete)" aria-label="Delete">✕</button>
+        </span>
+        <input id="mkNote" type="text" placeholder="Comment on the selected markup — goes to the register">
+        <button id="mkXlsx" class="btn btn-primary" title="Every markup of this file as a comment register with snapshots (Excel)">⤓ COMMENTS .XLSX</button>
+        <span id="mkInfo" class="mk-info"></span>
       </div>
       <div id="pvGrid" class="pv-grid" data-n="1"></div>
     </main>
@@ -662,7 +723,8 @@ window.DOC_STUDIO_CONFIG = {
 </script>
 <script type="module">
 import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs";
-import { parseDwg, svgToPng, sheetsPdf } from "./libredwg-engine.js?v=r2f";
+import { parseDwg, svgToPng, sheetsPdf, printMap } from "./libredwg-engine.js?v=mk1";
+import * as MK from "./markup.js?v=mk5";
 import * as CV from "./canvas-view.js?v=r2f";
 pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs";
 
@@ -1223,8 +1285,8 @@ $("#mergeOk").onclick=()=>{
    bottom quarter means before or after; dropped on a window, the file is
    shown there. Near the list's edges it scrolls. */
 function copyPage(p,target){
-  const {id,docId,_rot,_rotPending,_svgUrl,pngDataUrl,thumb,...rest}=p;
-  return newPage({...rest,docId:target.id,orig:p.orig||p});
+  const {id,docId,_rot,_rotPending,_svgUrl,pngDataUrl,thumb,marks,...rest}=p;
+  return newPage({...rest,docId:target.id,orig:p.orig||p,marks:marks?JSON.parse(JSON.stringify(marks)):undefined});
 }
 (function dragging(){
   const tree=$("#tree");
@@ -1420,14 +1482,14 @@ function commit(V){
   const done=ok=>{ if(!ok||V.host!==h) return; v.cs=target.s; v.cx=target.x; v.cy=target.y; liveTransform(V); };
   const r=h.draw(target);
   if(r&&r.then) r.then(done); else done(true);
-  zoomLabelOf(V);
+  zoomLabelOf(V); mkView(V);
 }
 /* a canvas sheet is drawn again on every step while frames come quickly; when
    they do not (a heavy sheet on a slow GPU: the frame interval, not only the
    script time, is watched), the rest of that gesture moves the last frame and
    the vectors follow when the wheel stops */
 function changed(V){
-  zoomLabelOf(V);
+  zoomLabelOf(V); mkView(V);
   clearTimeout(V.idleT); V.idleT=setTimeout(()=>{ V.gestureSlow=false; V.slowFrames=0; V.lastFrame=0; },350);
   const h=V.host;
   if(h&&h.kind==="scene"){
@@ -1564,7 +1626,7 @@ async function renderViewer(V){
     return;
   }
   const s=source(p.sourceId), o=p.orig||p, keep=view.pageId===p.id&&V.host;
-  const place=()=>{ if(keep){ commit(V); } else { view.pageId=p.id; fitView(V); } };
+  const place=()=>{ if(keep){ commit(V); } else { view.pageId=p.id; fitView(V); } mkAttach(V); };
   if(p.sourceType==="pdf"&&s?.pdfDoc){
     try{
       const pg=await s.pdfDoc.getPage(p.sourcePage+1); if(token!==V.token) return;
@@ -1712,6 +1774,7 @@ async function addSheet(a,b){
 }
 $("#frameBtn").onclick=async()=>{
   if(framing) return setFraming(false);
+  if(mk.on){ mk.on=false; mk.sel=null; mkSyncBar(); for(const W of viewers) if(W.pageId) mkAttach(W); }
   const V=activeV, p=page(V.pageId), m=modelPageOf(p); if(!m) return;
   if(m!==p) await showIn(V,m.id);
   setFraming(true);
@@ -1729,7 +1792,13 @@ function makeViewer(i){
   const V={ i, el, st:el.querySelector(".vw-stage"), view:{s:1,x:0,y:0,cs:1,cx:0,cy:0,fit:1,pageId:null}, host:null, pageId:null, token:0, rot:0,
             commitT:0, rafQ:0, lastFrame:0, slowFrames:0, gestureSlow:false, idleT:0, sharpT:0 };
   const st=V.st, view=V.view;
-  el.addEventListener("pointerdown",()=>setActive(V),true);
+  el.addEventListener("pointerdown",()=>{
+    setActive(V);
+    // a press on the sheet leaves the bar's fields (their change is kept), so
+    // that the keys — Delete, Ctrl+Z — go to the sheet again
+    const a=document.activeElement;
+    if(a&&a.closest?.(".preview-pane")&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)&&!a.classList.contains("mk-edit")) a.blur();
+  },true);
   el.querySelector(".vw-doc").addEventListener("change",e=>{ setActive(V); const d=doc(e.target.value); showIn(V,pageSeq(d)[0]?.id); });
   const step=k=>{ const p=page(V.pageId), seq=pageSeq(docOfPage(p)), j=seq.indexOf(p)+k; if(j>=0&&j<seq.length){ setActive(V); showIn(V,seq[j].id); } };
   el.querySelector(".vw-prev").onclick=()=>step(-1); el.querySelector(".vw-next").onclick=()=>step(1);
@@ -1801,6 +1870,407 @@ activeV=viewers[0]; activeV.el.classList.add("on");
 document.querySelectorAll(".vw-lay").forEach(b=>b.addEventListener("click",()=>setLayout(+b.dataset.n)));
 (()=>{ let n=1; try{ n=+localStorage.getItem("docStudio.views")||1; }catch{} setLayout(n); })();
 
+/* ── markups ──────────────────────────────────────────────────────────────
+   ✎ MARKUP opens the markup bar. The tools draw on the active window's page;
+   each window has an SVG layer over its sheet that follows the view. The
+   markups belong to the page (p.marks, in the page's units, markup.js) and
+   travel with it: moved or copied pages, merged files, the exported PDF —
+   where they are drawn as vectors, the text in the bundled Arimo.
+   Select: click a markup, drag it or its points; Delete removes it; double-
+   click edits its text. Drawing tools: press–drag–release for the two-point
+   ones, clicks for Length and Area (double-click or Enter ends), a click for
+   Text and Stamp. Shift keeps a line at 0/45/90°. With SNAP on, points catch
+   the drawing's vertices on a DWG sheet. Ctrl+Z / Ctrl+Y undo and redo. */
+var mk={ on:false, tool:"select", c:MK.COLORS[0][0], pen:0.35, th:3.5, stamp:"AWC", rev:1, sel:null, draft:null, hist:[], redo:[] };
+try{ const s=JSON.parse(localStorage.getItem("docStudio.mk")||"{}"); if(s.c) mk.c=s.c; if(s.pen) mk.pen=s.pen; if(s.th) mk.th=s.th; if(s.stamp) mk.stamp=s.stamp; if(s.author) mk.author=s.author; }catch{}
+const mkSave=()=>{ try{ localStorage.setItem("docStudio.mk",JSON.stringify({c:mk.c,pen:mk.pen,th:mk.th,stamp:mk.stamp,author:mk.author||""})); }catch{} };
+const ptOf=mm=>mm/MK.PT_MM;
+const today=()=>new Date().toISOString().slice(0,10);
+
+/* the page's markup units and its measuring scale */
+function mkSpace(p){
+  if(!p) return null;
+  const o=p.orig||p;
+  if(p.rotation) return { ok:false, why:"Markups are drawn on pages at 0°: turn this one back to mark it up." };
+  if(p.sourceType==="dwg-svg"){
+    const l=o.layout; if(!l) return { ok:false, why:"No sheet." };
+    const pm=printMap(l), U=MK.PT_MM/pm.k;
+    const du=l.units||"units";
+    const sc=pts=>{
+      if(p.cal) return p.cal;
+      if(l.isModel) return { k:1, unit:du, how:"drawing units" };
+      // inside one viewport: the model's length (paper ÷ the viewport's scale)
+      const vp=(l.vpRects||[]).find(r=>pts.every(([x,y])=>x>=r.minX&&x<=r.maxX&&-y>=r.minY&&-y<=r.maxY));
+      if(vp) return { k:1/vp.s, unit:du, how:"viewport 1:"+(+(1/vp.s*(l.unitMm||1)).toPrecision(4)) };
+      return { k:l.unitMm||1, unit:"mm", how:"paper" };
+    };
+    return { ok:true, U, sc, kind:"dwg", map:()=>({ x:pm.x0/MK.PT_MM, y:(pm.pageH-pm.y0)/MK.PT_MM, a:pm.k/MK.PT_MM }) };
+  }
+  if(p.sourceType==="pdf") return { ok:true, U:1, sc:()=>p.cal||{k:MK.PT_MM,unit:"mm",how:"paper"}, kind:"pdf" };
+  if(p.sourceType==="image") return { ok:true, U:1/0.75, sc:()=>p.cal||{k:0.75*MK.PT_MM,unit:"mm",how:"paper"}, kind:"image" };
+  return { ok:false, why:"This page cannot be marked up." };
+}
+const marksOf=p=>p.marks||(p.marks=[]);
+function mkPush(p){ mk.hist.push({ pid:p.id, before:JSON.stringify(p.marks||[]) }); if(mk.hist.length>200) mk.hist.shift(); mk.redo=[]; }
+function mkUndo(redo){
+  const from=redo?mk.redo:mk.hist, to=redo?mk.hist:mk.redo, h=from.pop(); if(!h) return;
+  const p=page(h.pid); if(!p) return;
+  to.push({ pid:p.id, before:JSON.stringify(p.marks||[]) });
+  p.marks=JSON.parse(h.before); mk.sel=null; mkRenderPage(p); mkSyncBar();
+}
+
+/* the layer over a window */
+function mkLayer(V){
+  let sv=V.st.querySelector(".mk-layer");
+  if(!sv){
+    sv=document.createElementNS("http://www.w3.org/2000/svg","svg"); sv.setAttribute("class","mk-layer");
+    sv.innerHTML='<g class="mk-view"><g class="mk-marks"></g><g class="mk-draft"></g><g class="mk-handles"></g></g>';
+    V.st.appendChild(sv); mkWire(V,sv);
+  }
+  return sv;
+}
+/* the layer follows the view (called on every frame) */
+function mkView(V){
+  const sv=V.st.querySelector(".mk-layer"); if(!sv) return;
+  const v=V.view;
+  sv.firstChild.setAttribute("transform","matrix("+v.s+",0,0,"+v.s+","+(-v.x*v.s)+","+(-v.y*v.s)+")");
+  mkHandles(V);
+}
+function mkAttach(V){
+  if(!mk) return;
+  const p=page(V.pageId), sp=mkSpace(p);
+  if(!V.host||!p||!sp?.ok){ V.st.querySelector(".mk-layer")?.remove(); return; }
+  const sv=mkLayer(V);
+  sv.classList.toggle("on",mk.on&&V===activeV);
+  sv.querySelector(".mk-marks").innerHTML=(p.marks||[]).map(m=>'<g data-mid="'+m.id+'"'+(mk.sel?.id===m.id?' class="sel"':"")+'>'+MK.svgOf(m,sp.U,sp.sc,true)+'</g>').join("");
+  mkView(V);
+}
+/* every window showing that page */
+function mkRenderPage(p){ for(const V of viewers) if(V.pageId===p.id) mkAttach(V); }
+function mkHandles(V){
+  if(!mk) return;
+  const sv=V.st.querySelector(".mk-layer"); if(!sv) return;
+  const g=sv.querySelector(".mk-handles"), s=mk.sel;
+  if(!mk.on||!s||s.pid!==V.pageId||V!==activeV){ g.innerHTML=""; return; }
+  const m=marksOf(page(s.pid)).find(x=>x.id===s.id); if(!m){ g.innerHTML=""; return; }
+  const r=4.5/V.view.s;
+  g.innerHTML=m.pts.map((q,i)=>'<rect class="mk-h" data-h="'+i+'" x="'+(q[0]-r)+'" y="'+(q[1]-r)+'" width="'+2*r+'" height="'+2*r+'"/>').join("");
+}
+
+/* a point under the pointer, in page units: snapped to the drawing on a DWG
+   sheet, kept to 0/45/90° from the previous point with Shift */
+function mkPoint(V,e,prev){
+  const r=V.st.getBoundingClientRect(), v=V.view;
+  let x=v.x+(e.clientX-r.left)/v.s, y=v.y+(e.clientY-r.top)/v.s;
+  if(prev&&e.shiftKey){
+    const dx=x-prev[0], dy=y-prev[1], a=Math.round(Math.atan2(dy,dx)/(Math.PI/4))*(Math.PI/4), L=Math.hypot(dx,dy);
+    return [prev[0]+Math.cos(a)*L, prev[1]+Math.sin(a)*L];
+  }
+  if(snapOn&&V.host?.kind==="scene"){ const q=CV.snap(CV.snapIndex(V.host.scene),x,y,10/v.s); if(q) return [q.x,q.y]; }
+  return [x,y];
+}
+const TWO=new Set(["line","arrow","rect","ellipse","cloud","highlight","whiteout","dist","callout","calibrate"]);
+function newMark(t,pts){
+  const m={ id:uid("mk"), t, pts, c:t==="highlight"?"#ffe600":t==="whiteout"?"#ffffff":mk.c, w:ptOf(mk.pen), fs:ptOf(mk.th), author:mk.author||"", date:today() };
+  if(t==="cloud"){ m.rev=mk.rev; }
+  if(t==="stamp"){ m.stamp=mk.stamp; }
+  if(t==="text") m.text="";
+  if(t==="callout") m.text="";
+  return m;
+}
+function mkWire(V,sv){
+  let drag=null;
+  sv.addEventListener("pointerdown",e=>{
+    if(!mk.on||V!==activeV||e.button!==0) return;
+    const p=page(V.pageId), sp=mkSpace(p); if(!sp?.ok) return;
+    // a click beside the text being typed only finishes it
+    const open=document.querySelector(".mk-edit");
+    if(open){ e.stopPropagation(); e.preventDefault(); open.blur(); return; }
+    const hEl=e.target.closest?.(".mk-h"), mEl=e.target.closest?.("[data-mid]");
+    if(mk.tool==="select"){
+      if(hEl&&mk.sel){ e.stopPropagation(); e.preventDefault(); mkPush(p); drag={ kind:"handle", i:+hEl.dataset.h }; sv.setPointerCapture(e.pointerId); return; }
+      if(mEl){
+        e.stopPropagation(); e.preventDefault();
+        mk.sel={ pid:p.id, id:mEl.dataset.mid }; mkAttach(V); mkSyncBar();
+        const m=marksOf(p).find(x=>x.id===mk.sel.id), at=mkPoint(V,e);
+        drag={ kind:"move", from:at, orig:JSON.stringify(m.pts), pushed:false }; sv.setPointerCapture(e.pointerId); return;
+      }
+      if(mk.sel){ mk.sel=null; mkAttach(V); mkSyncBar(); }
+      return;                                                   // empty space: the window pans
+    }
+    e.stopPropagation(); e.preventDefault();
+    const at=mkPoint(V,e);
+    if(mk.tool==="path"||mk.tool==="area"){
+      // a second press close to the last one, soon after it, ends the line
+      // (the double-click event does not come: the press is taken here)
+      const now=performance.now(), lc=mk.lastClick;
+      if(mk.draft&&lc&&now-lc.t<400&&Math.hypot(e.clientX-lc.x,e.clientY-lc.y)<6){ mk.lastClick=null; mkFinishPoly(); return; }
+      mk.lastClick={ t:now, x:e.clientX, y:e.clientY };
+      if(!mk.draft){ mk.draft={ V, m:newMark(mk.tool,[at,at]) }; }
+      else mk.draft.m.pts.splice(mk.draft.m.pts.length-1,0,at);
+      mkDraft(); return;
+    }
+    if(mk.tool==="edittext"){ mkEditPdfText(V,p,at); return; }
+    if(mk.tool==="text"||mk.tool==="stamp"){
+      const m=newMark(mk.tool,[at]); mkPush(p); marksOf(p).push(m); mk.sel={ pid:p.id, id:m.id }; mkRenderPage(p);
+      if(mk.tool==="text") mkEdit(V,m,true); else mkSyncBar();
+      return;
+    }
+    if(TWO.has(mk.tool)){ mk.draft={ V, m:newMark(mk.tool==="calibrate"?"dist":mk.tool,[at,at]), cal:mk.tool==="calibrate" }; sv.setPointerCapture(e.pointerId); drag={ kind:"draw" }; mkDraft(); }
+  });
+  sv.addEventListener("pointermove",e=>{
+    if(!mk.on||V!==activeV) return;
+    const p=page(V.pageId);
+    if(mk.draft&&mk.draft.V===V&&(drag?.kind==="draw"||mk.tool==="path"||mk.tool==="area")){
+      const pts=mk.draft.m.pts, prev=pts.length>1?pts[pts.length-2]:pts[0];
+      pts[pts.length-1]=mkPoint(V,e,prev); mkDraft(); return;
+    }
+    if(!drag||!mk.sel) return;
+    const m=marksOf(p).find(x=>x.id===mk.sel.id); if(!m) return;
+    if(drag.kind==="handle"){ const i=drag.i, prev=m.pts[i===0?1:i-1]; m.pts[i]=mkPoint(V,e,m.pts.length>1?prev:null); }
+    else if(drag.kind==="move"){
+      const at=mkPoint(V,e), dx=at[0]-drag.from[0], dy=at[1]-drag.from[1];
+      if(!drag.pushed&&Math.hypot(dx,dy)*V.view.s>2){ mkPush(p); drag.pushed=true; }
+      m.pts=JSON.parse(drag.orig).map(q=>[q[0]+dx,q[1]+dy]);
+    }
+    mkRenderPage(p);
+  });
+  const up=e=>{
+    if(!drag) return; const d=drag; drag=null;
+    try{ sv.releasePointerCapture(e.pointerId); }catch{}
+    if(d.kind!=="draw"||!mk.draft) { mkSyncBar(); return; }
+    const p=page(V.pageId), m=mk.draft.m, cal=mk.draft.cal; mk.draft=null; mkDraft();
+    const L=Math.hypot(m.pts[1][0]-m.pts[0][0],m.pts[1][1]-m.pts[0][1])*V.view.s;
+    if(L<4) return;
+    if(cal) return mkCalibrate(p,m);
+    mkPush(p); marksOf(p).push(m); mk.sel={ pid:p.id, id:m.id }; mkRenderPage(p); mkSyncBar();
+    if(m.t==="callout") mkEdit(V,m,true);
+  };
+  sv.addEventListener("pointerup",up); sv.addEventListener("pointercancel",up);
+  sv.addEventListener("dblclick",e=>{
+    if(!mk.on||V!==activeV) return;
+    if(mk.draft&&(mk.tool==="path"||mk.tool==="area")){ e.stopPropagation(); mkFinishPoly(); return; }
+    const mEl=e.target.closest?.("[data-mid]"); if(!mEl) return;
+    e.stopPropagation();
+    const p=page(V.pageId), m=marksOf(p).find(x=>x.id===mEl.dataset.mid);
+    if(m&&(m.t==="text"||m.t==="callout"||m.t==="stamp"||m.t==="replace")) mkEdit(V,m,false,m.t==="replace");
+  });
+}
+function mkDraft(){
+  for(const V of viewers){ const g=V.st.querySelector(".mk-layer .mk-draft"); if(g) g.innerHTML=""; }
+  const d=mk.draft; if(!d) return;
+  const p=page(d.V.pageId), sp=mkSpace(p), g=mkLayer(d.V).querySelector(".mk-draft");
+  g.innerHTML=MK.svgOf(d.m,sp.U,sp.sc);
+}
+function mkFinishPoly(){
+  const d=mk.draft; if(!d) return;
+  const p=page(d.V.pageId), m=d.m; mk.draft=null; mkDraft();
+  m.pts.pop();                                                 // the point that followed the pointer
+  const pts=m.pts.filter((q,i)=>!i||Math.hypot(q[0]-m.pts[i-1][0],q[1]-m.pts[i-1][1])>1e-9);
+  if(pts.length<(m.t==="area"?3:2)) return;
+  m.pts=pts; mkPush(p); marksOf(p).push(m); mk.sel={ pid:p.id, id:m.id }; mkRenderPage(p); mkSyncBar();
+}
+/* The PDF's own text, edited: the line under the click (pdf.js text layer)
+   is covered by a white box and typed again over it at its size and on its
+   baseline; the whole line is offered for editing, and an empty text deletes
+   it. A DWG's text is the drawing's geometry: Whiteout and Text do that. */
+async function mkEditPdfText(V,p,at){
+  if(p.sourceType!=="pdf"){ await askConfirm({ title:"EDIT TEXT", yes:"OK", html:"The text of a PDF page can be edited in place. On a DWG sheet the text is geometry of the drawing: cover it with <b>Whiteout</b> and write over it with <b>Text</b>." }); return; }
+  const src=source((p.orig||p).sourceId), pg=await src.pdfDoc.getPage(p.sourcePage+1), vp=pg.getViewport({scale:1,rotation:0});
+  const tc=p._tc||(p._tc=await pg.getTextContent());
+  let hit=null, best=Infinity;
+  for(const it of tc.items){
+    if(!it.str||!it.str.trim()) continue;
+    const t=it.transform, fh=Math.hypot(t[2],t[3]); if(Math.abs(t[1])>1e-3||Math.abs(t[2])>1e-3) continue;   // level text only
+    const [x0,yb]=vp.convertToViewportPoint(t[4],t[5]), x1=x0+it.width;
+    const box=[x0-0.5,yb-fh*0.86,x1+0.5,yb+fh*0.24];
+    if(at[0]>=box[0]&&at[0]<=box[2]&&at[1]>=box[1]&&at[1]<=box[3]){ const d=Math.abs(at[1]-(box[1]+box[3])/2); if(d<best){ best=d; hit={it,box,yb,fh}; } }
+  }
+  if(!hit){ $("#mkInfo").textContent="No PDF text under the click (a scan has none: cover it with Whiteout and write with Text)."; return; }
+  const m={ id:uid("mk"), t:"replace", pts:[[hit.box[0],hit.box[1]],[hit.box[2],hit.box[3]]], base:hit.yb, padX:0.5, fs:hit.fh, c:"#000000",
+            text:hit.it.str, orig:hit.it.str, author:mk.author||"", date:today() };
+  mkPush(p); marksOf(p).push(m); mk.sel={ pid:p.id, id:m.id }; mkRenderPage(p);
+  mkEdit(V,m,false,true);
+}
+/* text typed on the sheet itself */
+function mkEdit(V,m,isNew,replacing){
+  const p=page(V.pageId), sp=mkSpace(p), v=V.view;
+  document.querySelector(".mk-edit")?.blur();       // the one open before is finished, not torn out
+  const ta=document.createElement("textarea"); ta.className="mk-edit";
+  const at=m.t==="callout"?m.pts[1]:m.pts[0];
+  const fsPx=(m.t==="stamp"?ptOf(2.4):(m.fs||ptOf(3.5)))*sp.U*v.s;
+  if(replacing) ta.classList.add("mk-edit-line");
+  Object.assign(ta.style,{ left:(at[0]-v.x)*v.s+"px", top:(at[1]-v.y)*v.s+"px", fontSize:Math.max(11,fsPx)+"px", color:m.c });
+  ta.value=m.text||""; ta.placeholder=m.t==="stamp"?"Remark (optional)":"Type the text";
+  V.st.appendChild(ta); ta.focus();
+  const before=JSON.stringify(p.marks||[]);
+  let closed=false;
+  const done=keep=>{
+    if(closed) return; closed=true;                // remove() blurs, and blur comes back here
+    const val=ta.value; if(ta.isConnected) ta.remove();
+    if(!keep){ if(isNew&&m.t!=="stamp"){ p.marks=JSON.parse(before).filter(x=>x.id!==m.id); mkRenderPage(p); } return; }
+    if(!val.trim()&&m.t!=="stamp"&&m.t!=="replace"){ p.marks=marksOf(p).filter(x=>x.id!==m.id); mk.sel=null; }
+    else { if(!isNew) mk.hist.push({ pid:p.id, before }); m.text=val; }
+    mkRenderPage(p); mkSyncBar();
+  };
+  ta.addEventListener("keydown",e=>{ e.stopPropagation(); if(e.key==="Escape"){ e.preventDefault(); done(false); } if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)){ e.preventDefault(); done(true); } });
+  ta.addEventListener("blur",()=>done(true));
+}
+/* a known length drawn over the page sets its scale */
+async function mkCalibrate(p,m){
+  const sp=mkSpace(p), px=Math.hypot(m.pts[1][0]-m.pts[0][0],m.pts[1][1]-m.pts[0][1]), cur=sp.sc(m.pts);
+  const ok=await askConfirm({ title:"CALIBRATE THE SCALE", yes:"SET THE SCALE",
+    html:'The line you drew measures <b>'+esc(MK.fmtLen(px*cur.k,cur.unit))+'</b> ('+esc(cur.how||"")+'). What is its real length?'+
+      '<div class="cal-row"><input id="calLen" type="number" min="0" step="any" value="'+(+(px*cur.k).toPrecision(5))+'"><select id="calUnit">'+
+      ["mm","cm","m","km","in","ft"].map(u=>'<option'+(u===cur.unit?" selected":"")+'>'+u+'</option>').join("")+'</select></div>'+
+      '<label class="cal-all"><span class="chk"><input id="calAll" type="checkbox" checked><span></span></span>Use it on every page of this file</label>' });
+  if(!ok) return;
+  const L=+$("#calLen")?.value, unit=$("#calUnit")?.value||"mm", all=$("#calAll")?.checked;
+  if(!(L>0)) return;
+  const cal={ k:L/px, unit, how:"calibrated" }, d=docOfPage(p);
+  for(const q of (all&&d?d.all:[p])){ if(mkSpace(q)?.kind===sp.kind) q.cal=cal; }
+  for(const V of viewers) if(V.pageId) mkAttach(V);
+  mkSyncBar();
+}
+/* the bar */
+function mkSyncBar(){
+  const bar=$("#mkBar"); bar.hidden=!mk.on; $("#mkToggle").classList.toggle("btn-active",mk.on);
+  document.querySelectorAll("#mkBar [data-tool]").forEach(b=>b.classList.toggle("btn-active",b.dataset.tool===mk.tool));
+  document.querySelectorAll("#mkBar .mk-sw").forEach(b=>b.classList.toggle("on",b.dataset.c===mk.c));
+  $("#mkPen").value=String(mk.pen); $("#mkTh").value=String(mk.th); $("#mkStamp").value=mk.stamp; $("#mkRev").value=mk.rev; $("#mkAuthor").value=mk.author||"";
+  const p=page(activeV?.pageId), sp=mkSpace(p), m=mk.sel&&p&&mk.sel.pid===p.id?marksOf(p).find(x=>x.id===mk.sel.id):null;
+  $("#mkNote").disabled=!m; $("#mkNote").value=m?.note||""; $("#mkDel").disabled=!m;
+  $("#mkUndo").disabled=!mk.hist.length; $("#mkRedo").disabled=!mk.redo.length;
+  const info=$("#mkInfo");
+  info.textContent=!p?"":!sp?.ok?sp.why:(()=>{
+    const l=(p.orig||p).layout, n=marksOf(p).length, vps=l?.vpRects||[];
+    const how=p.cal?"calibrated, "+p.cal.unit
+      :sp.kind==="dwg"&&l?.isModel?"the drawing's own units ("+(l.units||"units")+")"
+      :sp.kind==="dwg"&&vps.length?"automatic — inside a viewport the model's "+(l.units||"units")+" (1:"+vps.map(r=>+(1/r.s*(l.unitMm||1)).toPrecision(4)).join(", 1:")+"), elsewhere paper mm"
+      :"paper mm — calibrate for real lengths";
+    return "Measuring: "+how+" · "+n+" markup"+(n===1?"":"s");
+  })();
+  for(const V of viewers){ const sv=V.st.querySelector(".mk-layer"); if(sv) sv.classList.toggle("on",mk.on&&V===activeV); mkHandles(V); }
+}
+function mkSetTool(t){
+  if(mk.draft) { mk.draft=null; mkDraft(); }
+  mk.tool=t; if(framing) setFraming(false); mkSyncBar();
+}
+$("#mkToggle").onclick=()=>{ mk.on=!mk.on; if(!mk.on){ mk.sel=null; mk.draft=null; mkDraft(); } else if(framing) setFraming(false); mkSyncBar(); for(const V of viewers) if(V.pageId) mkAttach(V); };
+$("#mkBar").addEventListener("click",e=>{
+  const t=e.target.closest("[data-tool]"); if(t) return mkSetTool(t.dataset.tool);
+  const sw=e.target.closest(".mk-sw");
+  if(sw){ mk.c=sw.dataset.c; mkSave(); mkApply(m=>{ if(m.t!=="highlight"&&m.t!=="whiteout"&&m.t!=="stamp") m.c=mk.c; }); mkSyncBar(); }
+});
+/* a style picked with a markup selected goes onto it too */
+function mkApply(fn){
+  const p=page(mk.sel?.pid), m=p&&marksOf(p).find(x=>x.id===mk.sel.id); if(!m) return;
+  mkPush(p); fn(m); mkRenderPage(p);
+}
+$("#mkPen").onchange=e=>{ mk.pen=+e.target.value; mkSave(); mkApply(m=>{ m.w=ptOf(mk.pen); }); };
+$("#mkTh").onchange=e=>{ mk.th=+e.target.value; mkSave(); mkApply(m=>{ m.fs=ptOf(mk.th); }); };
+$("#mkStamp").onchange=e=>{ mk.stamp=e.target.value; mkSave(); mkApply(m=>{ if(m.t==="stamp") m.stamp=mk.stamp; }); if(mk.tool!=="stamp") mkSetTool("stamp"); };
+$("#mkRev").onchange=e=>{ mk.rev=e.target.value; mkApply(m=>{ if(m.t==="cloud") m.rev=mk.rev; }); };
+$("#mkAuthor").onchange=e=>{ mk.author=e.target.value.trim(); mkSave(); };
+$("#mkNote").addEventListener("change",e=>{ mkApply(m=>{ m.note=e.target.value; }); });
+$("#mkDel").onclick=()=>mkDelete();
+$("#mkUndo").onclick=()=>mkUndo(false); $("#mkRedo").onclick=()=>mkUndo(true);
+function mkDelete(){
+  const p=page(mk.sel?.pid); if(!p) return;
+  mkPush(p); p.marks=marksOf(p).filter(x=>x.id!==mk.sel.id); mk.sel=null; mkRenderPage(p); mkSyncBar();
+}
+document.addEventListener("keydown",e=>{
+  if(!mk.on||document.querySelector(".modal.on")) return;
+  if(/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+  if((e.ctrlKey||e.metaKey)&&(e.key==="z"||e.key==="Z")){ e.preventDefault(); e.stopImmediatePropagation(); mkUndo(e.shiftKey); return; }
+  if((e.ctrlKey||e.metaKey)&&(e.key==="y"||e.key==="Y")){ e.preventDefault(); e.stopImmediatePropagation(); mkUndo(true); return; }
+  if(e.key==="Enter"&&mk.draft){ e.preventDefault(); mkFinishPoly(); return; }
+  if(e.key==="Escape"&&mk.draft){ e.preventDefault(); e.stopImmediatePropagation(); mk.draft=null; mkDraft(); return; }
+  if((e.key==="Delete"||e.key==="Backspace")&&mk.sel){ e.preventDefault(); e.stopImmediatePropagation(); mkDelete(); }
+},true);
+
+/* ── the comment register: every markup of a file, as a table with a snapshot
+   of the place it marks — a comment resolution sheet ready for Excel ── */
+async function snapshotOf(p,m,W=520){
+  const sp=mkSpace(p), b=MK.boxOf(m,sp.U,sp.sc), bw=Math.max(b[2]-b[0],1), bh=Math.max(b[3]-b[1],1);
+  const pad=Math.max(bw,bh)*0.35+30*sp.U, x0=b[0]-pad, y0=b[1]-pad, w=bw+2*pad, h=bh+2*pad;
+  const H=Math.round(Math.min(W*h/w,W*0.75)), s=Math.min(W/w,H/h), vx=x0+w/2-W/(2*s), vy=y0+h/2-H/(2*s);
+  const cv=document.createElement("canvas"); cv.width=W; cv.height=H;
+  const x=cv.getContext("2d"); x.fillStyle="#fff"; x.fillRect(0,0,W,H);
+  const o=p.orig||p, src=source(o.sourceId);
+  if(p.sourceType==="dwg-svg"){ const sc=sceneOf(o); if(sc) CV.draw(x,sc,{s,x:vx,y:vy},W,H,1,{background:"#ffffff"}); }
+  else if(p.sourceType==="pdf"&&src?.pdfDoc){
+    const pg=await src.pdfDoc.getPage(p.sourcePage+1);
+    await pg.render({canvasContext:x,viewport:pg.getViewport({scale:s,rotation:0,offsetX:-vx*s,offsetY:-vy*s})}).promise;
+  } else if(p.sourceType==="image"){ const im=new Image(); im.src=baseThumb(p); await im.decode().catch(()=>{}); x.setTransform(s,0,0,s,-vx*s,-vy*s); x.drawImage(im,0,0); x.setTransform(1,0,0,1,0,0); }
+  // the markups of the page over it, this one outlined
+  const svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+W+'" height="'+H+'" viewBox="'+vx+' '+vy+' '+W/s+' '+H/s+'">'+
+    marksOf(p).map(q=>MK.svgOf(q,sp.U,sp.sc,false,true)).join("")+
+    '<rect x="'+(b[0]-6/s)+'" y="'+(b[1]-6/s)+'" width="'+(bw+12/s)+'" height="'+(bh+12/s)+'" fill="none" stroke="#d11a2a" stroke-width="'+1.5/s+'" stroke-dasharray="'+6/s+' '+4/s+'"/></svg>';
+  const im=new Image(); im.src="data:image/svg+xml;charset=utf-8,"+encodeURIComponent(svg);
+  try{ await im.decode(); x.drawImage(im,0,0); }catch(e){ console.warn(e); }
+  return { url:cv.toDataURL("image/png"), w:W, h:H };
+}
+let excelLib=null;
+const loadExcel=()=>excelLib||(excelLib=new Promise((res,rej)=>{ const s=document.createElement("script"); s.src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"; s.onload=()=>res(window.ExcelJS); s.onerror=rej; document.head.appendChild(s); }));
+async function exportRegister(){
+  const d=docOfPage(page(activeV?.pageId))||activeDoc(); if(!d) return;
+  const rows=[]; const seq=[...d.pages,...outPages(d)];
+  for(const p of seq) for(const m of (p.marks||[])) if(m.t!=="whiteout") rows.push({p,m});
+  if(!rows.length){ await askConfirm({ title:"NO MARKUPS", yes:"OK", html:"<b>"+esc(d.name)+"</b> has no markups yet." }); return; }
+  const btn=$("#mkXlsx"), label=btn.textContent; btn.disabled=true; btn.textContent="…";
+  try{
+    const ExcelJS=await loadExcel(), wb=new ExcelJS.Workbook(), ws=wb.addWorksheet("Comment register");
+    wb.creator="IECCalc Engineering PDF Document Studio";
+    ws.columns=[{width:6},{width:9},{width:16},{width:48},{width:22},{width:14},{width:12},{width:74}];
+    ws.mergeCells("A1:H1"); ws.getCell("A1").value="COMMENT REGISTER — "+d.name; ws.getCell("A1").font={bold:true,size:14};
+    ws.mergeCells("A2:H2"); ws.getCell("A2").value="Made "+today()+(mk.author?" by "+mk.author:"")+" · "+rows.length+" markup"+(rows.length===1?"":"s")+" · IECCalc Engineering PDF Document Studio";
+    ws.getCell("A2").font={size:9,color:{argb:"FF666666"}};
+    const head=ws.getRow(4); head.values=["No.","Page","Markup","Comment / text","Value","Reviewer","Date","Snapshot"];
+    head.eachCell(c=>{ c.font={bold:true,color:{argb:"FFFFFFFF"}}; c.fill={type:"pattern",pattern:"solid",fgColor:{argb:"FF2E2B25"}}; c.alignment={vertical:"middle"}; });
+    let r=5;
+    for(let i=0;i<rows.length;i++){
+      const {p,m}=rows[i], sp=mkSpace(p), n=d.pages.indexOf(p);
+      btn.textContent=Math.round(i/rows.length*100)+"%";
+      const shot=await snapshotOf(p,m);
+      const kind=m.t==="stamp"?(m.stamp+" — "+MK.STAMPS[m.stamp].title):m.t==="cloud"?"Revision cloud · rev "+(m.rev??""):MK.TYPE_NAMES[m.t]||m.t;
+      const text=[m.t==="replace"?"“"+(m.orig||"")+"” → “"+(m.text||"")+"”"+(m.text?"":" (deleted)"):m.text,m.note].filter(Boolean).join("\n");
+      const val=["dist","path","area"].includes(m.t)?MK.measureText(m,sp.sc):"";
+      const row=ws.getRow(r); row.values=[i+1,n>=0?n+1:"—",kind,text,val,m.author||"",m.date||""];
+      row.alignment={vertical:"top",wrapText:true}; row.height=Math.max(40,shot.h*0.75+6);
+      const img=wb.addImage({base64:shot.url,extension:"png"});
+      ws.addImage(img,{tl:{col:7.05,row:r-1+0.05},ext:{width:shot.w,height:shot.h}});
+      r++;
+    }
+    const buf=await wb.xlsx.writeBuffer(), a=document.createElement("a");
+    a.href=URL.createObjectURL(new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}));
+    a.download=(d.name.replace(/\.[^.]+$/,"").replace(/[\\/:*?"<>|]+/g,"_").trim()||"document")+" — comment register.xlsx";
+    a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  }catch(e){ console.error(e); await askConfirm({ title:"EXPORT FAILED", yes:"OK", html:esc(e?.message||String(e)) }); }
+  finally{ btn.disabled=false; btn.textContent=label; }
+}
+$("#mkXlsx").onclick=exportRegister;
+/* the markups into the exported PDF: vectors, the text in the bundled Arimo */
+let fontkitLib=null;
+const loadFontkit=()=>fontkitLib||(fontkitLib=new Promise((res,rej)=>{ const s=document.createElement("script"); s.src="https://cdn.jsdelivr.net/npm/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js"; s.onload=()=>res(window.fontkit); s.onerror=rej; document.head.appendChild(s); }));
+async function markupFonts(out){
+  out.registerFontkit(await loadFontkit());
+  const get=u=>fetch(u).then(r=>r.arrayBuffer());
+  const [reg,bold]=await Promise.all([get("fonts/Arimo_400Regular.ttf"),get("fonts/Arimo_700Bold.ttf")]);
+  // whole fonts: pdf-lib subsetting through fontkit loses glyphs of these TTFs
+  // (the text is there, the shapes are not) — about 300 kB each
+  return { regular:await out.embedFont(reg,{subset:false}), bold:await out.embedFont(bold,{subset:false}) };
+}
+async function drawMarks(pg,p,fonts){
+  const sp=mkSpace(p); if(!sp?.ok||!p.marks?.length) return;
+  let map;
+  if(sp.kind==="dwg") map=sp.map();
+  else if(sp.kind==="pdf"){ const src=source((p.orig||p).sourceId), pj=await src.pdfDoc.getPage(p.sourcePage+1); map={ x:pj.view[0], y:pj.view[3], a:1 }; }
+  else map={ x:0, y:pg.getHeight(), a:0.75 };
+  MK.drawPdf(PDFLib,pg,p.marks,sp.U,sp.sc,map,fonts);
+}
+
+mkSyncBar();
 function renderAll(){renderTree();renderPreview();}
 
 /* One document, one PDF — a single file or a merged set; the progress is
@@ -1813,6 +2283,7 @@ async function exportPdf(d, btn){
     /* All DWG sheets of the document go through one vector PDF (sheetsPdf in
        the engine), so each bundled font is embedded once for the whole file,
        then their pages are copied in where they belong. */
+    const fonts=d.pages.some(p=>p.marks?.length)?await markupFonts(out):null;
     const dwg=d.pages.filter(p=>p.sourceType==="dwg-svg"&&p.svg);
     const sheetPage=new Map();
     if(dwg.length){
@@ -1826,13 +2297,16 @@ async function exportPdf(d, btn){
       if(p.sourceType==="pdf"&&s?.pdfBytes){
         let pdf=loaded.get(s.id);if(!pdf){pdf=await PDFDocument.load(s.pdfBytes.slice(0));loaded.set(s.id,pdf);}
         const [cp]=await out.copyPages(pdf,[p.sourcePage]);if(p.rotation)cp.setRotation(degrees((cp.getRotation().angle+p.rotation)%360));out.addPage(cp);
+        if(fonts) await drawMarks(cp,p,fonts);
       }else if(p.sourceType==="image"&&p.imageFile){
         const ab=await p.imageFile.arrayBuffer(), im=ext(p.imageFile.name)==="png"?await out.embedPng(ab):await out.embedJpg(ab);
         const w=im.width*.75,h=im.height*.75,pg=out.addPage([w,h]);pg.drawImage(im,{x:0,y:0,width:w,height:h});
+        if(fonts) await drawMarks(pg,p,fonts);
         if(p.rotation)pg.setRotation(degrees(p.rotation));
       }else if(p.sourceType==="dwg-svg"&&p.svg){
         const pg=sheetPage.get(p); if(!pg) continue;
         out.addPage(pg);
+        if(fonts) await drawMarks(pg,p,fonts);
         if(p.rotation)pg.setRotation(degrees(p.rotation));
       }
       if(btn) btn.textContent=Math.round((i+1)/d.pages.length*100)+"%";

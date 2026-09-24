@@ -789,8 +789,15 @@ function paperFrame(ext) {
   return ext;
 }
 
+/* $INSUNITS: what one drawing unit is (0 = not said) */
+const INSUNITS = { 1: "in", 2: "ft", 3: "mi", 4: "mm", 5: "cm", 6: "m", 7: "km", 8: "µin", 9: "mil", 10: "yd", 14: "dm" };
+function drawingUnits(db) {
+  const h = db?.header || {}, v = h.INSUNITS ?? h.insunits ?? h.$INSUNITS;
+  return INSUNITS[+v] || "";
+}
 function parseRendered(db) {
   const R = makeRenderer(db);
+  const units = drawingUnits(db);
   const blocks = blockRecords(db);
   const model = blocks.find(isModel), papers = blocks.filter(isPaper);
   const byHandle = new Map(layoutObjects(db).map(l => [String(l.handle), l]));
@@ -805,7 +812,7 @@ function parseRendered(db) {
     const r = R.render(modelEnts, { s: k, ltK: 1, idp: "m" });
     let svg = assemble(r.defs, r.body, ext, k);
     if (n) { ext = intersect(ext, drawnBox(svg)); svg = assemble(r.defs, r.body, ext, k); }
-    const lay = { id: "model", name: "Model", isModel: true, selected: false, empty: n === 0, entityCount: n, skippedTables: 0,
+    const lay = { id: "model", name: "Model", isModel: true, units, selected: false, empty: n === 0, entityCount: n, skippedTables: 0,
                   recordName: model.name, svg, previewUrl: svgUrl(svg), paper: "Model Space", ext, unitMm: k, sheet: "A1", ...meta(svg) };
     /* A drawing kept only in Model Space has no sheet of its own; the user can
        pick one: a window on the model (two corners, drawing coordinates) and a
@@ -838,7 +845,7 @@ function parseRendered(db) {
       const cid = "w" + cut + "_clip";
       const s2 = assemble(rr.defs + '<clipPath id="' + cid + '" clipPathUnits="userSpaceOnUse"><rect x="' + num(win.minX) + '" y="' + num(win.minY) +
         '" width="' + num(w) + '" height="' + num(h) + '"/></clipPath>', '<g clip-path="url(#' + cid + ')">' + rr.body + "</g>", win, kk);
-      return { id: "model-sheet-" + cut, name: "Model sheet " + cut, isModel: true, selected: true, empty: false, entityCount: n, skippedTables: 0,
+      return { id: "model-sheet-" + cut, name: "Model sheet " + cut, isModel: true, units, selected: true, empty: false, entityCount: n, skippedTables: 0,
                recordName: model.name, svg: s2, previewUrl: svgUrl(s2), paper: "Model Space · window", ext: { ...win }, unitMm: kk, sheet, framed: true, ...meta(s2) };
     };
     lay.resetFrame = () => { const r0 = R.render(modelEnts, { s: k, ltK: 1, idp: "m" }); Object.assign(lay, { svg: assemble(r0.defs, r0.body, ext, k), ext, unitMm: k, sheet: "A1", framed: false }); lay.previewUrl = svgUrl(lay.svg); Object.assign(lay, meta(lay.svg)); return true; };
@@ -852,6 +859,7 @@ function parseRendered(db) {
     const ext = n ? paperFrame(sheetExtents(lo, own, vps)) : null;
     const u = sheetUnitMm(ext);
     let defs = "", body = "";
+    const vpRects = [];
     // the model through each viewport, under the sheet's own drawing; only
     // what the viewport's window can show is drawn (a sheet of seven
     // viewports on one model used to carry the whole model seven times)
@@ -863,6 +871,7 @@ function parseRendered(db) {
       const ax = Math.abs(Math.cos(tw)) * hw + Math.abs(Math.sin(tw)) * hh, ay = Math.abs(Math.sin(tw)) * hw + Math.abs(Math.cos(tw)) * hh;
       const r = R.render(modelEnts, { s: u * s, ltK: R.PSLTSCALE ? 1 / s : 1, idp: "v" + j + "_", window: [mx - ax * 1.02, my - ay * 1.02, mx + ax * 1.02, my + ay * 1.02] });
       const deg = tw * 180 / Math.PI, id = "vpc" + j;
+      vpRects.push({ minX: cx - w / 2, maxX: cx + w / 2, minY: cy - h / 2, maxY: cy + h / 2, s });
       defs += r.defs + '<clipPath id="' + id + '" clipPathUnits="userSpaceOnUse"><rect x="' + num(cx - w / 2) + '" y="' + num(cy - h / 2) + '" width="' + num(w) + '" height="' + num(h) + '"/></clipPath>';
       body += '<g clip-path="url(#' + id + ')"><g transform="translate(' + num(cx) + "," + num(cy) + ") scale(" + num(s) + ")" + (deg ? " rotate(" + num(deg) + ")" : "") +
               " translate(" + num(-mx) + "," + num(-my) + ')">' + r.body + "</g></g>";
@@ -872,7 +881,7 @@ function parseRendered(db) {
     const svg = assemble(defs, body, ext, u);
     layouts.push({ id: "layout-" + i, name: lo?.layoutName || lo?.name || ("Layout " + (i + 1)), isModel: false,
                    selected: n > 0, empty: n === 0, entityCount: n, viewports: vps.length, skippedTables: 0,
-                   recordName: br.name, svg, previewUrl: svgUrl(svg), paper: "Paper Space", ext, unitMm: u, ...meta(svg) });
+                   recordName: br.name, svg, previewUrl: svgUrl(svg), paper: "Paper Space", ext, unitMm: u, vpRects, units, ...meta(svg) });
   });
   const paperWithContent = layouts.filter(l => !l.isModel && !l.empty).length;
   const modelOnly = !!model && paperWithContent === 0 && !layouts[0]?.empty;
@@ -1048,6 +1057,15 @@ function inlineUses(svg) {
   });
   const a = svg.indexOf("</defs>");
   return svg.slice(0, a) + expand(svg.slice(a), 0);
+}
+/* Where the sheet's units (the preview's viewBox units: x right, y down, the
+   drawing's y negated) land on its PDF page, in millimetres from the page's
+   top-left corner: the sheet box is fitted to the page, centred — as the
+   print SVG is (preserveAspectRatio xMidYMid meet). k = mm per unit. */
+export function printMap(layout) {
+  const g = printGeometry(layout), e = g.e, w = e.maxX - e.minX, h = e.maxY - e.minY;
+  const k = Math.min(g.pageW / w, g.pageH / h), ox = (g.pageW - w * k) / 2, oy = (g.pageH - h * k) / 2;
+  return { pageW: g.pageW, pageH: g.pageH, k, x0: ox - e.minX * k, y0: oy + e.maxY * k };   // mm = x0 + u·k, y0 + v·k
 }
 export function printSvg(layout) {
   const g = printGeometry(layout), lw = PRINT_LW / g.unitMm; // in drawing units
