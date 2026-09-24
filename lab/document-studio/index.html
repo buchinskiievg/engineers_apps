@@ -309,6 +309,53 @@
 
   @media(max-width:760px){ .workspace-v2{grid-template-columns:1fr; gap:10px;} .splitter{display:none;} .preview-stage{min-height:420px;} }
 
+  /* ── one screen, as the cable ampacity tool (lab/004) ─────────────────
+     The studio is a program, not a document: on a desktop window it is a
+     FIXED box under the site header (and right of the navigator, when the
+     page has one), the page furniture goes, and there is no outer scrollbar
+     at all — only the file list and the preview scroll inside themselves.
+     The heights come from flex, no script sizes anything. On a phone-width
+     window the page stays a page. */
+  @media (min-width:761px) {
+    html.app-screen, html.app-screen body { height:100%; overflow:hidden !important; }
+    html.app-screen #quick-launch,
+    html.app-screen .va-tabstrip,
+    html.app-screen .va-crumbs,
+    html.app-screen .va-foot,
+    html.app-screen .va-foot-cals { display:none !important; }
+    html.app-screen .container > .doc-head,
+    html.app-screen .container > .footer-refs,
+    html.app-screen .container > #forum-widget,
+    html.app-screen .container > .iec-author-foot { display:none !important; }
+    html.app-screen #appShell {
+      position:fixed; left:0; top:var(--chrome-h, 86px); right:0; bottom:0;
+      display:flex; flex-direction:column; gap:8px;
+      padding:8px 16px 10px; background:var(--paper,#ECE9E2); z-index:5;
+    }
+    html.app-screen body:has(.va-sidebar) #appShell { left:var(--sidebar-w, 280px); }
+    html.app-screen #appShell > .studio-toolbar { flex:0 0 auto; margin:0; }
+    html.app-screen #appShell > .workspace-v2 { flex:1 1 auto; min-height:0; margin:0; }
+    html.app-screen .workspace-v2 > .pane { min-height:0; }
+    html.app-screen .preview-stage { min-height:0; }
+    /* one line of controls where it fits: the page's name and description give
+       way first (the whole text is in their tooltip); the buttons wrap only
+       when even they do not fit */
+    html.app-screen .preview-toolbar-v2 > * { flex:0 0 auto; }
+    html.app-screen .preview-toolbar-v2 > #previewTitle { flex:0 1 auto; max-width:40%; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    html.app-screen .preview-toolbar-v2 > #previewMeta { flex:1 1 0; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    html.app-screen .preview-toolbar-v2 > .grow { display:none; }
+  }
+  #appTitle { font:800 11px/1.2 var(--display); letter-spacing:.12em; text-transform:uppercase; color:var(--ink,#2E2B25); white-space:nowrap; margin-right:4px; }
+  #appTitle span { color:var(--ink-4,#A29C8E); margin-left:8px; letter-spacing:.06em; }
+  @media (max-width:760px) { #appTitle { display:none; } }
+
+  /* ── full screen: the preview lifted over the whole window. CSS always
+     works; the desktop application's own browser refuses the Fullscreen API
+     ("permissions check failed"), which is asked for on top when allowed. */
+  .preview-pane.pv-maxed { position:fixed; inset:0; z-index:900; margin:0; border:0; }
+  .preview-pane:fullscreen { width:100vw; height:100vh; border:0; }
+  .preview-pane.pv-maxed .preview-stage, .preview-pane:fullscreen .preview-stage { min-height:0; }
+
 </style>
 </head>
 <body>
@@ -373,6 +420,7 @@
         <button id="previewZoomOut" class="btn btn-ghost">−</button>
         <span id="previewZoomLabel" style="font:700 11px var(--mono)">100%</span>
         <button id="previewZoomIn" class="btn btn-ghost">+</button>
+        <button id="previewFs" class="btn btn-ghost" title="Full screen (Esc to leave)" aria-label="Full screen">⛶</button>
       </div>
       <div id="previewStage" class="preview-stage">
         <div class="preview-empty"><b>Select a file and then a page/layout.</b><br><br>This pane shows what will go to the PDF.</div>
@@ -1077,7 +1125,7 @@ function renderPreviewMeta(){
   const p=page(state.activePageId); if(!p) return;
   const d=docOfPage(p), n=d?d.pages.indexOf(p)+1:0, l=(p.orig||p).layout;
   $("#previewTitle").textContent=p.label;
-  $("#previewMeta").textContent=[n?"page "+n+" of "+d.pages.length+" · "+d.name:"not in the PDF",l?.paper,l?.framed?(l.sheet||"A1"):null,l?.empty?"empty layout":null,p.rotation?"rotated "+p.rotation+"°":null].filter(Boolean).join(" · ");
+  $("#previewMeta").textContent=[n?"page "+n+" of "+d.pages.length+" · "+d.name:"not in the PDF",l?.paper,l?.framed?(l.sheet||"A1"):null,l?.empty?"empty layout":null,p.rotation?"rotated "+p.rotation+"°":null].filter(Boolean).join(" · "); $("#previewMeta").title=$("#previewMeta").textContent; $("#previewTitle").title=p.label;
 }
 /* sheets are cut out of Model Space: the tool shows on every page of a DWG
    that has one, and from a layout page it goes to the Model page first */
@@ -1336,6 +1384,41 @@ if($("#toggleBoundary"))$("#toggleBoundary").onclick=()=>{state.showBoundary=!st
     const cur=$(".tree-pane").getBoundingClientRect().width; save(set(cur+(e.key==="ArrowRight"?20:-20)));
   });
 })();
+/* One screen, as lab/004: the toolbar and the workspace move into a fixed
+   #appShell, the page furniture is hidden by the app-screen class. */
+(function appScreen(){
+  const c=$(".container"), bar=$(".studio-toolbar"), ws=$(".workspace-v2");
+  if(!c||!bar||!ws||$("#appShell")) return;
+  const t=document.createElement("div"); t.id="appTitle";
+  t.innerHTML='Engineering Document Studio <span>DWG · PDF · Word → one PDF</span>';
+  bar.insertBefore(t,bar.firstChild);
+  const shell=document.createElement("div"); shell.id="appShell";
+  c.insertBefore(shell,bar); shell.append(bar,ws);
+  document.documentElement.classList.add("app-screen");
+})();
+/* Full screen for the preview; Esc leaves it (after leaving the sheet tool). */
+(function fullScreen(){
+  const pane=$(".preview-pane"), btn=$("#previewFs");
+  const on=()=>pane.classList.contains("pv-maxed");
+  const sync=()=>{ btn.title=on()?"Leave full screen (Esc)":"Full screen (Esc to leave)"; btn.setAttribute("aria-label",on()?"Leave full screen":"Full screen"); btn.classList.toggle("btn-active",on()); };
+  const leave=()=>{ pane.classList.remove("pv-maxed"); try{ if(document.fullscreenElement) document.exitFullscreen(); }catch{} sync(); };
+  btn.onclick=()=>{
+    if(on()) return leave();
+    pane.classList.add("pv-maxed"); sync();
+    try{ pane.requestFullscreen?.().catch(()=>{}); }catch{}
+  };
+  document.addEventListener("keydown",e=>{
+    if(e.key!=="Escape"||!on()||stage().classList.contains("framing")) return;
+    leave();
+  },true);
+  document.addEventListener("fullscreenchange",()=>{ if(!document.fullscreenElement&&on()) leave(); });
+})();
+/* the preview follows its pane: a new size keeps the view (or the fit) */
+new ResizeObserver(()=>{
+  if(!host) return;
+  const atFit=Math.abs(view.s-view.fit)<view.fit*1e-6;
+  if(atFit) fitView(); else commit();
+}).observe(stage());
 renderAll();
 window.__docStudio={state,openMerge};
 window.__docStudioReady=true;
