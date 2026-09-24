@@ -489,6 +489,13 @@
   .mk-layer.on { pointer-events:auto; cursor:crosshair; }
   .mk-layer.on [data-mid] { cursor:move; }
   .mk-layer [data-mid].sel { filter:drop-shadow(0 0 1.5px rgba(209,26,42,.95)); }
+  .mk-os { pointer-events:none; }
+  .mk-trk { fill:none; stroke:#1d8a3a; stroke-width:1; stroke-dasharray:3 3; }
+  .mk-tip rect { fill:#fffbe6; stroke:#1d8a3a; stroke-width:1; }
+  .mk-tip text { font:600 10px var(--sans,sans-serif); fill:#1d5a2c; }
+  .mk-win { fill:rgba(31,95,191,.10); stroke:#1f5fbf; stroke-width:1; }
+  .mk-win.cross { fill:rgba(29,138,58,.10); stroke:#1d8a3a; stroke-dasharray:5 3; }
+  .mk-modes button { font-size:9px !important; padding:0 6px !important; }
   .mk-h { fill:#fff; stroke:var(--red); stroke-width:1.5px; vector-effect:non-scaling-stroke; cursor:pointer; }
   .mk-edit.mk-edit-line { min-height:0; resize:horizontal; }
   .mk-edit { position:absolute; z-index:8; min-width:180px; min-height:44px; padding:2px 4px; font-family:dssans,Arimo,Arial,sans-serif; line-height:1.22; border:2px solid var(--red); background:rgba(255,255,255,.97); resize:both; }
@@ -551,12 +558,12 @@
 
   <div class="studio-toolbar">
     <label class="btn btn-primary" for="fileInput">+ ADD FILES</label>
-    <input id="fileInput" class="file-input" type="file" multiple accept=".pdf,.dwg,.doc,.docx,.png,.jpg,.jpeg" />
+    <input id="fileInput" class="file-input" type="file" multiple accept=".pdf,.dwg,.doc,.docx,.rtf,.xls,.xlsx,.xlsm,.pptx,.png,.jpg,.jpeg" />
     <button id="clearBtn" class="btn btn-ghost">CLEAR</button>
     <span class="tool-sep"></span>
     <div id="dropzone" class="dropzone" role="button" tabindex="0" aria-label="Drop files here or click to choose them">
       <strong>Drop files here or click</strong>
-      <span>PDF · DWG · DOCX · JPG/PNG — PDF, DWG and images never leave your browser</span>
+      <span>PDF · DWG · Word · Excel · PowerPoint · JPG/PNG — nothing leaves your browser</span>
     </div>
   </div>
 
@@ -650,6 +657,11 @@
           <button id="mkRedo" class="btn btn-ghost ico" title="Redo (Ctrl+Y)" aria-label="Redo">↷</button>
           <button id="mkDel" class="btn btn-ghost ico" title="Delete the selected markup (Delete)" aria-label="Delete">✕</button>
         </span>
+        <span class="mk-grp mk-modes">
+          <button id="mkOsnap" class="btn btn-ghost" title="Object snaps: end, intersection, centre, midpoint, perpendicular, nearest (F3)">OSNAP</button>
+          <button id="mkOrtho" class="btn btn-ghost" title="Ortho: lines level or plumb (F8; Shift turns it the other way while held)">ORTHO</button>
+          <button id="mkOtrack" class="btn btn-ghost" title="Object snap tracking: rest on a point to acquire it, then follow its horizontal, vertical and extension lines (F11)">OTRACK</button>
+        </span>
         <input id="mkNote" type="text" placeholder="Comment on the selected markup — goes to the register">
         <button id="mkXlsx" class="btn btn-primary" title="Every markup of this file as a comment register with snapshots (Excel)">⤓ COMMENTS .XLSX</button>
         <span id="mkInfo" class="mk-info"></span>
@@ -725,7 +737,9 @@ window.DOC_STUDIO_CONFIG = {
 import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs";
 import { parseDwg, svgToPng, sheetsPdf, printMap } from "./libredwg-engine.js?v=mk1";
 import * as MK from "./markup.js?v=mk5";
-import * as CV from "./canvas-view.js?v=r2f";
+import { officeToPdf, OFFICE_EXT } from "./office.js?v=of9";
+import * as CV from "./canvas-view.js?v=sn1";
+import * as SN from "./snap.js?v=sn2";
 pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs";
 
 const $ = s => document.querySelector(s);
@@ -775,7 +789,7 @@ async function acceptFiles(list){
     if(e==="pdf") await ingestPdf(file);
     else if(["png","jpg","jpeg"].includes(e)) await ingestImage(file);
     else if(e==="dwg") await ingestDwg(file);
-    else if(["doc","docx"].includes(e)) await ingestOffice(file);
+    else if(OFFICE_EXT.includes(e)||e==="xlsm") await ingestOffice(file);
     else { const s=addSource(file,"other"); setStatus(s,"error","Unsupported file"); }
   }
   renderAll();
@@ -817,15 +831,16 @@ async function ingestImage(file){
   const im=new Image(); im.onload=()=>{p.orient=im.naturalWidth>im.naturalHeight?"landscape":"portrait";updateCard(p);}; im.src=url;
 }
 
+/* Word, Excel, PowerPoint and RTF are laid out and turned into a PDF in the
+   browser (office.js) — the file does not leave the page — and then read as
+   any PDF. (The server route meant to convert Word never existed: 404.) */
 async function ingestOffice(file){
-  const s=addSource(file,"office");setStatus(s,"pending","Converting with Office engine");
+  const s=addSource(file,"office");setStatus(s,"pending","Laying out the pages in the browser…");
   try{
-    const fd=new FormData();fd.append("file",file);
-    const r=await fetch(DOC_STUDIO_CONFIG.officeConvertUrl,{method:"POST",body:fd});
-    if(!r.ok) throw new Error(await r.text());
-    const blob=await r.blob();
-    await ingestPdf(new File([blob],file.name.replace(/\.docx?$/i,".pdf"),{type:"application/pdf"}),s,file.name);
-  }catch(e){console.error(e);setStatus(s,"error","Office renderer unavailable");}
+    const bytes=await officeToPdf(file,n=>setStatus(s,"pending","Laying out · page "+n+"…"));
+    await ingestPdf(new File([bytes],file.name.replace(/\.[^.]+$/,".pdf"),{type:"application/pdf"}),s,file.name);
+    s.type="office";
+  }catch(e){console.error(e);setStatus(s,"error","Office: "+(e?.message||e));}
 }
 
 /* A reload re-reads the same file in place: its pages keep their place in the
@@ -1735,7 +1750,7 @@ function setFraming(on){
   viewers.forEach(x=>{ x.st.classList.toggle("framing",on&&x===V); x.st.querySelector(".frame-box")?.remove(); x.st.querySelector(".snap-mark")?.remove(); });
   $("#frameBtn").classList.toggle("btn-active",on);
   $("#frameBtn").textContent=on?"CLICK 1ST CORNER…":"SHEET BY 2 CORNERS";
-  if(on&&V.host?.kind==="scene") CV.snapIndex(V.host.scene);          // the vertices, once per sheet
+  if(on&&V.host?.kind==="scene") CV.geometry(V.host.scene);           // the sheet's lines, once
 }
 const toUnits=(V,mx,my)=>({x:V.view.x+mx/V.view.s, y:V.view.y+my/V.view.s});     // viewBox units (y down)
 /* the point a corner click means: the nearest vertex within 12 px when SNAP
@@ -1745,7 +1760,7 @@ let snapOn=true;
 function pickPoint(V,mx,my){
   const p=toUnits(V,mx,my), v=V.view;
   let q=null;
-  if(snapOn&&V.host?.kind==="scene") q=CV.snap(CV.snapIndex(V.host.scene),p.x,p.y,12/v.s);
+  if(snapOn&&V.host?.kind==="scene"){ const sc=V.host.scene, h=SN.find(sc._osIdx||(sc._osIdx=SN.index(CV.geometry(sc))),null,p.x,p.y,12/v.s); if(h) q={ x:h.x, y:h.y }; }
   let mk=V.st.querySelector(".snap-mark");
   if(q){
     if(!mk){ mk=document.createElement("div"); mk.className="snap-mark"; V.st.appendChild(mk); }
@@ -1755,7 +1770,7 @@ function pickPoint(V,mx,my){
   if(mk) mk.hidden=true;
   return { x:p.x, y:p.y, mx, my };
 }
-$("#snapBtn").onclick=()=>{ snapOn=!snapOn; $("#snapBtn").classList.toggle("btn-active",snapOn); if(!snapOn) viewers.forEach(x=>x.st.querySelector(".snap-mark")?.remove()); };
+$("#snapBtn").onclick=()=>{ snapOn=!snapOn; if(typeof mk!=="undefined"&&mk) mk.osnap=snapOn; $("#snapBtn").classList.toggle("btn-active",snapOn); if(!snapOn) viewers.forEach(x=>x.st.querySelector(".snap-mark")?.remove()); };
 async function addSheet(a,b){
   const p=page(activeV.pageId), o=p&&(p.orig||p), l=o?.layout; if(!l?.makeSheet) return;
   // viewBox y runs down; the drawing's y is its negative (the content is flipped)
@@ -1881,7 +1896,7 @@ document.querySelectorAll(".vw-lay").forEach(b=>b.addEventListener("click",()=>s
    ones, clicks for Length and Area (double-click or Enter ends), a click for
    Text and Stamp. Shift keeps a line at 0/45/90°. With SNAP on, points catch
    the drawing's vertices on a DWG sheet. Ctrl+Z / Ctrl+Y undo and redo. */
-var mk={ on:false, tool:"select", c:MK.COLORS[0][0], pen:0.35, th:3.5, stamp:"AWC", rev:1, sel:null, draft:null, hist:[], redo:[] };
+var mk={ osnap:true, ortho:false, otrack:true, acq:[], hover:null, on:false, tool:"select", c:MK.COLORS[0][0], pen:0.35, th:3.5, stamp:"AWC", rev:1, sel:null, draft:null, hist:[], redo:[] };
 try{ const s=JSON.parse(localStorage.getItem("docStudio.mk")||"{}"); if(s.c) mk.c=s.c; if(s.pen) mk.pen=s.pen; if(s.th) mk.th=s.th; if(s.stamp) mk.stamp=s.stamp; if(s.author) mk.author=s.author; }catch{}
 const mkSave=()=>{ try{ localStorage.setItem("docStudio.mk",JSON.stringify({c:mk.c,pen:mk.pen,th:mk.th,stamp:mk.stamp,author:mk.author||""})); }catch{} };
 const ptOf=mm=>mm/MK.PT_MM;
@@ -1911,6 +1926,10 @@ function mkSpace(p){
   return { ok:false, why:"This page cannot be marked up." };
 }
 const marksOf=p=>p.marks||(p.marks=[]);
+/* the selection: markups of one page; id = the one picked last */
+const selOne=(pid,id)=>({ pid, id, ids:[id] });
+const isSel=(p,m)=>!!(mk.sel&&mk.sel.pid===p.id&&mk.sel.ids.includes(m.id));
+const selMarks=()=>{ const p=page(mk.sel?.pid); return p?marksOf(p).filter(m=>mk.sel.ids.includes(m.id)):[]; };
 function mkPush(p){ mk.hist.push({ pid:p.id, before:JSON.stringify(p.marks||[]) }); if(mk.hist.length>200) mk.hist.shift(); mk.redo=[]; }
 function mkUndo(redo){
   const from=redo?mk.redo:mk.hist, to=redo?mk.hist:mk.redo, h=from.pop(); if(!h) return;
@@ -1942,7 +1961,7 @@ function mkAttach(V){
   if(!V.host||!p||!sp?.ok){ V.st.querySelector(".mk-layer")?.remove(); return; }
   const sv=mkLayer(V);
   sv.classList.toggle("on",mk.on&&V===activeV);
-  sv.querySelector(".mk-marks").innerHTML=(p.marks||[]).map(m=>'<g data-mid="'+m.id+'"'+(mk.sel?.id===m.id?' class="sel"':"")+'>'+MK.svgOf(m,sp.U,sp.sc,true)+'</g>').join("");
+  sv.querySelector(".mk-marks").innerHTML=(p.marks||[]).map(m=>'<g data-mid="'+m.id+'"'+(isSel(p,m)?' class="sel"':"")+'>'+MK.svgOf(m,sp.U,sp.sc,true)+'</g>').join("");
   mkView(V);
 }
 /* every window showing that page */
@@ -1951,24 +1970,134 @@ function mkHandles(V){
   if(!mk) return;
   const sv=V.st.querySelector(".mk-layer"); if(!sv) return;
   const g=sv.querySelector(".mk-handles"), s=mk.sel;
-  if(!mk.on||!s||s.pid!==V.pageId||V!==activeV){ g.innerHTML=""; return; }
+  if(!mk.on||!s||s.pid!==V.pageId||V!==activeV||s.ids.length!==1){ g.innerHTML=""; return; }
   const m=marksOf(page(s.pid)).find(x=>x.id===s.id); if(!m){ g.innerHTML=""; return; }
   const r=4.5/V.view.s;
   g.innerHTML=m.pts.map((q,i)=>'<rect class="mk-h" data-h="'+i+'" x="'+(q[0]-r)+'" y="'+(q[1]-r)+'" width="'+2*r+'" height="'+2*r+'"/>').join("");
 }
 
-/* a point under the pointer, in page units: snapped to the drawing on a DWG
-   sheet, kept to 0/45/90° from the previous point with Shift */
-function mkPoint(V,e,prev){
-  const r=V.st.getBoundingClientRect(), v=V.view;
-  let x=v.x+(e.clientX-r.left)/v.s, y=v.y+(e.clientY-r.top)/v.s;
-  if(prev&&e.shiftKey){
-    const dx=x-prev[0], dy=y-prev[1], a=Math.round(Math.atan2(dy,dx)/(Math.PI/4))*(Math.PI/4), L=Math.hypot(dx,dy);
-    return [prev[0]+Math.cos(a)*L, prev[1]+Math.sin(a)*L];
-  }
-  if(snapOn&&V.host?.kind==="scene"){ const q=CV.snap(CV.snapIndex(V.host.scene),x,y,10/v.s); if(q) return [q.x,q.y]; }
-  return [x,y];
+/* ── snaps, tracking and ortho, as in CAD ──────────────────────────────
+   The page's geometry — a DWG sheet's lines from its scene, a vector PDF's
+   from its operator list — is indexed once (snap.js), the markups already on
+   the page are added on the fly. OSNAP (F3) catches ends, intersections,
+   centres, midpoints, the foot of a perpendicular from the last point, the
+   nearest point of a line; OTRACK (F11) tracks from the points the cursor
+   rested on (and from the last point placed): horizontal, vertical and along
+   their lines, and where two such lines cross; ORTHO (F8) keeps a line level
+   or plumb (Shift turns it the other way for as long as it is held). */
+function osKey(p){ return p.orig||p; }
+function mkGeoIdx(V,p){
+  const o=osKey(p);
+  if(o._osIdx!==undefined) return o._osIdx;
+  if(V.host?.kind==="scene"){ const sc=V.host.scene; o._osIdx=sc._osIdx||(sc._osIdx=SN.index(CV.geometry(sc))); return o._osIdx; }
+  if(p.sourceType==="pdf"){ o._osIdx=null; pdfGeometry(p).then(g=>{ o._osIdx=SN.index(g); }).catch(e=>console.warn(e)); return null; }
+  return (o._osIdx=null);
 }
+/* a vector PDF's lines, from pdf.js's operator list, in page units */
+async function pdfGeometry(p){
+  const src=source((p.orig||p).sourceId), pg=await src.pdfDoc.getPage(p.sourcePage+1), vp=pg.getViewport({scale:1,rotation:0});
+  const ol=await pg.getOperatorList(), OPS=pdfjsLib.OPS, P=[], S=[];
+  let m=[1,0,0,1,0,0]; const st=[];
+  const mul=(A,B)=>[A[0]*B[0]+A[2]*B[1],A[1]*B[0]+A[3]*B[1],A[0]*B[2]+A[2]*B[3],A[1]*B[2]+A[3]*B[3],A[0]*B[4]+A[2]*B[5]+A[4],A[1]*B[4]+A[3]*B[5]+A[5]];
+  const T=(x,y)=>vp.convertToViewportPoint(m[0]*x+m[2]*y+m[4],m[1]*x+m[3]*y+m[5]);
+  for(let i=0;i<ol.fnArray.length&&S.length<1.6e6;i++){
+    const fn=ol.fnArray[i], a=ol.argsArray[i];
+    if(fn===OPS.save) st.push(m); else if(fn===OPS.restore) m=st.pop()||m;
+    else if(fn===OPS.transform) m=mul(m,a);
+    else if(fn===OPS.paintFormXObjectBegin){ st.push(m); if(a?.[0]) m=mul(m,a[0]); }
+    else if(fn===OPS.paintFormXObjectEnd) m=st.pop()||m;
+    else if(fn===OPS.constructPath){
+      const ops=a[0], c=a[1]; let k=0, cur=null, start=null;
+      for(const op of ops){
+        if(op===OPS.moveTo){ cur=T(c[k],c[k+1]); start=cur; k+=2; P.push(cur[0],cur[1]); }
+        else if(op===OPS.lineTo){ const q=T(c[k],c[k+1]); k+=2; if(cur) S.push(cur[0],cur[1],q[0],q[1]); P.push(q[0],q[1]); cur=q; }
+        else if(op===OPS.curveTo){ const q=T(c[k+4],c[k+5]); k+=6; P.push(q[0],q[1]); cur=q; }
+        else if(op===OPS.curveTo2||op===OPS.curveTo3){ const q=T(c[k+2],c[k+3]); k+=4; P.push(q[0],q[1]); cur=q; }
+        else if(op===OPS.closePath){ if(cur&&start) S.push(cur[0],cur[1],start[0],start[1]); cur=start; }
+        else if(op===OPS.rectangle){
+          const x=c[k],y=c[k+1],w=c[k+2],h=c[k+3]; k+=4;
+          const q=[T(x,y),T(x+w,y),T(x+w,y+h),T(x,y+h)];
+          for(let j=0;j<4;j++){ const u=q[j],v2=q[(j+1)%4]; S.push(u[0],u[1],v2[0],v2[1]); P.push(u[0],u[1]); }
+          cur=q[0]; start=q[0];
+        }
+      }
+    }
+  }
+  return { pts:new Float64Array(P), segs:new Float64Array(S), circles:new Float64Array(0) };
+}
+/* the markups of the page as geometry (but the ones being drawn or moved) */
+function mkExtra(p,skip){
+  const P=[], S=[];
+  for(const m of marksOf(p)){
+    if(skip&&skip.has(m.id)) continue;
+    const q=m.pts;
+    for(const pt of q) P.push(pt[0],pt[1]);
+    if(["line","arrow","dist","path","area","callout"].includes(m.t)) for(let i=1;i<q.length;i++) S.push(q[i-1][0],q[i-1][1],q[i][0],q[i][1]);
+    if(m.t==="area"&&q.length>2) S.push(q[q.length-1][0],q[q.length-1][1],q[0][0],q[0][1]);
+    if(["rect","cloud","highlight","whiteout","ellipse"].includes(m.t)&&q.length===2){
+      const [x0,y0]=q[0],[x1,y1]=q[1]; S.push(x0,y0,x1,y0, x1,y0,x1,y1, x1,y1,x0,y1, x0,y1,x0,y0); P.push(x1,y0,x0,y1);
+    }
+  }
+  return { pts:P, segs:S };
+}
+/* the point the cursor means, and what it caught */
+function mkSnap(V,e,prev,skip){
+  const r=V.st.getBoundingClientRect(), v=V.view, p=page(V.pageId);
+  const x=v.x+(e.clientX-r.left)/v.s, y=v.y+(e.clientY-r.top)/v.s;
+  let hit=null;
+  if(mk.osnap&&p){ hit=SN.find(mkGeoIdx(V,p),mkExtra(p,skip),x,y,10/v.s,prev); if(hit?.kind==="nea") hit={...hit,weak:true}; }
+  // resting 0.4 s on a point acquires it for tracking (resting again lets it
+  // go) — a timer, since a cursor at rest sends no events
+  if(hit&&!hit.weak&&mk.otrack){
+    const h=mk.hover;
+    if(!(h&&Math.hypot(h.x-hit.x,h.y-hit.y)<1e-9)){
+      clearTimeout(mk.hoverT);
+      const nh={ x:hit.x, y:hit.y, seg:hit.seg }; mk.hover=nh;
+      mk.hoverT=setTimeout(()=>{
+        if(mk.hover!==nh) return;
+        const i=mk.acq.findIndex(q=>Math.hypot(q.x-nh.x,q.y-nh.y)<1e-9);
+        if(i>=0) mk.acq.splice(i,1);
+        else { const sg=nh.seg, L=sg?Math.hypot(sg[2]-sg[0],sg[3]-sg[1]):0; mk.acq.push({ x:nh.x, y:nh.y, dir:L?[(sg[2]-sg[0])/L,(sg[3]-sg[1])/L]:null }); if(mk.acq.length>7) mk.acq.shift(); }
+        mkOsDraw(V,{ x:nh.x, y:nh.y, kind:"end" },null);
+      },400);
+    }
+  } else { if(mk.hover) clearTimeout(mk.hoverT); mk.hover=null; }
+  if((!hit||hit.weak)&&mk.otrack){
+    const acq=prev?[...mk.acq,{ x:prev[0], y:prev[1], dir:null }]:mk.acq;
+    const t=acq.length?SN.track(acq,x,y,8/v.s):null;
+    if(t) hit=t;
+  }
+  if((!hit||hit.weak)&&prev&&(mk.ortho!==e.shiftKey)){
+    const dx=x-prev[0], dy=y-prev[1];
+    hit=Math.abs(dx)>=Math.abs(dy)?{ x, y:prev[1], kind:"ortho" }:{ x:prev[0], y, kind:"ortho" };
+  }
+  mkOsDraw(V,hit,e);
+  return hit?[hit.x,hit.y]:[x,y];
+}
+const mkPoint=(V,e,prev,skip)=>mkSnap(V,e,prev,skip);
+/* the markers, the tracking lines and the acquired points, in screen pixels */
+function mkOsDraw(V,hit,e){
+  const sv=V.st.querySelector(".mk-layer"); if(!sv) return;
+  let g=sv.querySelector(".mk-os"); if(!g){ g=document.createElementNS("http://www.w3.org/2000/svg","g"); g.setAttribute("class","mk-os"); sv.appendChild(g); }
+  const v=V.view, S=(px,py)=>[(px-v.x)*v.s,(py-v.y)*v.s];
+  let h="";
+  for(const q of mk.acq){ const [a,b]=S(q.x,q.y); h+=SN.marker("acq",a,b); }
+  if(hit){
+    const [hx,hy]=S(hit.x,hit.y);
+    for(const l of hit.lines||[]){
+      const [ax,ay]=S(l.a.x,l.a.y), dx=l.d[0], dy=l.d[1], L=4000;
+      h+='<path class="mk-trk" d="M'+(ax-dx*L).toFixed(1)+' '+(ay-dy*L).toFixed(1)+'L'+(ax+dx*L).toFixed(1)+' '+(ay+dy*L).toFixed(1)+'"/>';
+    }
+    if(hit.kind!=="ortho"&&!hit.lines) h+=SN.marker(hit.kind,hx,hy);
+    if(hit.lines) h+=SN.marker(hit.kind==="int"?"int":"acq",hx,hy);
+    const label=hit.lines?(hit.kind==="int"?"Tracking: intersection":hit.lines[0].kind==="ext"?"Extension":"Tracking: "+(Math.abs(hit.lines[0].d[0])>0.99?"horizontal":Math.abs(hit.lines[0].d[1])>0.99?"vertical":"along"))
+      :SN.NAMES[hit.kind]||"";
+    if(label) h+='<g class="mk-tip" transform="translate('+(hx+14).toFixed(1)+','+(hy+22).toFixed(1)+')"><rect x="-3" y="-11" width="'+(label.length*6.2+8)+'" height="15"/><text>'+label+'</text></g>';
+  }
+  g.innerHTML=h;
+}
+function mkOsClear(){ for(const V of viewers){ const g=V.st.querySelector(".mk-layer .mk-os"); if(g) g.innerHTML=""; } }
+
 const TWO=new Set(["line","arrow","rect","ellipse","cloud","highlight","whiteout","dist","callout","calibrate"]);
 function newMark(t,pts){
   const m={ id:uid("mk"), t, pts, c:t==="highlight"?"#ffe600":t==="whiteout"?"#ffffff":mk.c, w:ptOf(mk.pen), fs:ptOf(mk.th), author:mk.author||"", date:today() };
@@ -1977,6 +2106,12 @@ function newMark(t,pts){
   if(t==="text") m.text="";
   if(t==="callout") m.text="";
   return m;
+}
+/* the markups a selection window takes: left to right, the ones wholly
+   inside; right to left (crossing), the ones it touches */
+function mkWindowPick(p,a,b,crossing){
+  const sp=mkSpace(p), x0=Math.min(a[0],b[0]), x1=Math.max(a[0],b[0]), y0=Math.min(a[1],b[1]), y1=Math.max(a[1],b[1]);
+  return marksOf(p).filter(m=>{ const q=MK.boxOf(m,sp.U,sp.sc); return crossing?(q[2]>=x0&&q[0]<=x1&&q[3]>=y0&&q[1]<=y1):(q[0]>=x0&&q[2]<=x1&&q[1]>=y0&&q[3]<=y1); }).map(m=>m.id);
 }
 function mkWire(V,sv){
   let drag=null;
@@ -1988,18 +2123,28 @@ function mkWire(V,sv){
     if(open){ e.stopPropagation(); e.preventDefault(); open.blur(); return; }
     const hEl=e.target.closest?.(".mk-h"), mEl=e.target.closest?.("[data-mid]");
     if(mk.tool==="select"){
-      if(hEl&&mk.sel){ e.stopPropagation(); e.preventDefault(); mkPush(p); drag={ kind:"handle", i:+hEl.dataset.h }; sv.setPointerCapture(e.pointerId); return; }
+      e.stopPropagation(); e.preventDefault(); sv.setPointerCapture(e.pointerId);
+      if(hEl&&mk.sel){ mkPush(p); drag={ kind:"handle", i:+hEl.dataset.h }; return; }
       if(mEl){
-        e.stopPropagation(); e.preventDefault();
-        mk.sel={ pid:p.id, id:mEl.dataset.mid }; mkAttach(V); mkSyncBar();
-        const m=marksOf(p).find(x=>x.id===mk.sel.id), at=mkPoint(V,e);
-        drag={ kind:"move", from:at, orig:JSON.stringify(m.pts), pushed:false }; sv.setPointerCapture(e.pointerId); return;
+        const id=mEl.dataset.mid;
+        if(e.shiftKey||e.ctrlKey){                              // added to the selection, or taken out
+          const ids=mk.sel&&mk.sel.pid===p.id?[...mk.sel.ids]:[], k=ids.indexOf(id);
+          if(k>=0) ids.splice(k,1); else ids.push(id);
+          mk.sel=ids.length?{ pid:p.id, id:ids[ids.length-1], ids }:null; mkAttach(V); mkSyncBar(); return;
+        }
+        if(!isSel(p,{id})) mk.sel=selOne(p.id,id);
+        mkAttach(V); mkSyncBar();
+        const orig={}; for(const m of selMarks()) orig[m.id]=JSON.stringify(m.pts);
+        drag={ kind:"move", from:mkPoint(V,e,null,new Set(mk.sel.ids)), orig, pushed:false, skip:new Set(mk.sel.ids) }; return;
       }
-      if(mk.sel){ mk.sel=null; mkAttach(V); mkSyncBar(); }
-      return;                                                   // empty space: the window pans
+      // empty space: a selection window (the window pans with the middle button)
+      const r=V.st.getBoundingClientRect();
+      drag={ kind:"window", sx:e.clientX-r.left, sy:e.clientY-r.top, add:e.shiftKey||e.ctrlKey };
+      return;
     }
     e.stopPropagation(); e.preventDefault();
-    const at=mkPoint(V,e);
+    const prevPt=mk.draft&&mk.draft.V===V?mk.draft.m.pts[mk.draft.m.pts.length-2]:null;
+    const at=mkPoint(V,e,prevPt);
     if(mk.tool==="path"||mk.tool==="area"){
       // a second press close to the last one, soon after it, ends the line
       // (the double-click event does not come: the press is taken here)
@@ -2012,7 +2157,7 @@ function mkWire(V,sv){
     }
     if(mk.tool==="edittext"){ mkEditPdfText(V,p,at); return; }
     if(mk.tool==="text"||mk.tool==="stamp"){
-      const m=newMark(mk.tool,[at]); mkPush(p); marksOf(p).push(m); mk.sel={ pid:p.id, id:m.id }; mkRenderPage(p);
+      const m=newMark(mk.tool,[at]); mkPush(p); marksOf(p).push(m); mk.sel=selOne(p.id,m.id); mkRenderPage(p);
       if(mk.tool==="text") mkEdit(V,m,true); else mkSyncBar();
       return;
     }
@@ -2025,28 +2170,52 @@ function mkWire(V,sv){
       const pts=mk.draft.m.pts, prev=pts.length>1?pts[pts.length-2]:pts[0];
       pts[pts.length-1]=mkPoint(V,e,prev); mkDraft(); return;
     }
-    if(!drag||!mk.sel) return;
-    const m=marksOf(p).find(x=>x.id===mk.sel.id); if(!m) return;
-    if(drag.kind==="handle"){ const i=drag.i, prev=m.pts[i===0?1:i-1]; m.pts[i]=mkPoint(V,e,m.pts.length>1?prev:null); }
+    if(drag?.kind==="window"){
+      const r=V.st.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top, cross=x<drag.sx;
+      drag.x=x; drag.y=y;
+      let g=sv.querySelector(".mk-os"); if(!g){ g=document.createElementNS("http://www.w3.org/2000/svg","g"); g.setAttribute("class","mk-os"); sv.appendChild(g); }
+      g.innerHTML='<rect class="'+(cross?"mk-win cross":"mk-win")+'" x="'+Math.min(x,drag.sx)+'" y="'+Math.min(y,drag.sy)+'" width="'+Math.abs(x-drag.sx)+'" height="'+Math.abs(y-drag.sy)+'"/>';
+      return;
+    }
+    if(!drag){                                                  // no button: show what a point would catch
+      if(mk.tool!=="select") mkSnap(V,e,null); else mkOsClear();
+      return;
+    }
+    if(!mk.sel) return;
+    if(drag.kind==="handle"){
+      const m=marksOf(p).find(x=>x.id===mk.sel.id); if(!m) return;
+      const i=drag.i, prev=m.pts.length>1?m.pts[i===0?1:i-1]:null; m.pts[i]=mkPoint(V,e,prev,new Set([m.id]));
+    }
     else if(drag.kind==="move"){
-      const at=mkPoint(V,e), dx=at[0]-drag.from[0], dy=at[1]-drag.from[1];
+      const at=mkPoint(V,e,null,drag.skip), dx=at[0]-drag.from[0], dy=at[1]-drag.from[1];
       if(!drag.pushed&&Math.hypot(dx,dy)*V.view.s>2){ mkPush(p); drag.pushed=true; }
-      m.pts=JSON.parse(drag.orig).map(q=>[q[0]+dx,q[1]+dy]);
+      for(const m of selMarks()) if(drag.orig[m.id]) m.pts=JSON.parse(drag.orig[m.id]).map(q=>[q[0]+dx,q[1]+dy]);
     }
     mkRenderPage(p);
   });
   const up=e=>{
     if(!drag) return; const d=drag; drag=null;
     try{ sv.releasePointerCapture(e.pointerId); }catch{}
+    if(d.kind==="window"){
+      mkOsClear();
+      const p=page(V.pageId), v=V.view;
+      if(d.x==null||Math.hypot(d.x-d.sx,d.y-d.sy)<4){ if(!d.add){ mk.sel=null; mkAttach(V); mkSyncBar(); } return; }
+      const U=(x,y)=>[v.x+x/v.s,v.y+y/v.s];
+      let ids=mkWindowPick(p,U(d.sx,d.sy),U(d.x,d.y),d.x<d.sx);
+      if(d.add&&mk.sel?.pid===p.id) ids=[...new Set([...mk.sel.ids,...ids])];
+      mk.sel=ids.length?{ pid:p.id, id:ids[ids.length-1], ids }:null; mkAttach(V); mkSyncBar();
+      return;
+    }
     if(d.kind!=="draw"||!mk.draft) { mkSyncBar(); return; }
     const p=page(V.pageId), m=mk.draft.m, cal=mk.draft.cal; mk.draft=null; mkDraft();
     const L=Math.hypot(m.pts[1][0]-m.pts[0][0],m.pts[1][1]-m.pts[0][1])*V.view.s;
     if(L<4) return;
     if(cal) return mkCalibrate(p,m);
-    mkPush(p); marksOf(p).push(m); mk.sel={ pid:p.id, id:m.id }; mkRenderPage(p); mkSyncBar();
+    mkPush(p); marksOf(p).push(m); mk.sel=selOne(p.id,m.id); mkRenderPage(p); mkSyncBar();
     if(m.t==="callout") mkEdit(V,m,true);
   };
   sv.addEventListener("pointerup",up); sv.addEventListener("pointercancel",up);
+  sv.addEventListener("pointerleave",()=>{ if(!drag) mkOsClear(); });
   sv.addEventListener("dblclick",e=>{
     if(!mk.on||V!==activeV) return;
     if(mk.draft&&(mk.tool==="path"||mk.tool==="area")){ e.stopPropagation(); mkFinishPoly(); return; }
@@ -2068,7 +2237,7 @@ function mkFinishPoly(){
   m.pts.pop();                                                 // the point that followed the pointer
   const pts=m.pts.filter((q,i)=>!i||Math.hypot(q[0]-m.pts[i-1][0],q[1]-m.pts[i-1][1])>1e-9);
   if(pts.length<(m.t==="area"?3:2)) return;
-  m.pts=pts; mkPush(p); marksOf(p).push(m); mk.sel={ pid:p.id, id:m.id }; mkRenderPage(p); mkSyncBar();
+  m.pts=pts; mkPush(p); marksOf(p).push(m); mk.sel=selOne(p.id,m.id); mkRenderPage(p); mkSyncBar();
 }
 /* The PDF's own text, edited: the line under the click (pdf.js text layer)
    is covered by a white box and typed again over it at its size and on its
@@ -2089,7 +2258,7 @@ async function mkEditPdfText(V,p,at){
   if(!hit){ $("#mkInfo").textContent="No PDF text under the click (a scan has none: cover it with Whiteout and write with Text)."; return; }
   const m={ id:uid("mk"), t:"replace", pts:[[hit.box[0],hit.box[1]],[hit.box[2],hit.box[3]]], base:hit.yb, padX:0.5, fs:hit.fh, c:"#000000",
             text:hit.it.str, orig:hit.it.str, author:mk.author||"", date:today() };
-  mkPush(p); marksOf(p).push(m); mk.sel={ pid:p.id, id:m.id }; mkRenderPage(p);
+  mkPush(p); marksOf(p).push(m); mk.sel=selOne(p.id,m.id); mkRenderPage(p);
   mkEdit(V,m,false,true);
 }
 /* text typed on the sheet itself */
@@ -2138,8 +2307,10 @@ function mkSyncBar(){
   document.querySelectorAll("#mkBar [data-tool]").forEach(b=>b.classList.toggle("btn-active",b.dataset.tool===mk.tool));
   document.querySelectorAll("#mkBar .mk-sw").forEach(b=>b.classList.toggle("on",b.dataset.c===mk.c));
   $("#mkPen").value=String(mk.pen); $("#mkTh").value=String(mk.th); $("#mkStamp").value=mk.stamp; $("#mkRev").value=mk.rev; $("#mkAuthor").value=mk.author||"";
-  const p=page(activeV?.pageId), sp=mkSpace(p), m=mk.sel&&p&&mk.sel.pid===p.id?marksOf(p).find(x=>x.id===mk.sel.id):null;
-  $("#mkNote").disabled=!m; $("#mkNote").value=m?.note||""; $("#mkDel").disabled=!m;
+  const p=page(activeV?.pageId), sp=mkSpace(p), many=mk.sel&&p&&mk.sel.pid===p.id?mk.sel.ids.length:0;
+  const m=many===1?marksOf(p).find(x=>x.id===mk.sel.id):null;
+  $("#mkNote").disabled=!m; $("#mkNote").value=m?.note||""; $("#mkNote").placeholder=many>1?many+" markups selected — Delete removes them, the style goes onto all":"Comment on the selected markup — goes to the register"; $("#mkDel").disabled=!many;
+  for(const [id,on] of [["mkOsnap",mk.osnap],["mkOrtho",mk.ortho],["mkOtrack",mk.otrack]]) $("#"+id).classList.toggle("btn-active",on);
   $("#mkUndo").disabled=!mk.hist.length; $("#mkRedo").disabled=!mk.redo.length;
   const info=$("#mkInfo");
   info.textContent=!p?"":!sp?.ok?sp.why:(()=>{
@@ -2154,8 +2325,16 @@ function mkSyncBar(){
 }
 function mkSetTool(t){
   if(mk.draft) { mk.draft=null; mkDraft(); }
-  mk.tool=t; if(framing) setFraming(false); mkSyncBar();
+  mk.tool=t; mk.acq=[]; mk.hover=null; mkOsClear(); if(framing) setFraming(false); mkSyncBar();
 }
+/* OSNAP, ORTHO, OTRACK: the CAD status bar's switches */
+function mkToggle(k){
+  mk[k]=!mk[k];
+  if(k==="osnap"){ snapOn=mk.osnap; $("#snapBtn").classList.toggle("btn-active",snapOn); }
+  if(k==="otrack"&&!mk.otrack) mk.acq=[];
+  mkOsClear(); mkSyncBar();
+}
+$("#mkOsnap").onclick=()=>mkToggle("osnap"); $("#mkOrtho").onclick=()=>mkToggle("ortho"); $("#mkOtrack").onclick=()=>mkToggle("otrack");
 $("#mkToggle").onclick=()=>{ mk.on=!mk.on; if(!mk.on){ mk.sel=null; mk.draft=null; mkDraft(); } else if(framing) setFraming(false); mkSyncBar(); for(const V of viewers) if(V.pageId) mkAttach(V); };
 $("#mkBar").addEventListener("click",e=>{
   const t=e.target.closest("[data-tool]"); if(t) return mkSetTool(t.dataset.tool);
@@ -2164,8 +2343,8 @@ $("#mkBar").addEventListener("click",e=>{
 });
 /* a style picked with a markup selected goes onto it too */
 function mkApply(fn){
-  const p=page(mk.sel?.pid), m=p&&marksOf(p).find(x=>x.id===mk.sel.id); if(!m) return;
-  mkPush(p); fn(m); mkRenderPage(p);
+  const p=page(mk.sel?.pid), ms=selMarks(); if(!p||!ms.length) return;
+  mkPush(p); ms.forEach(fn); mkRenderPage(p);
 }
 $("#mkPen").onchange=e=>{ mk.pen=+e.target.value; mkSave(); mkApply(m=>{ m.w=ptOf(mk.pen); }); };
 $("#mkTh").onchange=e=>{ mk.th=+e.target.value; mkSave(); mkApply(m=>{ m.fs=ptOf(mk.th); }); };
@@ -2177,7 +2356,7 @@ $("#mkDel").onclick=()=>mkDelete();
 $("#mkUndo").onclick=()=>mkUndo(false); $("#mkRedo").onclick=()=>mkUndo(true);
 function mkDelete(){
   const p=page(mk.sel?.pid); if(!p) return;
-  mkPush(p); p.marks=marksOf(p).filter(x=>x.id!==mk.sel.id); mk.sel=null; mkRenderPage(p); mkSyncBar();
+  mkPush(p); p.marks=marksOf(p).filter(x=>!mk.sel.ids.includes(x.id)); mk.sel=null; mkRenderPage(p); mkSyncBar();
 }
 document.addEventListener("keydown",e=>{
   if(!mk.on||document.querySelector(".modal.on")) return;
@@ -2185,7 +2364,20 @@ document.addEventListener("keydown",e=>{
   if((e.ctrlKey||e.metaKey)&&(e.key==="z"||e.key==="Z")){ e.preventDefault(); e.stopImmediatePropagation(); mkUndo(e.shiftKey); return; }
   if((e.ctrlKey||e.metaKey)&&(e.key==="y"||e.key==="Y")){ e.preventDefault(); e.stopImmediatePropagation(); mkUndo(true); return; }
   if(e.key==="Enter"&&mk.draft){ e.preventDefault(); mkFinishPoly(); return; }
-  if(e.key==="Escape"&&mk.draft){ e.preventDefault(); e.stopImmediatePropagation(); mk.draft=null; mkDraft(); return; }
+  if(e.key==="F3"){ e.preventDefault(); e.stopImmediatePropagation(); mkToggle("osnap"); return; }
+  if(e.key==="F8"){ e.preventDefault(); e.stopImmediatePropagation(); mkToggle("ortho"); return; }
+  if(e.key==="F11"){ e.preventDefault(); e.stopImmediatePropagation(); mkToggle("otrack"); return; }
+  // Esc as in CAD: the element being drawn goes; again, the command ends
+  if(e.key==="Escape"){
+    if(mk.draft){ e.preventDefault(); e.stopImmediatePropagation(); mk.draft=null; mkDraft(); mk.acq=[]; mkOsClear(); return; }
+    if(mk.tool!=="select"){ e.preventDefault(); e.stopImmediatePropagation(); mkSetTool("select"); return; }
+    if(mk.sel){ e.preventDefault(); e.stopImmediatePropagation(); mk.sel=null; mkRenderPage(page(activeV.pageId)||{id:null}); mkSyncBar(); return; }
+  }
+  if((e.ctrlKey||e.metaKey)&&(e.key==="a"||e.key==="A")){
+    const p=page(activeV?.pageId); if(!p||!mkSpace(p)?.ok) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    const ids=marksOf(p).map(m=>m.id); mk.sel=ids.length?{ pid:p.id, id:ids[ids.length-1], ids }:null; mkRenderPage(p); mkSyncBar(); return;
+  }
   if((e.key==="Delete"||e.key==="Backspace")&&mk.sel){ e.preventDefault(); e.stopImmediatePropagation(); mkDelete(); }
 },true);
 

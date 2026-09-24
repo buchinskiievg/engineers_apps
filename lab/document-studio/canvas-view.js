@@ -74,21 +74,22 @@ function parseTransform(s) {
 function pathInfo(d) {
   const tok = d.match(/[a-zA-Z]|-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/g) || [];
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, cx = 0, cy = 0, sx = 0, sy = 0, cmd = "M", i = 0;
-  const pts = [];
+  const pts = [], segs = [];
   const add = (x, y) => { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; };
   const vtx = (x, y) => { add(x, y); pts.push(x, y); };
+  const seg = (ax, ay, bx, by) => { if (ax !== bx || ay !== by) segs.push(ax, ay, bx, by); };
   const num = () => +tok[i++];
   while (i < tok.length) {
     if (/[a-zA-Z]/.test(tok[i])) cmd = tok[i++];
     const rel = cmd === cmd.toLowerCase(), C = cmd.toUpperCase();
     const px = x => rel ? cx + x : x, py = y => rel ? cy + y : y;
-    if (C === "Z") { cx = sx; cy = sy; continue; }
+    if (C === "Z") { seg(cx, cy, sx, sy); cx = sx; cy = sy; continue; }
     if (i >= tok.length || /[a-zA-Z]/.test(tok[i])) { i++; continue; }
     switch (C) {
       case "M": cx = px(num()); cy = py(num()); sx = cx; sy = cy; vtx(cx, cy); cmd = rel ? "l" : "L"; break;
-      case "L": case "T": cx = px(num()); cy = py(num()); vtx(cx, cy); break;
-      case "H": cx = rel ? cx + num() : num(); vtx(cx, cy); break;
-      case "V": cy = rel ? cy + num() : num(); vtx(cx, cy); break;
+      case "L": case "T": { const ox = cx, oy = cy; cx = px(num()); cy = py(num()); vtx(cx, cy); seg(ox, oy, cx, cy); break; }
+      case "H": { const ox = cx; cx = rel ? cx + num() : num(); vtx(cx, cy); seg(ox, cy, cx, cy); break; }
+      case "V": { const oy = cy; cy = rel ? cy + num() : num(); vtx(cx, cy); seg(cx, oy, cx, cy); break; }
       case "C": { const a = px(num()), b = py(num()), c = px(num()), e = py(num()); add(a, b); add(c, e); cx = px(num()); cy = py(num()); vtx(cx, cy); break; }
       case "S": case "Q": { const a = px(num()), b = py(num()); add(a, b); cx = px(num()); cy = py(num()); vtx(cx, cy); break; }
       case "A": { const rx = Math.abs(num()), ry = Math.abs(num()); i += 3; const r = Math.max(rx, ry);
@@ -100,7 +101,7 @@ function pathInfo(d) {
       default: i++;
     }
   }
-  return x0 === Infinity ? null : { bb: [x0, y0, x1, y1], pts };
+  return x0 === Infinity ? null : { bb: [x0, y0, x1, y1], pts, segs };
 }
 
 /* presentation attributes the r2 SVG uses; all inherit the SVG way */
@@ -142,11 +143,11 @@ function merge(kids) {
   const out = []; let run = null, key = null;
   const flush = () => {
     if (run && run.length > 1) {
-      const p = new Path2D(); let bb = null, np = 0;
-      for (const n of run) { p.addPath(n.p2d); bb = union(bb, n.bb); np += n.pts ? n.pts.length : 0; }
-      const pts = new Float64Array(np); let o = 0;
-      for (const n of run) if (n.pts) { pts.set(n.pts, o); o += n.pts.length; }
-      out.push({ k: "p", ps: run[0].ps, p2d: p, bb, pts });
+      const p = new Path2D(); let bb = null, np = 0, ns = 0;
+      for (const n of run) { p.addPath(n.p2d); bb = union(bb, n.bb); np += n.pts ? n.pts.length : 0; ns += n.segs ? n.segs.length : 0; }
+      const pts = new Float64Array(np), segs = new Float64Array(ns); let o = 0, q = 0;
+      for (const n of run) { if (n.pts) { pts.set(n.pts, o); o += n.pts.length; } if (n.segs) { segs.set(n.segs, q); q += n.segs.length; } }
+      out.push({ k: "p", ps: run[0].ps, p2d: p, bb, pts, segs });
     } else if (run) out.push(run[0]);
     run = null; key = null;
   };
@@ -193,16 +194,16 @@ export function compile(svgText) {
   function shapePath(el) {
     const n = x => +el.getAttribute(x) || 0;
     switch (el.localName) {
-      case "path": { const d = el.getAttribute("d") || ""; const q = pathInfo(d); return q ? { p2d: new Path2D(d), bb: q.bb, pts: q.pts } : null; }
-      case "circle": { const cx = n("cx"), cy = n("cy"), r = n("r"); if (!(r > 0)) return null; const p = new Path2D(); p.arc(cx, cy, r, 0, 2 * Math.PI); return { p2d: p, bb: [cx - r, cy - r, cx + r, cy + r], pts: [cx, cy] }; }
-      case "ellipse": { const cx = n("cx"), cy = n("cy"), rx = n("rx"), ry = n("ry"); if (!(rx > 0 && ry > 0)) return null; const p = new Path2D(); p.ellipse(cx, cy, rx, ry, 0, 0, 2 * Math.PI); return { p2d: p, bb: [cx - rx, cy - ry, cx + rx, cy + ry], pts: [cx, cy] }; }
-      case "rect": { const x = n("x"), y = n("y"), w = n("width"), h = n("height"); if (!(w > 0 && h > 0)) return null; const p = new Path2D(); p.rect(x, y, w, h); return { p2d: p, bb: [x, y, x + w, y + h], pts: [x, y, x + w, y, x + w, y + h, x, y + h] }; }
-      case "line": { const a = [n("x1"), n("y1"), n("x2"), n("y2")]; const p = new Path2D(); p.moveTo(a[0], a[1]); p.lineTo(a[2], a[3]); return { p2d: p, bb: [Math.min(a[0], a[2]), Math.min(a[1], a[3]), Math.max(a[0], a[2]), Math.max(a[1], a[3])], pts: a }; }
+      case "path": { const d = el.getAttribute("d") || ""; const q = pathInfo(d); return q ? { p2d: new Path2D(d), bb: q.bb, pts: q.pts, segs: q.segs } : null; }
+      case "circle": { const cx = n("cx"), cy = n("cy"), r = n("r"); if (!(r > 0)) return null; const p = new Path2D(); p.arc(cx, cy, r, 0, 2 * Math.PI); return { p2d: p, bb: [cx - r, cy - r, cx + r, cy + r], pts: [], circ: [cx, cy, r] }; }
+      case "ellipse": { const cx = n("cx"), cy = n("cy"), rx = n("rx"), ry = n("ry"); if (!(rx > 0 && ry > 0)) return null; const p = new Path2D(); p.ellipse(cx, cy, rx, ry, 0, 0, 2 * Math.PI); return { p2d: p, bb: [cx - rx, cy - ry, cx + rx, cy + ry], pts: [], circ: [cx, cy, Math.max(rx, ry)] }; }
+      case "rect": { const x = n("x"), y = n("y"), w = n("width"), h = n("height"); if (!(w > 0 && h > 0)) return null; const p = new Path2D(); p.rect(x, y, w, h); return { p2d: p, bb: [x, y, x + w, y + h], pts: [x, y, x + w, y, x + w, y + h, x, y + h], segs: [x, y, x + w, y, x + w, y, x + w, y + h, x + w, y + h, x, y + h, x, y + h, x, y] }; }
+      case "line": { const a = [n("x1"), n("y1"), n("x2"), n("y2")]; const p = new Path2D(); p.moveTo(a[0], a[1]); p.lineTo(a[2], a[3]); return { p2d: p, bb: [Math.min(a[0], a[2]), Math.min(a[1], a[3]), Math.max(a[0], a[2]), Math.max(a[1], a[3])], pts: a, segs: a }; }
       case "polyline": case "polygon": {
         const v = (el.getAttribute("points") || "").split(/[\s,]+/).filter(Boolean).map(Number); if (v.length < 4) return null;
         let d = "M" + v[0] + " " + v[1]; for (let i = 2; i + 1 < v.length; i += 2) d += "L" + v[i] + " " + v[i + 1];
         if (el.localName === "polygon") d += "Z";
-        const q = pathInfo(d); return { p2d: new Path2D(d), bb: q.bb, pts: q.pts };
+        const q = pathInfo(d); return { p2d: new Path2D(d), bb: q.bb, pts: q.pts, segs: q.segs };
       }
     }
     return null;
@@ -273,7 +274,7 @@ export function compile(svgText) {
         const st = inherit(ist, ownStyle(el));
         const dash = st["stroke-dasharray"] && st["stroke-dasharray"] !== "none" ? st["stroke-dasharray"].split(/[\s,]+/).map(Number).filter(v => v >= 0) : null;
         const ps = paintOf(st, dash);
-        n = { k: "p", ps, p2d: s.p2d, pts: s.pts, bb: grow(s.bb, ps.px ? 0 : ps.sw / 2) };
+        n = { k: "p", ps, p2d: s.p2d, pts: s.pts, segs: s.segs, circ: s.circ, bb: grow(s.bb, ps.px ? 0 : ps.sw / 2) };
         break;
       }
       case "text": n = textNode(el, ist); if (!n) return null; break;
@@ -447,6 +448,24 @@ export function blit(ctx, scene, view, W, H, dpr, opts = {}) {
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = k < ov.k ? "medium" : "low";
   ctx.drawImage(ov.cv, (pg[0] - view.x) * k, (pg[1] - view.y) * k, pg[2] * k, pg[3] * k);
   return true;
+}
+
+/* ── the sheet's geometry, for object snaps (snap.js) ── */
+/* every segment, vertex and circle of the scene in page units */
+export function geometry(scene, cap = 2e6) {
+  if (scene.geo) return scene.geo;
+  const P = [], S = [], C = [];
+  (function go(nd, M, depth) {
+    if (S.length > cap * 4 || depth > 40) return;
+    if (nd.m) M = mul(M, nd.m);
+    if (nd.k === "g") { for (const c of nd.kids) go(c, M, depth + 1); return; }
+    if (nd.k === "u") { go(nd.ref, M, depth + 1); return; }
+    const X = (x, y) => M[0] * x + M[2] * y + M[4], Y = (x, y) => M[1] * x + M[3] * y + M[5];
+    const p = nd.pts; if (p) for (let i = 0; i + 1 < p.length; i += 2) P.push(X(p[i], p[i + 1]), Y(p[i], p[i + 1]));
+    const s = nd.segs; if (s) for (let i = 0; i + 3 < s.length; i += 4) S.push(X(s[i], s[i + 1]), Y(s[i], s[i + 1]), X(s[i + 2], s[i + 3]), Y(s[i + 2], s[i + 3]));
+    const c = nd.circ; if (c) C.push(X(c[0], c[1]), Y(c[0], c[1]), c[2] * scaleOf(M));
+  })(scene.root, ID, 0);
+  return (scene.geo = { pts: new Float64Array(P), segs: new Float64Array(S), circles: new Float64Array(C) });
 }
 
 /* ── snapping to vertices ── */
