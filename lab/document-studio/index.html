@@ -234,6 +234,11 @@
   .doc-ghost { position:fixed; left:0; top:0; z-index:1000; pointer-events:none; background:var(--panel-2); border:1px solid var(--ink); box-shadow:0 10px 26px rgba(0,0,0,.28); opacity:.95; }
 
   .merge-box { width:min(520px,100%); }
+  .ask-box { width:min(440px,100%); }
+  .ask-body { padding:14px 16px 16px; font-size:12.5px; line-height:1.45; color:var(--ink); }
+  .ask-body .ask-name { font-weight:800; word-break:break-word; }
+  .ask-body .ask-note { display:block; margin-top:6px; font-size:11px; color:var(--muted); }
+  .merge-foot .grow { flex:1; }
   .merge-body { padding:14px 16px; display:flex; flex-direction:column; gap:12px; }
   .merge-note { font-size:11.5px; color:var(--muted); }
   .merge-list { margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:6px; counter-reset:m; }
@@ -250,7 +255,8 @@
   .merge-all .chk { margin:0; }
   .merge-opts { display:flex; flex-direction:column; gap:6px; font-size:11.5px; }
   .merge-opts label { display:flex; align-items:flex-start; gap:8px; cursor:pointer; line-height:1.35; }
-  .merge-opts .chk { margin:0; flex:0 0 16px; }
+  .merge-opts .chk { margin:0; flex:0 0 24px; }
+  .merge-opts label { align-items:center !important; }
   .merge-sum { font:700 10.5px var(--mono); color:var(--ink); }
   .merge-list { max-height:min(46vh,420px); overflow:auto; }
   .section-head .head-btn { min-height:0 !important; height:24px; padding:2px 8px !important; font-size:9.5px !important; margin-right:8px; }
@@ -338,14 +344,18 @@
   .vw-prev:not(:disabled):hover, .vw-next:not(:disabled):hover { background:var(--ink); color:#fff; }
 
   /* ── the file list: checkboxes, thumbnail size, what to do with the checked */
-  .chk { position:relative; flex:0 0 16px; width:16px; height:16px; margin:3px 0 0; cursor:pointer; display:inline-block; }
-  .chk input { position:absolute; inset:0; width:100%; height:100%; margin:0; opacity:0; cursor:pointer; }
-  .chk span { position:absolute; inset:0; border:1.5px solid var(--ink-3,#7A7367); background:#fff; pointer-events:none; }
+  /* a checkbox is a 24 × 24 box like the icon buttons beside it: the site's
+     line and paper, and a red square inside when it is ticked (a red bar when
+     only some of a set are) */
+  .chk { position:relative; flex:0 0 24px; width:24px; height:24px; margin:0; cursor:pointer; display:inline-block; }
+  .chk input { position:absolute !important; inset:0; width:100% !important; height:100% !important; margin:0 !important; opacity:0; cursor:pointer; }
+  .chk span { position:absolute; inset:0; border:1px solid var(--line); background:#fff; pointer-events:none; transition:border-color .12s; }
   .chk:hover span { border-color:var(--ink); }
-  .chk input:focus-visible + span { outline:2px solid var(--red); outline-offset:1px; }
-  .chk input:checked + span, .chk input:indeterminate + span { background:var(--red); border-color:var(--red); }
-  .chk input:checked + span::after { content:""; position:absolute; left:4px; top:0; width:4px; height:9px; border:solid #fff; border-width:0 2px 2px 0; transform:rotate(45deg); }
-  .chk input:indeterminate + span::after { content:""; position:absolute; left:3px; right:3px; top:6px; height:2px; background:#fff; }
+  .chk input:focus-visible + span { outline:2px solid var(--ink); outline-offset:1px; }
+  .chk input:checked + span { border-color:var(--ink); }
+  .chk input:checked + span::after { content:""; position:absolute; inset:5px; background:var(--red); }
+  .chk input:indeterminate + span::after { content:""; position:absolute; left:5px; right:5px; top:10px; height:3px; background:var(--red); }
+  .chk input:disabled + span { opacity:.45; }
   .section-head .chk { margin:0 8px 0 0; }
   .doc.checked > .doc-row { background:rgba(163,14,24,.05); }
   .tree-tools { flex:0 0 auto; border-bottom:1px solid var(--line); background:var(--panel-2); }
@@ -603,6 +613,14 @@
       <label class="merge-name">Name of the merged file<input id="mergeName" type="text" autocomplete="off"></label>
     </div>
     <div class="merge-foot"><span id="mergeSum" class="merge-sum"></span><span class="grow"></span><button id="mergeCancel" class="btn btn-ghost">CANCEL</button><button id="mergeOk" class="btn btn-primary">CREATE MERGED FILE</button></div>
+  </div>
+</div>
+
+<div id="askModal" class="modal" role="alertdialog" aria-modal="true" aria-labelledby="askTitle" aria-describedby="askText">
+  <div class="modal-box ask-box">
+    <div class="modal-head"><b id="askTitle">REMOVE</b><span class="grow"></span><button id="askX" class="btn btn-ghost ico" aria-label="Cancel">✕</button></div>
+    <div class="ask-body"><div id="askText"></div></div>
+    <div class="merge-foot"><span class="grow"></span><button id="askNo" class="btn btn-ghost">CANCEL</button><button id="askYes" class="btn btn-primary">REMOVE</button></div>
   </div>
 </div>
 
@@ -944,6 +962,21 @@ function putBack(p){
 function actOn(p){ return state.selected.has(p.id)&&state.selected.size>1 ? [...state.selected] : [p.id]; }
 function setActiveDoc(d){ if(state.activeDocId!==d.id){ state.activeDocId=d.id; state.selected.clear(); } }
 
+/* The site's confirm dialog: a promise of yes (true) or no. The safe answer
+   has the focus; Esc and the ✕ say no, Enter on the red button says yes. */
+function askConfirm({title="REMOVE",html="",yes="REMOVE"}={}){
+  return new Promise(res=>{
+    const m=$("#askModal"), back=document.activeElement;
+    $("#askTitle").textContent=title; $("#askText").innerHTML=html; $("#askYes").textContent=yes;
+    const done=v=>{ m.classList.remove("on"); m.removeEventListener("keydown",key); $("#askYes").onclick=$("#askNo").onclick=$("#askX").onclick=null; m.onclick=null; try{ back?.focus?.(); }catch{} res(v); };
+    const key=e=>{ if(e.key==="Escape"){ e.preventDefault(); e.stopPropagation(); done(false); } };
+    $("#askYes").onclick=()=>done(true); $("#askNo").onclick=()=>done(false); $("#askX").onclick=()=>done(false);
+    m.onclick=e=>{ if(e.target===m) done(false); };       // a click beside the box
+    m.addEventListener("keydown",key);
+    m.classList.add("on"); $("#askNo").focus();
+  });
+}
+const pagesWord=n=>n+" page"+(n===1?"":"s");
 let suppressClick=false;
 $("#tree").addEventListener("click",ev=>{
   if(ev.target.closest(".chk")) return;
@@ -969,7 +1002,13 @@ $("#tree").addEventListener("click",ev=>{
   const el=ev.target.closest(".doc"); if(!el) return;
   const d=doc(el.dataset.doc); if(!d) return;
   if(act==="toggle"){ d.open=!d.open; renderDoc(d); return; }
-  if(act==="remove") return removeDoc(d);
+  if(act==="remove"){
+    askConfirm({ title:"REMOVE FILE", yes:"REMOVE",
+      html:'Remove <span class="ask-name">'+esc(d.name)+'</span> from the list?'+
+           '<span class="ask-note">'+pagesWord(d.pages.length)+' in its PDF leave the list with it. The file on your disk is not touched.</span>' })
+      .then(ok=>{ if(ok&&doc(d.id)) removeDoc(d); });
+    return;
+  }
   if(act==="dl") return exportPdf(d, ev.target.closest("button"));
   if(act==="reload"){ const s=source(d.sourceIds[0]); ingestDwg(s.file,s); return; }
   setActiveDoc(d);
@@ -979,7 +1018,7 @@ $("#tree").addEventListener("click",ev=>{
 });
 document.addEventListener("keydown",ev=>{
   if(/^(INPUT|TEXTAREA|SELECT)$/.test(ev.target.tagName)||ev.target.isContentEditable) return;
-  if($("#mergeModal").classList.contains("on")) return;
+  if(document.querySelector(".modal.on")) return;       // a dialog is open
   const ids=[...state.selected].filter(id=>inDoc(page(id)));
   if(!ids.length) return;
   if(ev.key==="Delete"||ev.key==="Backspace"){ ev.preventDefault(); removePages(ids); }
@@ -1024,8 +1063,11 @@ $("#checkAll").addEventListener("change",ev=>{ state.checked=ev.target.checked?n
 $("#checkNone").onclick=()=>{ state.checked.clear(); syncChecks(); };
 $("#checkRemove").onclick=()=>{
   const list=checkedDocs(); if(!list.length) return;
-  if(!confirm("Remove "+(list.length===1?"“"+list[0].name+"”":list.length+" files")+" from the list?")) return;
-  list.forEach(d=>removeDoc(d));
+  const n=list.reduce((k,d)=>k+d.pages.length,0);
+  askConfirm({ title:list.length===1?"REMOVE FILE":"REMOVE "+list.length+" FILES", yes:"REMOVE",
+    html:'Remove '+(list.length===1?'<span class="ask-name">'+esc(list[0].name)+'</span>':'<b>'+list.length+' files</b>')+' from the list?'+
+         '<span class="ask-note">'+pagesWord(n)+' leave the list with them. The files on your disk are not touched.</span>' })
+    .then(ok=>{ if(ok) list.forEach(d=>{ if(doc(d.id)) removeDoc(d); }); });
 };
 $("#checkMerge").onclick=()=>{ const list=checkedDocs(); if(list.length>=2) openMergeOf(list); };
 $("#checkView").onclick=()=>{
@@ -1823,7 +1865,10 @@ document.addEventListener("drop",e=>{
   e.preventDefault();dragDepth=0;dz.classList.remove("drag");
   if(e.dataTransfer.files.length)acceptFiles(e.dataTransfer.files);
 });
-$("#clearBtn").onclick=()=>{state.sources.clear();state.docs=[];state.all.clear();state.selected.clear();state.checked.clear();viewers.forEach(V=>{V.pageId=null;});state.activeDocId=null;state.activePageId=null;renderAll();};
+$("#clearBtn").onclick=async()=>{
+  if(state.docs.length&&!await askConfirm({ title:"CLEAR THE LIST", yes:"CLEAR ALL",
+    html:'Remove all <b>'+state.docs.length+' file'+(state.docs.length===1?"":"s")+'</b> from the list?<span class="ask-note">The files on your disk are not touched.</span>' })) return;
+  state.sources.clear();state.docs=[];state.all.clear();state.selected.clear();state.checked.clear();viewers.forEach(V=>{V.pageId=null;});state.activeDocId=null;state.activePageId=null;renderAll();};
 const zoomLabel=()=>{$("#previewZoomLabel").textContent=Math.round(state.previewZoom*100)+"%";};
 $("#previewZoomIn").onclick=()=>zoomCentre(activeV,1.4);
 $("#previewZoomOut").onclick=()=>zoomCentre(activeV,1/1.4);
@@ -1873,7 +1918,7 @@ if($("#toggleBoundary"))$("#toggleBoundary").onclick=()=>{state.showBoundary=!st
     try{ pane.requestFullscreen?.().catch(()=>{}); }catch{}
   };
   document.addEventListener("keydown",e=>{
-    if(e.key!=="Escape"||!on()||framing) return;
+    if(e.key!=="Escape"||!on()||framing||document.querySelector(".modal.on")) return;
     leave();
   },true);
   document.addEventListener("fullscreenchange",()=>{ if(!document.fullscreenElement&&on()) leave(); });
