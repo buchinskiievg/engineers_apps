@@ -9,6 +9,10 @@
 <link rel="stylesheet" href="/_lib/mobile.css" />
 <link rel="stylesheet" href="/_lib/calc-skin.css" />
 <style>
+  /* the design system has no monospace face: without this every var(--mono) in
+     this page was an invalid font shorthand and fell back to 16 px (page
+     numbers cut off under the thumbnails, oversized counters) */
+  :root { --mono: "Geist Mono", "Cascadia Mono", ui-monospace, Consolas, "Courier New", monospace; }
   * { box-sizing:border-box; }
   body { margin:0; }
   .container { max-width:1480px !important; padding:20px 16px 48px !important; }
@@ -221,7 +225,7 @@
   .doc-meta { font-size:10px; color:var(--muted); margin-top:2px; }
   .doc-acts { display:flex; gap:3px; flex-wrap:wrap; justify-content:flex-end; }
   .doc-acts button { min-height:0; padding:3px 6px; font-size:9.5px; }
-  .doc > .pg-list { border-top:1px solid var(--line); grid-template-columns:repeat(auto-fill,minmax(96px,1fr)); background:var(--panel); }
+  .doc > .pg-list { border-top:1px solid var(--line); grid-template-columns:repeat(auto-fill,minmax(min(var(--thumb-w,96px),100%),1fr)); background:var(--panel); }
   .doc-row.drop-before { box-shadow:inset 0 3px 0 var(--red); }
   .doc-row.drop-after { box-shadow:inset 0 -3px 0 var(--red); }
   .doc-row.drop-merge { outline:2px dashed var(--red); outline-offset:-2px; background:rgba(163,14,24,.07); }
@@ -255,7 +259,8 @@
   .pg-card.mine .pg-no { background:var(--bg-soft, #E4E0D6); }
   .pg-card.active { outline:3px solid var(--red); outline-offset:0; }
   .pg-card.selected { box-shadow:inset 0 0 0 3px var(--red); }
-  .pg-card.out { cursor:pointer; }
+  .pg-card.out { cursor:grab; }
+  body.dragging-pages, body.dragging-pages * { cursor:grabbing !important; }
   .pg-card.out .pg-img { opacity:.45; }
   .pg-img { aspect-ratio:1/1.414; background:#fff; display:flex; align-items:center; justify-content:center; overflow:hidden; }
   .pg-card.landscape .pg-img { aspect-ratio:1.414/1; }
@@ -287,6 +292,80 @@
 
   .preview-toolbar-v2 { min-height:42px; border-bottom:1px solid var(--line); background:var(--panel-2); padding:7px 9px; display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
   .preview-toolbar-v2 .grow { flex:1; }
+  /* the windows: 1, 2 side by side, 3 (one large, two small), 4 */
+  .vw-lays { display:inline-flex; gap:2px; padding-right:6px; margin-right:2px; border-right:1px solid var(--line); }
+  .vw-lay { width:30px; height:28px; min-height:0 !important; padding:0 !important; display:grid; place-items:center; }
+  .vw-lay svg { width:16px; height:12px; fill:none; stroke:currentColor; stroke-width:1.2; }
+  .vw-lay.btn-active svg { fill:rgba(255,255,255,.25); }
+  .pv-grid { flex:1; min-height:520px; display:grid; gap:4px; background:var(--line); }
+  html.app-screen .pv-grid { min-height:0; }
+  .pv-grid[data-n="1"] { grid-template:minmax(0,1fr) / minmax(0,1fr); }
+  .pv-grid[data-n="2"] { grid-template:minmax(0,1fr) / repeat(2,minmax(0,1fr)); }
+  .pv-grid[data-n="3"], .pv-grid[data-n="4"] { grid-template:repeat(2,minmax(0,1fr)) / repeat(2,minmax(0,1fr)); }
+  .pv-grid[data-n="3"] > .vw:first-child { grid-row:1 / span 2; }
+  .vw { position:relative; display:flex; flex-direction:column; min-width:0; min-height:0; background:#aaa69d; }
+  .vw[hidden] { display:none; }
+  .vw > .preview-stage { flex:1; min-height:0; }
+  .pv-grid:not([data-n="1"]) .vw.on::after { content:""; position:absolute; inset:0; border:2px solid var(--red); pointer-events:none; z-index:7; }
+  .vw.drop::after { content:""; position:absolute; inset:0; border:3px dashed var(--red); background:rgba(163,14,24,.08); pointer-events:none; z-index:8; }
+  .vw-head { display:flex; align-items:center; gap:5px; height:28px; padding:0 5px; background:var(--panel-2); border-bottom:1px solid var(--line); min-width:0; }
+  .pv-grid[data-n="1"] .vw-head { display:none; }
+  .vw-no { flex:0 0 18px; height:18px; display:grid; place-items:center; font:800 10px var(--mono); background:var(--ink); color:#fff; }
+  .vw.on .vw-no { background:var(--red); }
+  .vw-doc { flex:0 1 auto; min-width:60px; max-width:48%; height:22px !important; min-height:0 !important; padding:1px 4px !important; font:700 10.5px var(--sans,sans-serif) !important; border:1px solid var(--line); background:#fff; }
+  .vw-page { flex:1 1 0; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:10px var(--mono); color:var(--muted); }
+  .vw-prev, .vw-next { flex:0 0 22px; width:22px; height:22px; min-height:0 !important; padding:0 !important; border:1px solid var(--line); background:#fff; color:var(--ink); font:700 13px/1 var(--mono); cursor:pointer; }
+  .vw-prev:disabled, .vw-next:disabled { opacity:.35; cursor:default; }
+  .vw-prev:not(:disabled):hover, .vw-next:not(:disabled):hover { background:var(--ink); color:#fff; }
+
+  /* ── the file list: checkboxes, thumbnail size, what to do with the checked */
+  .chk { position:relative; flex:0 0 16px; width:16px; height:16px; margin:3px 0 0; cursor:pointer; display:inline-block; }
+  .chk input { position:absolute; inset:0; width:100%; height:100%; margin:0; opacity:0; cursor:pointer; }
+  .chk span { position:absolute; inset:0; border:1.5px solid var(--ink-3,#7A7367); background:#fff; pointer-events:none; }
+  .chk:hover span { border-color:var(--ink); }
+  .chk input:focus-visible + span { outline:2px solid var(--red); outline-offset:1px; }
+  .chk input:checked + span, .chk input:indeterminate + span { background:var(--red); border-color:var(--red); }
+  .chk input:checked + span::after { content:""; position:absolute; left:4px; top:0; width:4px; height:9px; border:solid #fff; border-width:0 2px 2px 0; transform:rotate(45deg); }
+  .chk input:indeterminate + span::after { content:""; position:absolute; left:3px; right:3px; top:6px; height:2px; background:#fff; }
+  .section-head .chk { margin:0 8px 0 0; }
+  .doc.checked > .doc-row { background:rgba(163,14,24,.05); }
+  .tree-tools { flex:0 0 auto; border-bottom:1px solid var(--line); background:var(--panel-2); }
+  .thumb-size { display:flex; align-items:center; gap:12px; padding:9px 12px 5px; }
+  .ts-label { font:800 9px/1 var(--display) !important; letter-spacing:.1em !important; color:var(--ink); text-transform:uppercase; white-space:nowrap; }
+  /* the slider as UI-RULES §4 has it: a 4 px track in --ink-4, the part passed
+     in --ink, a 16 px square red thumb, no shadows; the grab zone is the full
+     control height; the number field beside it is the value, the slider moves
+     it; ticks only at the signed sizes */
+  .ts-track { position:relative; flex:1; min-width:120px; }
+  .ts-track input[type=range] { -webkit-appearance:none; appearance:none; display:block; width:100%; height:var(--ctl-h,30px) !important; min-height:0 !important; margin:0 !important; padding:0 !important; border:0 !important; background:transparent !important; cursor:pointer; }
+  .ts-track input[type=range]:focus { outline:none; }
+  .ts-track input[type=range]::-webkit-slider-runnable-track { height:4px; background:linear-gradient(90deg,var(--ink,#2E2B25) 0 var(--p,12.5%),var(--ink-4,#A29C8E) var(--p,12.5%) 100%); }
+  .ts-track input[type=range]::-moz-range-track { height:4px; background:var(--ink-4,#A29C8E); }
+  .ts-track input[type=range]::-moz-range-progress { height:4px; background:var(--ink,#2E2B25); }
+  .ts-track input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:16px; height:16px; margin-top:-6px; background:var(--red); border:0; border-radius:0; }
+  .ts-track input[type=range]::-moz-range-thumb { width:16px; height:16px; background:var(--red); border:0; border-radius:0; }
+  .ts-track input[type=range]:focus-visible::-webkit-slider-thumb { outline:2px solid var(--ink); outline-offset:2px; }
+  .ts-track input[type=range]:focus-visible::-moz-range-thumb { outline:2px solid var(--ink); outline-offset:2px; }
+  /* the scale, on the thumb's travel (8 px in from each end) */
+  .ts-scale { position:relative; height:17px; margin:-8px 8px 0; }
+  .ts-scale i { position:absolute; top:0; width:1px; height:5px; background:var(--ink-3,#7A7367); transform:translateX(-.5px); }
+  .ts-scale b { position:absolute; top:6px; transform:translateX(-50%); font:600 8.5px/10px var(--mono) !important; letter-spacing:0 !important; color:var(--ink-3,#7A7367); cursor:pointer; }
+  .ts-scale b:first-of-type { transform:none; }
+  .ts-scale b:last-of-type { transform:translateX(-100%); }
+  .ts-scale b.on { color:var(--ink); font-weight:800 !important; }
+  .ts-num { display:inline-flex; align-items:center; gap:3px; white-space:nowrap; font:600 9.5px var(--mono) !important; color:var(--muted); }
+  .ts-num input { width:50px; height:var(--ctl-h-dense,22px) !important; min-height:0 !important; padding:1px 4px !important; font:800 11px var(--mono) !important; letter-spacing:0 !important; text-align:right; border:1px solid var(--line); background:#fff; }
+  .ts-scope { font:700 8px/1.3 var(--mono) !important; letter-spacing:.06em !important; padding:2px 5px; background:var(--ink); color:#fff; white-space:nowrap; }
+  .ts-scope.some { background:var(--red); }
+  .check-bar { display:flex; align-items:center; gap:4px; padding:5px 10px 6px; border-top:1px dashed var(--line); }
+  .check-bar[hidden] { display:none; }
+  .check-bar b { font:800 9.5px/1 var(--mono) !important; letter-spacing:.05em !important; color:var(--red); }
+  .check-bar .grow { flex:1; }
+  .check-bar button { min-height:0 !important; padding:3px 7px !important; font-size:9.5px !important; }
+  .pg-ghost.copying::after { content:"+ COPY"; position:absolute; left:4px; top:4px; padding:1px 4px; background:var(--red); color:#fff; font:800 8.5px var(--mono); }
+  .pg-ghost .pg-count { position:absolute; right:-6px; top:-6px; min-width:18px; height:18px; padding:0 4px; background:var(--ink); color:#fff; font:800 10px/18px var(--mono); text-align:center; }
+  .doc-row.drop-into { outline:2px dashed var(--red); outline-offset:-2px; background:rgba(163,14,24,.07); }
+  .doc-row.drop-into .doc-meta::after { content:"  ⇢ release to put the pages here"; color:var(--red); font-weight:800; }
   /* the preview is a CAD-style viewport: the sheet is placed and scaled by a
      transform (wheel = zoom at the cursor, drag = pan, double-click = fit) */
   .preview-stage { flex:1; min-height:520px; position:relative; overflow:hidden; background:#aaa69d; cursor:grab; touch-action:none; user-select:none; -webkit-user-select:none; }
@@ -345,16 +424,17 @@
     html.app-screen .preview-toolbar-v2 > #previewMeta { flex:1 1 0; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     html.app-screen .preview-toolbar-v2 > .grow { display:none; }
   }
-  #appTitle { font:800 11px/1.2 var(--display); letter-spacing:.12em; text-transform:uppercase; color:var(--ink,#2E2B25); white-space:nowrap; margin-right:4px; }
+  #appTitle { font:800 15px/1.2 var(--display); letter-spacing:.1em; text-transform:uppercase; color:var(--ink,#2E2B25); white-space:nowrap; margin-right:4px; }
   #appTitle span { color:var(--ink-4,#A29C8E); margin-left:8px; letter-spacing:.06em; }
   @media (max-width:760px) { #appTitle { display:none; } }
 
   /* ── full screen: the preview lifted over the whole window. CSS always
      works; the desktop application's own browser refuses the Fullscreen API
      ("permissions check failed"), which is asked for on top when allowed. */
-  .preview-pane.pv-maxed { position:fixed; inset:0; z-index:900; margin:0; border:0; }
-  .preview-pane:fullscreen { width:100vw; height:100vh; border:0; }
-  .preview-pane.pv-maxed .preview-stage, .preview-pane:fullscreen .preview-stage { min-height:0; }
+  .workspace-v2.pv-maxed { position:fixed; inset:0; z-index:900; margin:0; padding:8px; min-height:0; background:var(--paper,#ECE9E2); }
+  .workspace-v2:fullscreen { width:100vw; height:100vh; padding:8px; min-height:0; background:var(--paper,#ECE9E2); }
+  :is(.workspace-v2.pv-maxed,.workspace-v2:fullscreen) > .pane { min-height:0; }
+  :is(.workspace-v2.pv-maxed,.workspace-v2:fullscreen) .pv-grid { min-height:0; }
 
 </style>
 </head>
@@ -368,7 +448,7 @@
         <span class="head-badge">PDF</span>
         <span class="head-badge">WORD</span><span class="head-badge">LIBREDWG · OPEN SOURCE</span>
       </div>
-      <h1>ENGINEERING DOCUMENT STUDIO</h1>
+      <h1>ENGINEERING PDF DOCUMENT STUDIO</h1>
       <div class="sub">Preflight DWG layouts before conversion, verify plot boundaries, then combine, reorder, rotate and export engineering documents as one PDF.</div>
     </div>
     <div style="font-size:11px;color:var(--muted);text-align:right">
@@ -392,7 +472,25 @@
 
   <div class="workspace-v2">
     <aside class="pane tree-pane">
-      <div class="section-head"><b>/ FILES &amp; PAGES</b><span id="docCount" class="count">0 FILES</span></div>
+      <div class="section-head"><label class="chk" title="Check all files"><input id="checkAll" type="checkbox" aria-label="Check all files"><span></span></label><b>/ FILES &amp; PAGES</b><span id="docCount" class="count">0 FILES</span></div>
+      <div class="tree-tools">
+        <div class="thumb-size">
+          <span class="ts-label">Thumbnails</span>
+          <div class="ts-track">
+            <input id="thumbSize" type="range" min="64" max="320" step="8" value="96" aria-label="Thumbnail size, pixels">
+            <div id="thumbScale" class="ts-scale" aria-hidden="true"></div>
+          </div>
+          <label class="ts-num"><input id="thumbNum" type="number" min="64" max="320" step="8" value="96" aria-label="Thumbnail size, px">px</label>
+          <span id="thumbScope" class="ts-scope" title="Checked files take the size; with none checked, all files do">ALL FILES</span>
+        </div>
+        <div id="checkBar" class="check-bar" hidden>
+          <b id="checkN">0 CHECKED</b><span class="grow"></span>
+          <button id="checkView" class="btn btn-ghost" title="Show the checked files side by side, up to four windows">VIEW</button>
+          <button id="checkMerge" class="btn btn-ghost" title="Merge the checked files into one new PDF">MERGE</button>
+          <button id="checkRemove" class="btn btn-ghost" title="Remove the checked files from the list">REMOVE</button>
+          <button id="checkNone" class="btn btn-ghost" title="Uncheck all">✕</button>
+        </div>
+      </div>
       <div id="tree" class="pane-body tree">
         <div class="thumb-empty">Drop files above to start.</div>
       </div>
@@ -405,6 +503,12 @@
         <span class="grow"></span>
       </div>
       <div class="preview-toolbar-v2">
+        <span class="vw-lays" role="group" aria-label="Windows">
+          <button class="btn btn-ghost vw-lay" data-n="1" title="One window"><svg viewBox="0 0 16 12"><rect x=".5" y=".5" width="15" height="11"/></svg></button>
+          <button class="btn btn-ghost vw-lay" data-n="2" title="Two windows side by side"><svg viewBox="0 0 16 12"><rect x=".5" y=".5" width="7" height="11"/><rect x="8.5" y=".5" width="7" height="11"/></svg></button>
+          <button class="btn btn-ghost vw-lay" data-n="3" title="Three windows: one large, two small"><svg viewBox="0 0 16 12"><rect x=".5" y=".5" width="7" height="11"/><rect x="8.5" y=".5" width="7" height="5"/><rect x="8.5" y="6.5" width="7" height="5"/></svg></button>
+          <button class="btn btn-ghost vw-lay" data-n="4" title="Four windows"><svg viewBox="0 0 16 12"><rect x=".5" y=".5" width="7" height="5"/><rect x="8.5" y=".5" width="7" height="5"/><rect x=".5" y="6.5" width="7" height="5"/><rect x="8.5" y="6.5" width="7" height="5"/></svg></button>
+        </span>
         <b id="previewTitle" style="font-size:11px">NO PAGE SELECTED</b>
         <span id="previewMeta" style="font:10px var(--mono);color:var(--muted)"></span>
         <span class="grow"></span>
@@ -422,9 +526,7 @@
         <button id="previewZoomIn" class="btn btn-ghost">+</button>
         <button id="previewFs" class="btn btn-ghost" title="Full screen (Esc to leave)" aria-label="Full screen">⛶</button>
       </div>
-      <div id="previewStage" class="preview-stage">
-        <div class="preview-empty"><b>Select a file and then a page/layout.</b><br><br>This pane shows what will go to the PDF.</div>
-      </div>
+      <div id="pvGrid" class="pv-grid" data-n="1"></div>
     </main>
   </div>
 
@@ -492,8 +594,11 @@ const $ = s => document.querySelector(s);
    Space — so that a removed page can be previewed and put back. */
 const state = {
   sources:new Map(), docs:[], all:new Map(), activeDocId:null, activePageId:null,
-  selected:new Set(), anchorId:null, previewZoom:1, showBoundary:false
+  selected:new Set(), anchorId:null, previewZoom:1, showBoundary:false,
+  checked:new Set(),                    // files ticked in the list (doc ids)
+  thumbW:96                             // thumbnail size of the files without their own
 };
+try{ const w=+localStorage.getItem("docStudio.thumbW"); if(w>=64&&w<=320) state.thumbW=w; }catch{}
 
 function uid(p="id"){ return p+"-"+Math.random().toString(36).slice(2,10); }
 function ext(n){ return (n.split(".").pop()||"").toLowerCase(); }
@@ -590,6 +695,9 @@ async function ingestDwg(file, existing=null){
     const first=d.pages.findIndex(p=>p.sourceId===src.id); if(first>=0) at=first;
     d.pages=[]; d.all=[];
     for(const id of src.pageIds){ state.all.delete(id); state.selected.delete(id); }
+    // pages of this drawing moved into other files go with the old reading
+    const gone=new Set(src.pageIds);
+    for(const x of state.docs) if(x!==d){ x.pages=x.pages.filter(p=>!gone.has(p.id)); x.all=x.all.filter(p=>!gone.has(p.id)); }
     src.pageIds=[]; src.layouts=[]; src.engineError=null;
   }
   state.activeDocId=d.id;
@@ -707,19 +815,22 @@ function docHtml(d){
   const acts=(s?.type==="dwg"?'<button class="btn btn-ghost" data-act="reload" title="Read the drawing again">RELOAD</button>':'')+
     '<button class="btn btn-ghost" data-act="remove" title="Remove from the list">✕</button>'+
     '<button class="btn btn-primary doc-dl" data-act="dl" title="Download this document as one PDF"'+(d.pages.length?"":" disabled")+'>⤓ PDF</button>';
-  return '<div class="doc'+(d.id===state.activeDocId?" active":"")+'" data-doc="'+d.id+'">'+
+  return '<div class="doc'+(d.id===state.activeDocId?" active":"")+(state.checked.has(d.id)?" checked":"")+'" data-doc="'+d.id+'">'+
     '<div class="doc-row">'+
+      '<label class="chk doc-chk" title="Check this file"><input type="checkbox" data-chk="'+d.id+'"'+(state.checked.has(d.id)?" checked":"")+' aria-label="Check '+esc(d.name)+'"><span></span></label>'+
       '<button class="doc-tog" data-act="toggle" title="'+(d.open?"Hide pages":"Show pages")+'" aria-expanded="'+d.open+'">'+(d.open?"−":"+")+'</button>'+
       '<div class="source-icon">'+docIcon(d)+'</div>'+
       '<div class="doc-main"><div class="doc-name" title="'+esc(d.name)+'">'+esc(d.name)+'</div>'+
         '<div class="doc-meta'+(s?.status==="error"?" status error":"")+'">'+esc(docMeta(d))+'</div></div>'+
       '<div class="doc-acts">'+acts+'</div>'+
     '</div>'+
-    (d.open?'<div class="pg-list" data-doc="'+d.id+'">'+pagesHtml(d)+'</div>':"")+
+    (d.open?'<div class="pg-list" data-doc="'+d.id+'"'+(d.thumbW?' style="--thumb-w:'+d.thumbW+'px"':'')+'>'+pagesHtml(d)+'</div>':"")+
   '</div>';
 }
 function renderTree(){
   const root=$("#tree");
+  root.style.setProperty("--thumb-w",state.thumbW+"px");
+  syncChecks();
   $("#docCount").textContent=state.docs.length+" FILE"+(state.docs.length===1?"":"S");
   if(!state.docs.length){ root.innerHTML='<div class="thumb-empty">Drop files above to start.</div>'; return; }
   root.innerHTML=state.docs.map(docHtml).join("");
@@ -750,12 +861,12 @@ function syncMarks(){
 function removePages(ids){
   const set=new Set(ids), touched=new Set();
   for(const id of ids){ const d=docOfPage(page(id)); if(d){ d.pages=d.pages.filter(p=>p.id!==id); touched.add(d); } state.selected.delete(id); }
-  touched.forEach(renderDoc); if(set.has(state.activePageId)) renderPreview();
+  touched.forEach(renderDoc); if(set.has(state.activePageId)) renderPreview(); else syncHeads();
 }
 function rotatePages(ids){
   const touched=new Set();
   for(const id of ids){ const p=page(id); if(p){ p.rotation=(p.rotation+90)%360; touched.add(docOfPage(p)); } }
-  touched.forEach(d=>d&&renderDoc(d)); if(ids.includes(state.activePageId)) renderPreview();
+  touched.forEach(d=>d&&renderDoc(d)); renderPreview();
 }
 /* back where it came from: after the nearest page of the same file that is
    still in the document, or before the next one, or at the end */
@@ -773,6 +884,7 @@ function setActiveDoc(d){ if(state.activeDocId!==d.id){ state.activeDocId=d.id; 
 
 let suppressClick=false;
 $("#tree").addEventListener("click",ev=>{
+  if(ev.target.closest(".chk")) return;
   if(suppressClick){suppressClick=false;return;}
   const act=ev.target.closest("button")?.dataset.act;
   const card=ev.target.closest(".pg-card");
@@ -814,6 +926,7 @@ document.addEventListener("keydown",ev=>{
 });
 
 function removeDoc(d){
+  state.checked.delete(d.id);
   for(const p of d.all){ state.all.delete(p.id); state.selected.delete(p.id); }
   const i=state.docs.indexOf(d); state.docs.splice(i,1);
   // a file stays while a merged document still draws on it
@@ -822,10 +935,81 @@ function removeDoc(d){
   if(!page(state.activePageId)) state.activePageId=null;
   renderAll();
 }
+/* ── checked files ─────────────────────────────────────────────────────────
+   The box left of a file ticks it. The ticked files take the thumbnail size
+   from the slider (with none ticked, every file does) and are what VIEW
+   (side by side, up to four windows), MERGE and REMOVE act on. */
+const checkedDocs=()=>state.docs.filter(d=>state.checked.has(d.id));
+function syncChecks(){
+  for(const id of [...state.checked]) if(!doc(id)) state.checked.delete(id);
+  const n=state.checked.size, all=$("#checkAll");
+  all.checked=!!n&&n===state.docs.length; all.indeterminate=!!n&&n<state.docs.length; all.disabled=!state.docs.length;
+  $("#checkBar").hidden=!n; $("#checkN").textContent=n+" CHECKED";
+  $("#checkMerge").disabled=n<2;
+  const sc=$("#thumbScope"); sc.textContent=n?(n===1?"1 FILE":n+" FILES"):"ALL FILES"; sc.classList.toggle("some",!!n);
+  const first=checkedDocs()[0]; setSlider(n?(first?.thumbW||state.thumbW):state.thumbW);
+  document.querySelectorAll("#tree .doc").forEach(el=>{
+    const on=state.checked.has(el.dataset.doc); el.classList.toggle("checked",on);
+    const b=el.querySelector("input[data-chk]"); if(b) b.checked=on;
+  });
+}
+$("#tree").addEventListener("change",ev=>{
+  const b=ev.target.closest("input[data-chk]"); if(!b) return;
+  b.checked?state.checked.add(b.dataset.chk):state.checked.delete(b.dataset.chk); syncChecks();
+});
+$("#checkAll").addEventListener("change",ev=>{ state.checked=ev.target.checked?new Set(state.docs.map(d=>d.id)):new Set(); syncChecks(); });
+$("#checkNone").onclick=()=>{ state.checked.clear(); syncChecks(); };
+$("#checkRemove").onclick=()=>{
+  const list=checkedDocs(); if(!list.length) return;
+  if(!confirm("Remove "+(list.length===1?"“"+list[0].name+"”":list.length+" files")+" from the list?")) return;
+  list.forEach(d=>removeDoc(d));
+};
+$("#checkMerge").onclick=()=>{ const list=checkedDocs(); if(list.length>=2) openMergeOf(list); };
+$("#checkView").onclick=()=>{
+  const list=checkedDocs().slice(0,4); if(!list.length) return;
+  setLayout(Math.max(layoutN,list.length));
+  list.forEach((d,i)=>{ viewers[i].pageId=pageSeq(d)[0]?.id||null; });
+  setActive(viewers[0]); state.activePageId=viewers[0].pageId; syncMarks();
+  viewers.slice(0,layoutN).forEach(V=>renderViewer(V)); syncHeads(); renderPreviewMeta();
+};
+/* the thumbnail size: 64 to 320 px in steps of 8, the number field and the
+   slider always showing the same value; the scale's sizes are clickable */
+(function slider(){
+  const sc=$("#thumbScale"), MIN=64, MAX=320;
+  const at=v=>(v-MIN)/(MAX-MIN)*100+"%";
+  let h="";
+  for(let v=MIN;v<=MAX;v+=64) h+='<i style="left:'+at(v)+'"></i><b data-v="'+v+'" style="left:'+at(v)+'">'+v+'</b>';
+  sc.innerHTML=h;
+  sc.addEventListener("click",e=>{ const b=e.target.closest("b[data-v]"); if(b) applyThumbW(+b.dataset.v,true); });
+  $("#thumbSize").addEventListener("input",e=>applyThumbW(+e.target.value,false));
+  $("#thumbSize").addEventListener("change",e=>applyThumbW(+e.target.value,true));
+  $("#thumbNum").addEventListener("change",e=>{
+    let v=Math.round((+e.target.value||96)/8)*8; v=Math.max(MIN,Math.min(MAX,v)); applyThumbW(v,true);
+  });
+})();
+function setSlider(v){
+  const r=$("#thumbSize"); r.value=v;
+  r.style.setProperty("--p",((v-64)/(320-64)*100)+"%");
+  $("#thumbNum").value=v;
+  document.querySelectorAll("#thumbScale b").forEach(b=>b.classList.toggle("on",+b.dataset.v===v));
+}
+/* the checked files, or with none checked every file (their own sizes go) */
+function applyThumbW(v,save){
+  setSlider(v);
+  const list=checkedDocs();
+  if(list.length){
+    for(const d of list){ d.thumbW=v; $('#tree .pg-list[data-doc="'+d.id+'"]')?.style.setProperty("--thumb-w",v+"px"); }
+  }else{
+    state.thumbW=v; $("#tree").style.setProperty("--thumb-w",v+"px");
+    for(const d of state.docs){ d.thumbW=null; $('#tree .pg-list[data-doc="'+d.id+'"]')?.style.removeProperty("--thumb-w"); }
+    if(save) try{ localStorage.setItem("docStudio.thumbW",String(v)); }catch{}
+  }
+}
 /* ── merging ───────────────────────────────────────────────────────────── */
 let merge=null;
-function openMerge(dragged,target){
-  merge={order:[target,dragged],auto:true};
+function openMerge(dragged,target){ openMergeOf([target,dragged]); }
+function openMergeOf(list){
+  merge={order:[...list],auto:true};
   drawMerge(); $("#mergeModal").classList.add("on"); $("#mergeOk").focus();
 }
 // the name follows the order until the user types one of their own
@@ -870,24 +1054,35 @@ $("#mergeOk").onclick=()=>{
    Pointer events, not HTML5 drag and drop: a native drag of an <img> hands the
    page a file ("download.svg"), which the drop-anywhere handler used to open
    as a new source.
-   A page card, dragged inside its document: the card itself becomes the
-   insertion slot — a dashed frame that moves through the grid live — while a
-   copy follows the pointer and the other cards slide aside (FLIP: measured
-   before the slot moves, animated from where they were). Dragging one of
-   several selected cards moves them all.
+   A page card is dragged with the LEFT button to move it and with the RIGHT
+   button to copy it (the original stays). Where it will land is a slot — a
+   dashed frame that moves live through the grid under the pointer, in its own
+   file or in another file's open grid, the other cards sliding aside (FLIP).
+   Over a closed file's row the pages go to the end of that file; over a
+   preview window the page is shown there and nothing moves. Dragging one of
+   several selected cards takes them all. A page taken from "not in the PDF"
+   goes into the PDF where it is dropped.
    A file row, dragged over another: its middle half means merge, its top or
-   bottom quarter means before or after. Near the panel's edges it scrolls. */
+   bottom quarter means before or after; dropped on a window, the file is
+   shown there. Near the list's edges it scrolls. */
+function copyPage(p,target){
+  const {id,docId,_rot,_rotPending,_svgUrl,pngDataUrl,thumb,...rest}=p;
+  return newPage({...rest,docId:target.id,orig:p.orig||p});
+}
 (function dragging(){
   const tree=$("#tree");
   let drag=null;
+  // the right button copies: no context menu over the pages
+  tree.addEventListener("contextmenu",ev=>{ if(ev.target.closest(".pg-card")) ev.preventDefault(); });
   tree.addEventListener("pointerdown",ev=>{
-    if(ev.button!==0||ev.target.closest("button")) return;
-    const card=ev.target.closest('.pg-card[data-in="1"]');
+    if(ev.target.closest("button,.chk,select,input")) return;
+    const card=ev.target.closest(".pg-card");
     const row=!card&&ev.target.closest(".doc-row");
     if(!card&&!row) return;
-    const sx=ev.clientX, sy=ev.clientY;
+    if(!(ev.button===0||(card&&ev.button===2))) return;
+    const copy=ev.button===2, sx=ev.clientX, sy=ev.clientY;
     const move=e=>{
-      if(!drag){ if(Math.hypot(e.clientX-sx,e.clientY-sy)<5) return; drag=card?beginCard(card,e):beginDoc(row.closest(".doc"),e); }
+      if(!drag){ if(Math.hypot(e.clientX-sx,e.clientY-sy)<5) return; drag=card?beginCard(card,e,copy):beginDoc(row.closest(".doc"),e); }
       drag.x=e.clientX; drag.y=e.clientY; drag.step();
     };
     const up=()=>{
@@ -898,7 +1093,7 @@ $("#mergeOk").onclick=()=>{
   });
   function ghostOf(el,e,cls){
     const r=el.getBoundingClientRect(), g=el.cloneNode(true);
-    g.classList.add(cls); g.classList.remove("placeholder","active","dragging"); g.style.width=r.width+"px";
+    g.classList.add(cls); g.classList.remove("placeholder","active","dragging","selected"); g.style.width=r.width+"px";
     if(cls==="doc-ghost"){ g.querySelector(".pg-list")?.remove(); }
     document.body.appendChild(g);
     return {g,dx:e.clientX-r.left,dy:Math.min(e.clientY-r.top,30)};
@@ -906,47 +1101,92 @@ $("#mergeOk").onclick=()=>{
   function autoscroll(d){
     d.raf=requestAnimationFrame(function tick(){
       const r=tree.getBoundingClientRect(), edge=40;
-      let v=0; if(d.y<r.top+edge) v=-(r.top+edge-d.y)/3; else if(d.y>r.bottom-edge) v=(d.y-(r.bottom-edge))/3;
+      let v=0;
+      if(d.x>=r.left&&d.x<=r.right){ if(d.y<r.top+edge) v=-(r.top+edge-d.y)/3; else if(d.y>r.bottom-edge) v=(d.y-(r.bottom-edge))/3; }
       if(v){ tree.scrollTop+=Math.max(-24,Math.min(24,v)); d.step(); }
       d.raf=requestAnimationFrame(tick);
     });
   }
-  function beginCard(card,e){
-    const list=card.closest(".pg-list"), {g,dx,dy}=ghostOf(card,e,"pg-ghost");
-    card.classList.add("placeholder"); list.classList.add("sorting");
-    const d={ghost:g,x:e.clientX,y:e.clientY,raf:0};
-    const ins=()=>[...list.querySelectorAll('.pg-card[data-in="1"]')];
+  const inCards=l=>[...l.querySelectorAll('.pg-card[data-in="1"]')];
+  function beginCard(card,e,copy){
+    const home=card.closest(".pg-list"), homeDoc=doc(home.dataset.doc), moved=page(card.dataset.id);
+    // what goes: the card, or all the selected cards of that file with it
+    const group=state.selected.has(moved.id)&&state.selected.size>1
+      ? [moved,...homeDoc.pages.filter(p=>state.selected.has(p.id)&&p!==moved)] : [moved];
+    const {g,dx,dy}=ghostOf(card,e,"pg-ghost");
+    if(copy) g.classList.add("copying");
+    if(group.length>1){ const c=document.createElement("span"); c.className="pg-count"; c.textContent=group.length; g.appendChild(c); }
+    // the slot where the pages will land
+    const slot=document.createElement("div");
+    slot.className="pg-card placeholder"+(card.classList.contains("landscape")?" landscape":""); slot.dataset.slot="1";
+    slot.innerHTML='<div class="pg-img"></div><div class="pg-no"></div>';
+    const hidden=copy?[]:group.map(p=>tree.querySelector('.pg-card[data-id="'+p.id+'"]')).filter(Boolean);
+    if(card.dataset.in==="1") card.after(slot);
+    else { const ins=inCards(home); ins.length?ins[ins.length-1].after(slot):home.prepend(slot); }
+    hidden.forEach(c=>{ c.style.display="none"; });
+    document.body.classList.add("dragging-pages");
+    const d={ghost:g,x:e.clientX,y:e.clientY,raf:0,view:null,rowDoc:null};
+    const clearMarks=()=>{ tree.querySelectorAll(".doc-row.drop-into").forEach(r=>r.classList.remove("drop-into")); markViewer(null); };
+    const cardsIn=l=>inCards(l).filter(c=>c.style.display!=="none");
+    function flip(list,doIt){
+      const all=[...list.querySelectorAll(".pg-card")], first=new Map(all.map(c=>[c,c.getBoundingClientRect()]));
+      doIt();
+      for(const c of all){
+        if(c===slot) continue;
+        const a=first.get(c), b=c.getBoundingClientRect(), tx=a.left-b.left, ty=a.top-b.top;
+        if(tx||ty) c.animate([{transform:"translate("+tx+"px,"+ty+"px)"},{transform:"none"}],{duration:150,easing:"cubic-bezier(.2,.7,.3,1)"});
+      }
+    }
     d.step=()=>{
       g.style.transform="translate("+(d.x-dx)+"px,"+(d.y-dy)+"px)";
-      const cards=ins().filter(c=>c!==card); if(!cards.length) return;
+      clearMarks(); d.view=null; d.rowDoc=null;
+      const hit=document.elementFromPoint(d.x,d.y);
+      const vw=viewerAt(hit); if(vw){ d.view=vw; markViewer(vw); return; }
+      const list=hit?.closest?.(".pg-list"), hdoc=hit?.closest?.(".doc");
+      if(!list||!tree.contains(list)){
+        // a closed file's row: the pages go to its end
+        if(hdoc&&tree.contains(hdoc)&&!hdoc.querySelector(".pg-list")){ d.rowDoc=doc(hdoc.dataset.doc); hdoc.querySelector(".doc-row").classList.add("drop-into"); }
+        return;
+      }
+      if(slot.parentElement!==list){                       // into another file's grid
+        const cs=cardsIn(list); cs.length?cs[cs.length-1].after(slot):list.prepend(slot);
+      }
       // the slot goes before the first card whose centre lies after the
       // pointer, reading the grid row by row
+      const cards=cardsIn(list); if(!cards.length) return;
       let before=null;
       for(const c of cards){
         const r=c.getBoundingClientRect();
         if(d.y<r.top){ before=c; break; }
         if(d.y<=r.bottom&&d.x<r.left+r.width/2){ before=c; break; }
       }
-      const cur=ins(), k=cur.indexOf(card);
-      if(before===cur[k+1]||(!before&&k===cur.length-1)) return;
-      const all=[...list.querySelectorAll(".pg-card")], first=new Map(all.map(c=>[c,c.getBoundingClientRect()]));
-      if(before) list.insertBefore(card,before); else cards[cards.length-1].after(card);
-      for(const c of all){
-        if(c===card) continue;
-        const a=first.get(c), b=c.getBoundingClientRect(), tx=a.left-b.left, ty=a.top-b.top;
-        if(tx||ty) c.animate([{transform:"translate("+tx+"px,"+ty+"px)"},{transform:"none"}],{duration:150,easing:"cubic-bezier(.2,.7,.3,1)"});
-      }
+      const seq=[...list.querySelectorAll('.pg-card[data-in="1"],.pg-card[data-slot]')].filter(c=>c.style.display!=="none"), k=seq.indexOf(slot);
+      if(before===seq[k+1]||(!before&&k===seq.length-1)) return;
+      flip(list,()=>{ if(before) list.insertBefore(slot,before); else cards[cards.length-1].after(slot); });
     };
     d.finish=()=>{
-      card.classList.remove("placeholder"); list.classList.remove("sorting");
-      const dc=doc(list.dataset.doc), moved=page(card.dataset.id);
-      let pages=ins().map(c=>page(c.dataset.id)).filter(Boolean);
-      if(state.selected.has(moved.id)&&state.selected.size>1){
-        const group=pages.filter(p=>state.selected.has(p.id)&&p!==moved);
-        pages=pages.filter(p=>!group.includes(p)); pages.splice(pages.indexOf(moved)+1,0,...group);
+      clearMarks(); document.body.classList.remove("dragging-pages");
+      const list=slot.parentElement?.closest(".pg-list");
+      const order=list?[...list.querySelectorAll('.pg-card[data-in="1"],.pg-card[data-slot]')].filter(c=>c.style.display!=="none"):null;
+      slot.remove(); hidden.forEach(c=>{ c.style.display=""; });
+      // dropped on a window: shown there, nothing moves
+      if(d.view){ renderDoc(homeDoc); setActive(d.view); showIn(d.view,moved.id); return; }
+      const target=d.rowDoc||(list&&doc(list.dataset.doc));
+      if(!target){ renderDoc(homeDoc); return; }
+      const landing=copy?group.map(p=>copyPage(p,target)):group;
+      let seq;
+      if(d.rowDoc||!order) seq=[...target.pages.filter(p=>copy||!group.includes(p)),...landing];
+      else { seq=[]; for(const c of order){ if(c===slot) seq.push(...landing); else { const p=page(c.dataset.id); if(p&&(copy||!group.includes(p))) seq.push(p); } } }
+      if(!copy&&target!==homeDoc){
+        homeDoc.pages=homeDoc.pages.filter(p=>!group.includes(p)); homeDoc.all=homeDoc.all.filter(p=>!group.includes(p));
+        for(const p of group){ p.docId=target.id; target.all.push(p); }
       }
-      dc.pages=pages; renderDoc(dc);
-      if(state.activePageId) renderPreviewMeta();
+      if(copy) for(const q of landing) target.all.push(q);
+      for(const p of landing) if(!target.sourceIds.includes(p.sourceId)) target.sourceIds.push(p.sourceId);
+      target.pages=seq;
+      if(target!==homeDoc){ state.selected.clear(); target.open=true; }
+      renderDoc(homeDoc); if(target!==homeDoc) renderDoc(target);
+      renderPreviewMeta(); syncHeads();
     };
     autoscroll(d); d.step();
     return d;
@@ -954,12 +1194,14 @@ $("#mergeOk").onclick=()=>{
   function beginDoc(el,e){
     const {g,dx,dy}=ghostOf(el,e,"doc-ghost");
     el.classList.add("dragging");
-    const d={ghost:g,x:e.clientX,y:e.clientY,raf:0,target:null,mode:null};
-    const clear=()=>tree.querySelectorAll(".doc-row").forEach(r=>r.classList.remove("drop-before","drop-after","drop-merge"));
+    const d={ghost:g,x:e.clientX,y:e.clientY,raf:0,target:null,mode:null,view:null};
+    const clear=()=>{ tree.querySelectorAll(".doc-row").forEach(r=>r.classList.remove("drop-before","drop-after","drop-merge")); markViewer(null); };
     d.step=()=>{
       g.style.transform="translate("+(d.x-dx)+"px,"+(d.y-dy)+"px)";
-      clear(); d.target=null; d.mode=null;
-      const hit=document.elementFromPoint(d.x,d.y)?.closest?.(".doc");
+      clear(); d.target=null; d.mode=null; d.view=null;
+      const at=document.elementFromPoint(d.x,d.y);
+      const vw=viewerAt(at); if(vw){ d.view=vw; markViewer(vw); return; }
+      const hit=at?.closest?.(".doc");
       if(!hit||hit===el||!tree.contains(hit)) return;
       const row=hit.querySelector(".doc-row"), r=row.getBoundingClientRect();
       let mode;
@@ -970,11 +1212,12 @@ $("#mergeOk").onclick=()=>{
     d.finish=()=>{
       clear(); el.classList.remove("dragging");
       const src=doc(el.dataset.doc), t=d.target;
+      if(d.view&&src){ setActive(d.view); showIn(d.view,pageSeq(src)[0]?.id); return; }
       if(!t||!src) return;
       if(d.mode==="merge") return openMerge(src,t);
       state.docs.splice(state.docs.indexOf(src),1);
       state.docs.splice(state.docs.indexOf(t)+(d.mode==="after"?1:0),0,src);
-      renderTree();
+      renderTree(); syncHeads();
     };
     autoscroll(d); d.step();
     return d;
@@ -993,71 +1236,75 @@ $("#mergeOk").onclick=()=>{
    made that 0.1-0.6 s a step on the Senan sheets.) A PDF page is rendered by
    pdf.js for exactly the part in view at the resolution shown; an image is
    drawn onto a canvas the same way.
-   Wheel = zoom at the cursor, drag = pan, double-click / FIT = fit the sheet. */
-let previewToken=0;
-const view={s:1,x:0,y:0, cs:1,cx:0,cy:0, page:null, pageId:null, kind:null};   // s = px per unit, x,y = top-left in units; c* = committed
-let host=null;                       // {kind:"svg"|"canvas", el, draw(), page:[x,y,w,h]}
+   Wheel = zoom at the cursor, drag = pan, double-click / FIT = fit the sheet.
+   There are up to four such windows side by side (below). */
+/* One to four windows (the 1 · 2 · 3 · 4 layouts). Each window has its own
+   page, view, zoom and canvas; the toolbar (sheet tool, FIT, zoom) acts on
+   the active one — outlined red — and a page clicked in the file list opens
+   in it. Which file a window shows is picked in its own header, by dragging a
+   file or a page from the list onto it, or with VIEW for the checked files. */
+const viewers=[];
+let activeV=null, layoutN=1;
 function svgUrl(p){ const o=p.orig||p; return o._svgUrl||(o._svgUrl=URL.createObjectURL(new Blob([o.svg],{type:"image/svg+xml"}))); }
-const stage=()=>$("#previewStage");
-const stageSize=()=>{ const r=stage().getBoundingClientRect(); return [Math.max(50,r.width),Math.max(50,r.height)]; };
+const sizeOf=V=>{ const r=V.st.getBoundingClientRect(); return [Math.max(50,r.width),Math.max(50,r.height)]; };
 
-function liveTransform(){
-  if(!host) return;
-  const q=view.s/view.cs, tx=(view.cx-view.x)*view.s, ty=(view.cy-view.y)*view.s;
-  host.el.style.transform=(q===1&&!tx&&!ty)?"":"translate("+tx.toFixed(1)+"px,"+ty.toFixed(1)+"px) scale("+q.toFixed(5)+")";
+function liveTransform(V){
+  if(!V.host) return;
+  const v=V.view, q=v.s/v.cs, tx=(v.cx-v.x)*v.s, ty=(v.cy-v.y)*v.s;
+  V.host.el.style.transform=(q===1&&!tx&&!ty)?"":"translate("+tx.toFixed(1)+"px,"+ty.toFixed(1)+"px) scale("+q.toFixed(5)+")";
 }
-let commitT=0;
-function scheduleCommit(){ clearTimeout(commitT); commitT=setTimeout(commit,110); }
+function scheduleCommit(V){ clearTimeout(V.commitT); V.commitT=setTimeout(()=>commit(V),110); }
+function zoomLabelOf(V){ if(V===activeV) $("#previewZoomLabel").textContent=V.host?Math.round(V.view.s/V.view.fit*100)+"%":"—"; }
 /* the transform is always relative to the view actually drawn (cs, cx, cy):
    it is dropped only when the new frame is there, so nothing jumps */
-function commit(){
-  if(!host) return;
-  const h=host, target={s:view.s,x:view.x,y:view.y};
-  const done=ok=>{ if(!ok||host!==h) return; view.cs=target.s; view.cx=target.x; view.cy=target.y; liveTransform(); };
+function commit(V){
+  if(!V.host) return;
+  const h=V.host, v=V.view, target={s:v.s,x:v.x,y:v.y};
+  const done=ok=>{ if(!ok||V.host!==h) return; v.cs=target.s; v.cx=target.x; v.cy=target.y; liveTransform(V); };
   const r=h.draw(target);
   if(r&&r.then) r.then(done); else done(true);
-  $("#previewZoomLabel").textContent=Math.round(view.s/view.fit*100)+"%";
+  zoomLabelOf(V);
 }
 /* a canvas sheet is drawn again on every step while frames come quickly; when
    they do not (a heavy sheet on a slow GPU: the frame interval, not only the
    script time, is watched), the rest of that gesture moves the last frame and
    the vectors follow when the wheel stops */
-let rafQ=0, lastFrame=0, slowFrames=0, gestureSlow=false, idleT=0, sharpT=0;
-function changed(){
-  $("#previewZoomLabel").textContent=Math.round(view.s/view.fit*100)+"%";
-  clearTimeout(idleT); idleT=setTimeout(()=>{ gestureSlow=false; slowFrames=0; lastFrame=0; },350);
-  if(host&&host.kind==="scene"){
-    host.moving=true; clearTimeout(sharpT);
-    const h=host; sharpT=setTimeout(()=>{ if(host!==h) return; h.moving=false; commit(); },150);
+function changed(V){
+  zoomLabelOf(V);
+  clearTimeout(V.idleT); V.idleT=setTimeout(()=>{ V.gestureSlow=false; V.slowFrames=0; V.lastFrame=0; },350);
+  const h=V.host;
+  if(h&&h.kind==="scene"){
+    h.moving=true; clearTimeout(V.sharpT);
+    V.sharpT=setTimeout(()=>{ if(V.host!==h) return; h.moving=false; commit(V); },150);
   }
-  if(host&&host.kind==="scene"&&!gestureSlow&&host.lastMs<40){
-    clearTimeout(commitT);
-    if(!rafQ) rafQ=requestAnimationFrame(now=>{
-      rafQ=0;
-      if(lastFrame&&now-lastFrame>45){ if(++slowFrames>=2){ gestureSlow=true; liveTransform(); scheduleCommit(); return; } } else slowFrames=0;
-      lastFrame=now; commit();
+  if(h&&h.kind==="scene"&&!V.gestureSlow&&h.lastMs<40){
+    clearTimeout(V.commitT);
+    if(!V.rafQ) V.rafQ=requestAnimationFrame(now=>{
+      V.rafQ=0;
+      if(V.lastFrame&&now-V.lastFrame>45){ if(++V.slowFrames>=2){ V.gestureSlow=true; liveTransform(V); scheduleCommit(V); return; } } else V.slowFrames=0;
+      V.lastFrame=now; commit(V);
     });
     return;
   }
-  liveTransform(); scheduleCommit();
+  liveTransform(V); scheduleCommit(V);
 }
-function fitView(){
-  if(!host) return;
-  const [W,H]=stageSize(), [px,py,pw,ph]=host.page, pad=24;
+function fitView(V){
+  if(!V.host) return;
+  const [W,H]=sizeOf(V), [px,py,pw,ph]=V.host.page, pad=24, v=V.view;
   const s=Math.min((W-2*pad)/pw,(H-2*pad)/ph);
-  view.s=view.fit=s; view.x=px+pw/2-W/(2*s); view.y=py+ph/2-H/(2*s);
-  commit();
+  v.s=v.fit=s; v.x=px+pw/2-W/(2*s); v.y=py+ph/2-H/(2*s);
+  commit(V);
 }
-function zoomAt(mx,my,f){
-  const ux=view.x+mx/view.s, uy=view.y+my/view.s;
-  const s2=Math.max(view.fit*0.2,Math.min(view.fit*400,view.s*f));
-  view.s=s2; view.x=ux-mx/s2; view.y=uy-my/s2; changed();
+function zoomAt(V,mx,my,f){
+  const v=V.view, ux=v.x+mx/v.s, uy=v.y+my/v.s;
+  const s2=Math.max(v.fit*0.2,Math.min(v.fit*400,v.s*f));
+  v.s=s2; v.x=ux-mx/s2; v.y=uy-my/s2; changed(V);
 }
-function zoomCentre(f){ const [W,H]=stageSize(); zoomAt(W/2,H/2,f); }
+function zoomCentre(V,f){ const [W,H]=sizeOf(V); zoomAt(V,W/2,H/2,f); }
 
-/* the DWG sheet: its own SVG, viewBox = view */
-function svgHost(svgText){
-  const st=stage(); st.innerHTML=svgText.replace(/^\s*<\?xml[^>]*>/,"");
+/* the DWG sheet: its own SVG, viewBox = view (the fallback, ?svgview=1) */
+function svgHost(V,svgText){
+  const st=V.st; st.innerHTML=svgText.replace(/^\s*<\?xml[^>]*>/,"");
   const sv=st.querySelector("svg");
   const vb=(sv.getAttribute("viewBox")||"0 0 100 100").split(/[ ,]+/).map(Number);
   sv.removeAttribute("width"); sv.removeAttribute("height"); sv.setAttribute("preserveAspectRatio","none");
@@ -1067,48 +1314,49 @@ function svgHost(svgText){
   paper.setAttribute("x",vb[0]); paper.setAttribute("y",vb[1]); paper.setAttribute("width",vb[2]); paper.setAttribute("height",vb[3]);
   paper.setAttribute("fill","#fff"); paper.setAttribute("stroke","#8c887f"); paper.setAttribute("vector-effect","non-scaling-stroke"); paper.setAttribute("stroke-width","1");
   const first=[...sv.children].find(c=>c.tagName!=="style"&&c.tagName!=="defs"); sv.insertBefore(paper,first||null);
-  return { kind:"svg", el:sv, page:vb, draw(t){ const [W,H]=stageSize(); sv.setAttribute("viewBox",t.x+" "+t.y+" "+(W/t.s)+" "+(H/t.s)); return true; } };
+  return { kind:"svg", el:sv, page:vb, draw(t){ const [W,H]=sizeOf(V); sv.setAttribute("viewBox",t.x+" "+t.y+" "+(W/t.s)+" "+(H/t.s)); return true; } };
 }
 /* the DWG sheet as a scene drawn on a canvas (canvas-view.js) */
-function sceneHost(scene){
+function sceneHost(V,scene){
   // two canvases: one at one pixel per CSS pixel for frames while the view
   // moves, one at the screen's resolution drawn once it stops (a 150 % screen
   // has 2.25× the pixels to fill, a 200 % one 4×); each keeps its size, so
   // switching between them allocates nothing
-  const st=stage(); st.innerHTML="";
+  const st=V.st; st.innerHTML="";
   const mk=()=>{ const cv=document.createElement("canvas"); cv.className="pv-el"; st.appendChild(cv); return { cv, ctx:cv.getContext("2d",{alpha:false}) }; };
   const hi=mk(), lo=mk(); lo.cv.style.visibility="hidden";
   const h={ kind:"scene", el:hi.cv, scene, page:scene.page, lastMs:0, moving:false, draw(t){
-    const [W,H]=stageSize(), full=window.devicePixelRatio||1, low=h.moving&&full>1;
+    const [W,H]=sizeOf(V), full=window.devicePixelRatio||1, low=h.moving&&full>1;
     const c=low?lo:hi, dpr=low?1:full, bw=Math.round(W*dpr), bh=Math.round(H*dpr);
     if(c.cv.width!==bw||c.cv.height!==bh){ c.cv.width=bw; c.cv.height=bh; }
     c.cv.style.width=W+"px"; c.cv.style.height=H+"px";
     // while it moves, a copy of the whole-sheet picture when that is sharp enough
     if(h.moving&&CV.blit(c.ctx,scene,t,W,H,dpr)) h.lastMs=1;
     else h.lastMs=CV.draw(c.ctx,scene,t,W,H,dpr).ms;
-    if(!h.moving&&!scene.ov&&!h.ovT) h.ovT=setTimeout(()=>{ h.ovT=0; if(host===h&&!h.moving) CV.overview(scene); },300);
+    if(!h.moving&&!scene.ov&&!h.ovT) h.ovT=setTimeout(()=>{ h.ovT=0; if(V.host===h&&!h.moving) CV.overview(scene); },300);
     const other=low?hi:lo; c.cv.style.visibility=""; other.cv.style.visibility="hidden";
     c.cv.style.transform=""; other.cv.style.transform="";
     h.el=c.cv;                                   // the one a live transform moves
     return true;
   }};
-  scene.ready.then(()=>{ if(host===h) commit(); });        // pictures decoded
+  scene.ready.then(()=>{ if(V.host===h) commit(V); });        // pictures decoded
   return h;
 }
-if(/[?&]dsdebug=1(?:&|$)/.test(location.search)) window.__ds={ view, get host(){ return host; }, commit };   // for the timing scripts
+if(/[?&]dsdebug=1(?:&|$)/.test(location.search))                  // for the timing scripts
+  window.__ds={ get view(){ return activeV.view; }, get host(){ return activeV.host; }, commit:()=>commit(activeV), viewers };
 const FORCE_SVG=/[?&]svgview=1(?:&|$)/.test(location.search);    // the SVG preview, for comparison
 function sceneOf(o){
   if(o._sceneFor!==o.svg){ o._sceneFor=o.svg; try{ o._scene=CV.compile(o.svg); }catch(e){ console.error(e); o._scene=null; } }
   return o._scene;
 }
 // fonts arriving late change text widths
-document.fonts?.addEventListener?.("loadingdone",()=>{ if(host?.kind==="scene"){ CV.remeasure(host.scene); commit(); } });
-/* a PDF page or an image: a canvas the size of the pane, drawn for the view */
-function canvasHost(pageW,pageH,paint){
-  const st=stage(); st.innerHTML=""; const cv=document.createElement("canvas"); cv.className="pv-el"; st.appendChild(cv);
+document.fonts?.addEventListener?.("loadingdone",()=>{ for(const V of viewers) if(V.host?.kind==="scene"){ CV.remeasure(V.host.scene); commit(V); } });
+/* a PDF page or an image: a canvas the size of the window, drawn for the view */
+function canvasHost(V,pageW,pageH,paint){
+  const st=V.st; st.innerHTML=""; const cv=document.createElement("canvas"); cv.className="pv-el"; st.appendChild(cv);
   let task=0;
   return { kind:"canvas", el:cv, page:[0,0,pageW,pageH], async draw(t){
-    const [W,H]=stageSize(), dpr=window.devicePixelRatio||1, my=++task;
+    const [W,H]=sizeOf(V), dpr=window.devicePixelRatio||1, my=++task;
     const off=document.createElement("canvas"); off.width=Math.round(W*dpr); off.height=Math.round(H*dpr);
     const x=off.getContext("2d"); x.fillStyle="#aaa69d"; x.fillRect(0,0,off.width,off.height);
     x.setTransform(t.s*dpr,0,0,t.s*dpr,-t.x*t.s*dpr,-t.y*t.s*dpr);
@@ -1122,10 +1370,15 @@ function canvasHost(pageW,pageH,paint){
 }
 
 function renderPreviewMeta(){
-  const p=page(state.activePageId); if(!p) return;
+  const p=page(activeV?.pageId);
+  if(!p){
+    $("#previewTitle").textContent=layoutN>1?"WINDOW "+(activeV.i+1)+" · NO PAGE":"NO PAGE SELECTED";
+    $("#previewMeta").textContent=""; $("#previewMeta").title=""; return;
+  }
   const d=docOfPage(p), n=d?d.pages.indexOf(p)+1:0, l=(p.orig||p).layout;
-  $("#previewTitle").textContent=p.label;
-  $("#previewMeta").textContent=[n?"page "+n+" of "+d.pages.length+" · "+d.name:"not in the PDF",l?.paper,l?.framed?(l.sheet||"A1"):null,l?.empty?"empty layout":null,p.rotation?"rotated "+p.rotation+"°":null].filter(Boolean).join(" · "); $("#previewMeta").title=$("#previewMeta").textContent; $("#previewTitle").title=p.label;
+  $("#previewTitle").textContent=(layoutN>1?(activeV.i+1)+" · ":"")+p.label;
+  $("#previewMeta").textContent=[n?"page "+n+" of "+d.pages.length+" · "+d.name:"not in the PDF",l?.paper,l?.framed?(l.sheet||"A1"):null,l?.empty?"empty layout":null,p.rotation?"rotated "+p.rotation+"°":null].filter(Boolean).join(" · ");
+  $("#previewMeta").title=$("#previewMeta").textContent; $("#previewTitle").title=p.label;
 }
 /* sheets are cut out of Model Space: the tool shows on every page of a DWG
    that has one, and from a layout page it goes to the Model page first */
@@ -1135,29 +1388,32 @@ function modelPageOf(p){
   return (src.pageIds||[]).map(page).find(x=>x&&(x.orig||x).layout?.isModel&&(x.orig||x).layout.makeSheet)||null;
 }
 function syncFrameTools(){
-  const p=page(state.activePageId), m=modelPageOf(p);
+  const p=page(activeV?.pageId), m=modelPageOf(p);
   $("#frameTools").hidden=!m;
   const onModel=!!(m&&m===p&&!p.rotation);
   $("#frameBtn").title=onModel?"Cut a sheet out of Model Space: click two corners of its frame (Esc to stop)"
                               :"Opens Model Space, then click two corners of the sheet's frame (Esc to stop)";
   if(!onModel&&framing) setFraming(false);
 }
-async function renderPreview(){
-  const p=page(state.activePageId), st=stage(), token=++previewToken;
-  syncFrameTools();
+async function renderViewer(V){
+  const p=page(V.pageId), st=V.st, token=++V.token, view=V.view;
+  V.rot=p?.rotation;
+  if(V===activeV){ syncFrameTools(); renderPreviewMeta(); }
   if(!p){
-    $("#previewTitle").textContent="NO PAGE SELECTED";$("#previewMeta").textContent=""; host=null;
-    st.innerHTML='<div class="preview-empty"><b>Open a file with + and pick a page.</b><br><br>This pane shows what will go to the PDF.</div>';return;
+    V.host=null; view.pageId=null; zoomLabelOf(V);
+    st.innerHTML='<div class="preview-empty">'+(layoutN>1
+      ?'<b>Window '+(V.i+1)+'</b><br><br>Pick a file in the header above, drag a file or a page here from the list, or click a page while this window is active.'
+      :'<b>Open a file with + and pick a page.</b><br><br>This pane shows what will go to the PDF.')+'</div>';
+    return;
   }
-  renderPreviewMeta();
-  const s=source(p.sourceId), o=p.orig||p, keep=view.pageId===p.id&&host;
-  const place=()=>{ if(keep){ commit(); } else { view.pageId=p.id; fitView(); } };
+  const s=source(p.sourceId), o=p.orig||p, keep=view.pageId===p.id&&V.host;
+  const place=()=>{ if(keep){ commit(V); } else { view.pageId=p.id; fitView(V); } };
   if(p.sourceType==="pdf"&&s?.pdfDoc){
     try{
-      const pg=await s.pdfDoc.getPage(p.sourcePage+1); if(token!==previewToken) return;
+      const pg=await s.pdfDoc.getPage(p.sourcePage+1); if(token!==V.token) return;
       const v1=pg.getViewport({scale:1,rotation:p.rotation});
       let rt=null;
-      host=canvasHost(v1.width,v1.height,async(x,t,dpr)=>{
+      V.host=canvasHost(V,v1.width,v1.height,async(x,t,dpr)=>{
         if(rt) rt.cancel();
         x.setTransform(1,0,0,1,0,0);               // pdf.js multiplies onto the current transform
         const vp=pg.getViewport({scale:t.s*dpr,rotation:p.rotation,offsetX:-t.x*t.s*dpr,offsetY:-t.y*t.s*dpr});
@@ -1168,13 +1424,13 @@ async function renderPreview(){
     }catch(e){console.error(e);}
   }
   if(p.sourceType==="dwg-svg"&&o.svg&&!p.rotation&&/data-ds="r2"/.test(o.svg.slice(0,400))){
-    const sc=FORCE_SVG?null:sceneOf(o); host=sc?sceneHost(sc):svgHost(o.svg); place(); return;
+    const sc=FORCE_SVG?null:sceneOf(o); V.host=sc?sceneHost(V,sc):svgHost(V,o.svg); place(); return;
   }
   // an image, or a rotated sheet: a bitmap drawn for the view
   const url=p.sourceType==="image"?baseThumb(p):o.svg?svgUrl(p):null;
-  if(!url){ host=null; st.innerHTML='<div class="preview-empty">Preview unavailable.</div>'; return; }
+  if(!url){ V.host=null; st.innerHTML='<div class="preview-empty">Preview unavailable.</div>'; return; }
   const im=new Image(); im.src=url; try{ await im.decode(); }catch{ return; }
-  if(token!==previewToken) return;
+  if(token!==V.token) return;
   let src=im, w=im.naturalWidth, h=im.naturalHeight;
   if(p.sourceType==="dwg-svg"){ const k=3200/Math.max(w,h); w*=k; h*=k; }
   if(p.rotation){
@@ -1183,39 +1439,106 @@ async function renderPreview(){
     x.translate(cv.width/2,cv.height/2); x.rotate(p.rotation*Math.PI/180); x.drawImage(im,-w/2,-h/2,w,h);
     src=cv; w=cv.width; h=cv.height;
   }
-  host=canvasHost(w,h,(x)=>{ x.imageSmoothingQuality="high"; x.drawImage(src,0,0,w,h); });
+  V.host=canvasHost(V,w,h,(x)=>{ x.imageSmoothingQuality="high"; x.drawImage(src,0,0,w,h); });
   place();
 }
+/* The active window shows state.activePageId (the page clicked in the list);
+   the other windows are drawn again only when their page went or turned. */
+function renderPreview(){
+  const V=activeV; V.pageId=state.activePageId||null;
+  for(const W of viewers){
+    if(W===V||!W.pageId) continue;
+    const q=page(W.pageId);
+    if(!q){ W.pageId=null; renderViewer(W); } else if(q.rotation!==W.rot) renderViewer(W);
+  }
+  syncHeads();
+  return renderViewer(V);
+}
+/* a file's pages in the order the list shows them: the PDF, then the rest */
+function pageSeq(d){ return d?[...d.pages,...outPages(d)]:[]; }
+function syncHeads(){
+  const opts=state.docs.map(d=>'<option value="'+d.id+'">'+esc(d.name)+'</option>').join("");
+  for(const V of viewers){
+    const p=page(V.pageId), d=docOfPage(p), sel=V.el.querySelector(".vw-doc");
+    sel.innerHTML='<option value="">— choose a file —</option>'+opts; sel.value=d?d.id:"";
+    const seq=pageSeq(d), k=p?seq.indexOf(p):-1;
+    const name=p?(p.label.split(" — ").slice(1).join(" — ")||p.label):"";
+    const lab=V.el.querySelector(".vw-page"); lab.textContent=p?name+(k>=0?"  ·  "+(k+1)+"/"+seq.length:""):""; lab.title=p?p.label:"";
+    V.el.querySelector(".vw-prev").disabled=!(k>0);
+    V.el.querySelector(".vw-next").disabled=!(k>=0&&k<seq.length-1);
+  }
+}
+/* the window the toolbar acts on; the list follows its page */
+function setActive(V){
+  if(!V||activeV===V) return;
+  if(framing) setFraming(false);
+  activeV=V; viewers.forEach(x=>x.el.classList.toggle("on",x===V));
+  state.activePageId=V.pageId;
+  const d=docOfPage(page(V.pageId)); if(d) setActiveDoc(d);
+  syncMarks(); syncFrameTools(); renderPreviewMeta(); zoomLabelOf(V);
+}
+/* a page into a window */
+function showIn(V,pid){
+  V.pageId=pid||null;
+  if(V===activeV){ state.activePageId=V.pageId; const d=docOfPage(page(V.pageId)); if(d) setActiveDoc(d); syncMarks(); }
+  syncHeads();
+  return renderViewer(V);
+}
+function setLayout(n){
+  n=Math.max(1,Math.min(4,n|0||1)); layoutN=n;
+  $("#pvGrid").dataset.n=n;
+  viewers.forEach((V,i)=>{ V.el.hidden=i>=n; });
+  document.querySelectorAll(".vw-lay").forEach(b=>{ const on=+b.dataset.n===n; b.classList.toggle("btn-active",on); b.setAttribute("aria-pressed",on); });
+  if(activeV.i>=n) setActive(viewers[0]);
+  // a window that opens empty shows the next file that is not on screen yet
+  for(let i=0;i<n;i++){
+    const V=viewers[i];
+    if(!(V.pageId&&page(V.pageId))){
+      const shown=new Set(viewers.slice(0,n).map(W=>docOfPage(page(W.pageId))?.id).filter(Boolean));
+      const d=state.docs.find(x=>!shown.has(x.id)&&pageSeq(x).length);
+      V.pageId=d?pageSeq(d)[0].id:null;
+      if(V===activeV){ state.activePageId=V.pageId; syncMarks(); }
+    }
+    renderViewer(V);
+  }
+  syncHeads(); renderPreviewMeta();
+  try{ localStorage.setItem("docStudio.views",String(n)); }catch{}
+}
+/* the window under a point, if one is on screen there */
+function viewerAt(el){ const w=el?.closest?.(".vw"); return w&&!w.hidden?viewers[+w.dataset.i]:null; }
+function markViewer(V){ viewers.forEach(x=>x.el.classList.toggle("drop",x===V)); }
 
 /* ── sheets cut out of Model Space: two corners, clicked (or dragged) ── */
 let framing=false, corner=null;
 function setFraming(on){
-  framing=on; corner=null; stage().classList.toggle("framing",on); $("#frameBtn").classList.toggle("btn-active",on);
+  const V=activeV;
+  framing=on; corner=null;
+  viewers.forEach(x=>{ x.st.classList.toggle("framing",on&&x===V); x.st.querySelector(".frame-box")?.remove(); x.st.querySelector(".snap-mark")?.remove(); });
+  $("#frameBtn").classList.toggle("btn-active",on);
   $("#frameBtn").textContent=on?"CLICK 1ST CORNER…":"SHEET BY 2 CORNERS";
-  stage().querySelector(".frame-box")?.remove(); stage().querySelector(".snap-mark")?.remove();
-  if(on&&host?.kind==="scene") CV.snapIndex(host.scene);          // the vertices, once per sheet
+  if(on&&V.host?.kind==="scene") CV.snapIndex(V.host.scene);          // the vertices, once per sheet
 }
-const toUnits=(mx,my)=>({x:view.x+mx/view.s, y:view.y+my/view.s});     // viewBox units (y down)
+const toUnits=(V,mx,my)=>({x:V.view.x+mx/V.view.s, y:V.view.y+my/V.view.s});     // viewBox units (y down)
 /* the point a corner click means: the nearest vertex within 12 px when SNAP
    is on (line ends, polyline and frame corners, circle centres), shown by a
    green square as AutoCAD's endpoint marker */
 let snapOn=true;
-function pickPoint(mx,my){
-  const p=toUnits(mx,my);
+function pickPoint(V,mx,my){
+  const p=toUnits(V,mx,my), v=V.view;
   let q=null;
-  if(snapOn&&host?.kind==="scene") q=CV.snap(CV.snapIndex(host.scene),p.x,p.y,12/view.s);
-  let mk=stage().querySelector(".snap-mark");
+  if(snapOn&&V.host?.kind==="scene") q=CV.snap(CV.snapIndex(V.host.scene),p.x,p.y,12/v.s);
+  let mk=V.st.querySelector(".snap-mark");
   if(q){
-    if(!mk){ mk=document.createElement("div"); mk.className="snap-mark"; stage().appendChild(mk); }
-    mk.hidden=false; mk.style.left=(q.x-view.x)*view.s+"px"; mk.style.top=(q.y-view.y)*view.s+"px";
-    return { x:q.x, y:q.y, mx:(q.x-view.x)*view.s, my:(q.y-view.y)*view.s };
+    if(!mk){ mk=document.createElement("div"); mk.className="snap-mark"; V.st.appendChild(mk); }
+    mk.hidden=false; mk.style.left=(q.x-v.x)*v.s+"px"; mk.style.top=(q.y-v.y)*v.s+"px";
+    return { x:q.x, y:q.y, mx:(q.x-v.x)*v.s, my:(q.y-v.y)*v.s };
   }
   if(mk) mk.hidden=true;
   return { x:p.x, y:p.y, mx, my };
 }
-$("#snapBtn").onclick=()=>{ snapOn=!snapOn; $("#snapBtn").classList.toggle("btn-active",snapOn); if(!snapOn) stage().querySelector(".snap-mark")?.remove(); };
+$("#snapBtn").onclick=()=>{ snapOn=!snapOn; $("#snapBtn").classList.toggle("btn-active",snapOn); if(!snapOn) viewers.forEach(x=>x.st.querySelector(".snap-mark")?.remove()); };
 async function addSheet(a,b){
-  const p=page(state.activePageId), o=p&&(p.orig||p), l=o?.layout; if(!l?.makeSheet) return;
+  const p=page(activeV.pageId), o=p&&(p.orig||p), l=o?.layout; if(!l?.makeSheet) return;
   // viewBox y runs down; the drawing's y is its negative (the content is flipped)
   const win={minX:Math.min(a.x,b.x),maxX:Math.max(a.x,b.x),minY:-Math.max(a.y,b.y),maxY:-Math.min(a.y,b.y)};
   const lay=l.makeSheet(win,$("#frameSheet").value); if(!lay) return;
@@ -1226,24 +1549,39 @@ async function addSheet(a,b){
   // placed after the Model page or the sheets cut before it, in cutting order
   const cuts=d.pages.filter(x=>x.layout&&/^model-sheet-/.test(x.layout.id)&&x.sourceId===src.id);
   if(cuts.length>1){ d.pages=d.pages.filter(x=>x!==np); const last=cuts.filter(x=>x!==np).pop(); d.pages.splice(d.pages.indexOf(last)+1,0,np); }
-  renderDoc(d); renderPreviewMeta();
+  renderDoc(d); renderPreviewMeta(); syncHeads();
   const msg=$("#frameMsg"); msg.textContent="+ "+lay.name+" · "+lay.sheet+" → page "+(d.pages.indexOf(np)+1); msg.hidden=false; clearTimeout(msg._t); msg._t=setTimeout(()=>{msg.hidden=true;},4000);
   queueThumbs(async()=>{ try{ np.thumb=await svgToPng(np.svg,420); }catch{} updateCard(np); });
 }
 $("#frameBtn").onclick=async()=>{
   if(framing) return setFraming(false);
-  const p=page(state.activePageId), m=modelPageOf(p); if(!m) return;
-  if(m!==p){ state.activePageId=m.id; syncMarks(); await renderPreview(); }
+  const V=activeV, p=page(V.pageId), m=modelPageOf(p); if(!m) return;
+  if(m!==p) await showIn(V,m.id);
   setFraming(true);
 };
 
-(function viewport(){
-  const st=stage();
+/* one window: its header (number, file, page, ‹ ›) and its stage */
+function makeViewer(i){
+  const el=document.createElement("div"); el.className="vw"; el.dataset.i=i;
+  el.innerHTML='<div class="vw-head"><b class="vw-no">'+(i+1)+'</b>'+
+    '<select class="vw-doc" title="The file shown in this window" aria-label="File in window '+(i+1)+'"></select>'+
+    '<span class="vw-page"></span>'+
+    '<button class="vw-prev" type="button" title="Previous page">‹</button><button class="vw-next" type="button" title="Next page">›</button></div>'+
+    '<div class="preview-stage vw-stage"></div>';
+  $("#pvGrid").appendChild(el);
+  const V={ i, el, st:el.querySelector(".vw-stage"), view:{s:1,x:0,y:0,cs:1,cx:0,cy:0,fit:1,pageId:null}, host:null, pageId:null, token:0, rot:0,
+            commitT:0, rafQ:0, lastFrame:0, slowFrames:0, gestureSlow:false, idleT:0, sharpT:0 };
+  const st=V.st, view=V.view;
+  el.addEventListener("pointerdown",()=>setActive(V),true);
+  el.querySelector(".vw-doc").addEventListener("change",e=>{ setActive(V); const d=doc(e.target.value); showIn(V,pageSeq(d)[0]?.id); });
+  const step=k=>{ const p=page(V.pageId), seq=pageSeq(docOfPage(p)), j=seq.indexOf(p)+k; if(j>=0&&j<seq.length){ setActive(V); showIn(V,seq[j].id); } };
+  el.querySelector(".vw-prev").onclick=()=>step(-1); el.querySelector(".vw-next").onclick=()=>step(1);
+
   st.addEventListener("wheel",e=>{
-    if(!host) return; e.preventDefault();
+    if(!V.host) return; e.preventDefault();
     const r=st.getBoundingClientRect(), d=e.deltaMode===1?e.deltaY*16:e.deltaMode===2?e.deltaY*400:e.deltaY;
-    zoomAt(e.clientX-r.left,e.clientY-r.top,Math.exp(-d*0.0018));
-    if(framing){ const q=pickPoint(e.clientX-r.left,e.clientY-r.top); if(corner) rubber(q.mx,q.my); }
+    zoomAt(V,e.clientX-r.left,e.clientY-r.top,Math.exp(-d*0.0018));
+    if(framing&&V===activeV){ const q=pickPoint(V,e.clientX-r.left,e.clientY-r.top); if(corner) rubber(q.mx,q.my); }
   },{passive:false});
   let drag=null, last=null;
   function rubber(mx,my){
@@ -1251,49 +1589,60 @@ $("#frameBtn").onclick=async()=>{
     const ax=(corner.x-view.x)*view.s, ay=(corner.y-view.y)*view.s;
     Object.assign(box.style,{left:Math.min(ax,mx)+"px",top:Math.min(ay,my)+"px",width:Math.abs(mx-ax)+"px",height:Math.abs(my-ay)+"px"});
   }
+  const fr=()=>framing&&V===activeV;
   st.addEventListener("pointerdown",e=>{
-    if(!host||(e.button!==0&&e.button!==1)) return;
+    if(!V.host||(e.button!==0&&e.button!==1)) return;
     e.preventDefault(); try{ st.setPointerCapture(e.pointerId); }catch{}
     const r=st.getBoundingClientRect();
     drag={x:e.clientX,y:e.clientY,x0:e.clientX,y0:e.clientY,moved:false,button:e.button,r,
-          pick:framing&&e.button===0?pickPoint(e.clientX-r.left,e.clientY-r.top):null};
-    if(!(framing&&e.button===0)) st.classList.add("panning");
+          pick:fr()&&e.button===0?pickPoint(V,e.clientX-r.left,e.clientY-r.top):null};
+    if(!(fr()&&e.button===0)) st.classList.add("panning");
   });
   st.addEventListener("pointermove",e=>{
     const r=st.getBoundingClientRect();
-    if(framing&&(!drag||drag.button===0)){
-      const q=pickPoint(e.clientX-r.left,e.clientY-r.top); last=q;
+    if(fr()&&(!drag||drag.button===0)){
+      const q=pickPoint(V,e.clientX-r.left,e.clientY-r.top); last=q;
       if(corner&&!drag) rubber(q.mx,q.my);
     }
     if(!drag) return;
     if(Math.hypot(e.clientX-drag.x0,e.clientY-drag.y0)>4) drag.moved=true;
-    if(framing&&drag.button===0){
+    if(fr()&&drag.button===0){
       // dragging a window works too: the press is the first corner
-      if(drag.moved&&!corner){ const q=drag.pick||toUnits(drag.x0-r.left,drag.y0-r.top); corner={x:q.x,y:q.y}; }
+      if(drag.moved&&!corner){ const q=drag.pick||toUnits(V,drag.x0-r.left,drag.y0-r.top); corner={x:q.x,y:q.y}; }
       if(corner) rubber(last.mx,last.my);
       return;
     }
-    view.x-=(e.clientX-drag.x)/view.s; view.y-=(e.clientY-drag.y)/view.s; drag.x=e.clientX; drag.y=e.clientY; changed();
-    if(framing){ const q=pickPoint(e.clientX-r.left,e.clientY-r.top); if(corner) rubber(q.mx,q.my); }   // panning with the middle button while framing
+    view.x-=(e.clientX-drag.x)/view.s; view.y-=(e.clientY-drag.y)/view.s; drag.x=e.clientX; drag.y=e.clientY; changed(V);
+    if(fr()){ const q=pickPoint(V,e.clientX-r.left,e.clientY-r.top); if(corner) rubber(q.mx,q.my); }   // panning with the middle button while framing
   });
   const end=async e=>{
     if(!drag) return; const d=drag; drag=null; st.classList.remove("panning");
     try{ st.releasePointerCapture(e.pointerId); }catch{}
-    if(!(framing&&d.button===0)) return;
-    const r=st.getBoundingClientRect(), q=pickPoint(e.clientX-r.left,e.clientY-r.top), pt={x:q.x,y:q.y};
+    if(!(fr()&&d.button===0)) return;
+    const r=st.getBoundingClientRect(), q=pickPoint(V,e.clientX-r.left,e.clientY-r.top), pt={x:q.x,y:q.y};
     if(!corner){ corner=pt; $("#frameBtn").textContent="CLICK 2ND CORNER…"; rubber(q.mx,q.my); return; }
     if(Math.abs(pt.x-corner.x)*view.s<6||Math.abs(pt.y-corner.y)*view.s<6) return;
     const a=corner; corner=null; st.querySelector(".frame-box")?.remove(); $("#frameBtn").textContent="CLICK 1ST CORNER…";
     await addSheet(a,pt);                           // stays in the mode: the next sheet can be picked right away
   };
   st.addEventListener("pointerup",end); st.addEventListener("pointercancel",end);
-  st.addEventListener("dblclick",()=>{ if(!framing) fitView(); });
-  document.addEventListener("keydown",e=>{
-    if(e.key==="Escape"&&framing) setFraming(false);
-    if(e.key==="F3"&&framing){ e.preventDefault(); $("#snapBtn").click(); }
-  });
-  window.addEventListener("resize",()=>{ if(host) commit(); });
-})();
+  st.addEventListener("dblclick",()=>{ if(!fr()) fitView(V); });
+  // the window follows its size: a new size keeps the view (or the fit)
+  new ResizeObserver(()=>{
+    if(!V.host||el.hidden) return;
+    if(Math.abs(view.s-view.fit)<view.fit*1e-6) fitView(V); else commit(V);
+  }).observe(st);
+  return V;
+}
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape"&&framing) setFraming(false);
+  if(e.key==="F3"&&framing){ e.preventDefault(); $("#snapBtn").click(); }
+});
+for(let i=0;i<4;i++) viewers.push(makeViewer(i));
+viewers[0].st.id="previewStage";
+activeV=viewers[0]; activeV.el.classList.add("on");
+document.querySelectorAll(".vw-lay").forEach(b=>b.addEventListener("click",()=>setLayout(+b.dataset.n)));
+(()=>{ let n=1; try{ n=+localStorage.getItem("docStudio.views")||1; }catch{} setLayout(n); })();
 
 function renderAll(){renderTree();renderPreview();}
 
@@ -1359,11 +1708,11 @@ document.addEventListener("drop",e=>{
   e.preventDefault();dragDepth=0;dz.classList.remove("drag");
   if(e.dataTransfer.files.length)acceptFiles(e.dataTransfer.files);
 });
-$("#clearBtn").onclick=()=>{state.sources.clear();state.docs=[];state.all.clear();state.selected.clear();state.activeDocId=null;state.activePageId=null;renderAll();};
+$("#clearBtn").onclick=()=>{state.sources.clear();state.docs=[];state.all.clear();state.selected.clear();state.checked.clear();viewers.forEach(V=>{V.pageId=null;});state.activeDocId=null;state.activePageId=null;renderAll();};
 const zoomLabel=()=>{$("#previewZoomLabel").textContent=Math.round(state.previewZoom*100)+"%";};
-$("#previewZoomIn").onclick=()=>zoomCentre(1.4);
-$("#previewZoomOut").onclick=()=>zoomCentre(1/1.4);
-$("#previewFit").onclick=()=>fitView();
+$("#previewZoomIn").onclick=()=>zoomCentre(activeV,1.4);
+$("#previewZoomOut").onclick=()=>zoomCentre(activeV,1/1.4);
+$("#previewFit").onclick=()=>fitView(activeV);
 if($("#toggleBoundary"))$("#toggleBoundary").onclick=()=>{state.showBoundary=!state.showBoundary;$("#toggleBoundary").classList.toggle("btn-active",state.showBoundary);document.querySelectorAll("#previewStage .boundary").forEach(b=>b.classList.toggle("on",state.showBoundary));};
 /* The file list is as wide as the user drags it; remembered in this browser. */
 (function splitter(){
@@ -1390,15 +1739,16 @@ if($("#toggleBoundary"))$("#toggleBoundary").onclick=()=>{state.showBoundary=!st
   const c=$(".container"), bar=$(".studio-toolbar"), ws=$(".workspace-v2");
   if(!c||!bar||!ws||$("#appShell")) return;
   const t=document.createElement("div"); t.id="appTitle";
-  t.innerHTML='Engineering Document Studio <span>DWG · PDF · Word → one PDF</span>';
+  t.textContent='Engineering PDF Document Studio';
   bar.insertBefore(t,bar.firstChild);
   const shell=document.createElement("div"); shell.id="appShell";
   c.insertBefore(shell,bar); shell.append(bar,ws);
   document.documentElement.classList.add("app-screen");
 })();
-/* Full screen for the preview; Esc leaves it (after leaving the sheet tool). */
+/* Full screen: the workspace — the file list and the windows — over the whole
+   window; Esc leaves it (after leaving the sheet tool). */
 (function fullScreen(){
-  const pane=$(".preview-pane"), btn=$("#previewFs");
+  const pane=$(".workspace-v2"), btn=$("#previewFs");
   const on=()=>pane.classList.contains("pv-maxed");
   const sync=()=>{ btn.title=on()?"Leave full screen (Esc)":"Full screen (Esc to leave)"; btn.setAttribute("aria-label",on()?"Leave full screen":"Full screen"); btn.classList.toggle("btn-active",on()); };
   const leave=()=>{ pane.classList.remove("pv-maxed"); try{ if(document.fullscreenElement) document.exitFullscreen(); }catch{} sync(); };
@@ -1408,17 +1758,11 @@ if($("#toggleBoundary"))$("#toggleBoundary").onclick=()=>{state.showBoundary=!st
     try{ pane.requestFullscreen?.().catch(()=>{}); }catch{}
   };
   document.addEventListener("keydown",e=>{
-    if(e.key!=="Escape"||!on()||stage().classList.contains("framing")) return;
+    if(e.key!=="Escape"||!on()||framing) return;
     leave();
   },true);
   document.addEventListener("fullscreenchange",()=>{ if(!document.fullscreenElement&&on()) leave(); });
 })();
-/* the preview follows its pane: a new size keeps the view (or the fit) */
-new ResizeObserver(()=>{
-  if(!host) return;
-  const atFit=Math.abs(view.s-view.fit)<view.fit*1e-6;
-  if(atFit) fitView(); else commit();
-}).observe(stage());
 renderAll();
 window.__docStudio={state,openMerge};
 window.__docStudioReady=true;
