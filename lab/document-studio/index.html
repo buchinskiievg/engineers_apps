@@ -218,7 +218,7 @@
   .doc.active { border-left:4px solid var(--red); }
   .doc-row { display:flex; align-items:flex-start; gap:8px; padding:8px; cursor:grab; user-select:none; -webkit-user-select:none; touch-action:none; }
   .doc.active .doc-row { padding-left:5px; }
-  .doc-tog { flex:0 0 22px; width:22px; height:22px; min-height:0; padding:0; border:1px solid var(--line); background:#fff; color:var(--ink); font:700 14px/1 var(--mono); cursor:pointer; display:grid; place-items:center; }
+  .doc-tog { flex:0 0 24px; width:24px; height:24px; min-height:0; padding:0; border:1px solid var(--line); background:#fff; color:var(--ink); font:700 14px/1 var(--mono); cursor:pointer; display:grid; place-items:center; }
   .doc-tog:hover { background:var(--ink); color:#fff; border-color:var(--ink); }
   .doc-main { min-width:0; flex:1; }
   .doc-name { font-size:12px; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -237,13 +237,32 @@
   .merge-body { padding:14px 16px; display:flex; flex-direction:column; gap:12px; }
   .merge-note { font-size:11.5px; color:var(--muted); }
   .merge-list { margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:6px; counter-reset:m; }
-  .merge-list li { counter-increment:m; display:flex; align-items:center; gap:8px; padding:8px 9px; border:1px solid var(--line); background:var(--panel-2); }
-  .merge-list li::before { content:counter(m); font:800 12px var(--mono); color:var(--red); min-width:16px; }
+  .merge-list li { display:flex; align-items:center; gap:8px; padding:6px 8px; border:1px solid var(--line); background:var(--panel-2); user-select:none; -webkit-user-select:none; }
+  .merge-list li.off { background:var(--panel); }
+  .merge-list li.off .m-name, .merge-list li.off .m-n { color:var(--muted); }
+  .merge-list li.dragging { outline:2px dashed var(--red); outline-offset:-2px; background:rgba(163,14,24,.06); }
+  .merge-list .m-grip { flex:0 0 14px; cursor:grab; color:var(--ink-4,#A29C8E); font:800 13px/1 var(--mono); letter-spacing:-2px; touch-action:none; text-align:center; }
+  .merge-list li.dragging .m-grip { cursor:grabbing; }
+  .merge-list .chk { margin:0; }
+  .merge-list .m-no { flex:0 0 18px; height:18px; display:grid; place-items:center; font:800 10px var(--mono); background:var(--red); color:#fff; }
+  .merge-list li.off .m-no { background:transparent; color:transparent; }
+  .merge-all { display:flex; align-items:center; gap:8px; padding:0 9px; font:800 9.5px var(--mono); letter-spacing:.06em; color:var(--muted); }
+  .merge-all .chk { margin:0; }
+  .merge-opts { display:flex; flex-direction:column; gap:6px; font-size:11.5px; }
+  .merge-opts label { display:flex; align-items:flex-start; gap:8px; cursor:pointer; line-height:1.35; }
+  .merge-opts .chk { margin:0; flex:0 0 16px; }
+  .merge-sum { font:700 10.5px var(--mono); color:var(--ink); }
+  .merge-list { max-height:min(46vh,420px); overflow:auto; }
+  .section-head .head-btn { min-height:0 !important; height:24px; padding:2px 8px !important; font-size:9.5px !important; margin-right:8px; }
+  .section-head .grow { flex:1; }
+  /* the file a merge has just made: lit for a moment */
+  @keyframes doc-fresh { 0%,40% { background:rgba(163,14,24,.16); box-shadow:0 0 0 2px var(--red); } 100% { background:var(--panel-2); box-shadow:none; } }
+  .doc.fresh { animation:doc-fresh 2.2s ease-out 1; }
   .merge-list .m-name { flex:1; min-width:0; font-size:12px; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .merge-list .m-n { font:10px var(--mono); color:var(--muted); }
-  .merge-list button { min-height:0; width:26px; height:24px; padding:0; }
+
   .merge-name { display:flex; flex-direction:column; gap:4px; font-size:10.5px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; }
-  .merge-name input { font:600 12.5px var(--sans, sans-serif); text-transform:none; letter-spacing:0; padding:7px 8px; border:1px solid var(--line); background:#fff; }
+  .merge-name input { text-transform:none; border:1px solid var(--line); background:#fff; }
   .merge-foot { display:flex; justify-content:flex-end; gap:8px; padding:10px 16px; border-top:1px solid var(--line); }
   .pane { border:1px solid var(--line); background:var(--panel); min-width:0; display:flex; flex-direction:column; }
   .pane-body { min-height:0; flex:1; overflow:auto; }
@@ -294,7 +313,7 @@
   .preview-toolbar-v2 .grow { flex:1; }
   /* the windows: 1, 2 side by side, 3 (one large, two small), 4 */
   .vw-lays { display:inline-flex; gap:2px; padding-right:6px; margin-right:2px; border-right:1px solid var(--line); }
-  .vw-lay { width:30px; height:28px; min-height:0 !important; padding:0 !important; display:grid; place-items:center; }
+  .vw-lay { display:grid !important; place-items:center; }
   .vw-lay svg { width:16px; height:12px; fill:none; stroke:currentColor; stroke-width:1.2; }
   .vw-lay.btn-active svg { fill:rgba(255,255,255,.25); }
   .pv-grid { flex:1; min-height:520px; display:grid; gap:4px; background:var(--line); }
@@ -312,9 +331,9 @@
   .pv-grid[data-n="1"] .vw-head { display:none; }
   .vw-no { flex:0 0 18px; height:18px; display:grid; place-items:center; font:800 10px var(--mono); background:var(--ink); color:#fff; }
   .vw.on .vw-no { background:var(--red); }
-  .vw-doc { flex:0 1 auto; min-width:60px; max-width:48%; height:22px !important; min-height:0 !important; padding:1px 4px !important; font:700 10.5px var(--sans,sans-serif) !important; border:1px solid var(--line); background:#fff; }
+  .vw-doc { flex:0 1 auto; min-width:60px; max-width:48%; border:1px solid var(--line); background:#fff; font:700 10.5px/22px var(--sans,sans-serif) !important; letter-spacing:0 !important; }
   .vw-page { flex:1 1 0; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:10px var(--mono); color:var(--muted); }
-  .vw-prev, .vw-next { flex:0 0 22px; width:22px; height:22px; min-height:0 !important; padding:0 !important; border:1px solid var(--line); background:#fff; color:var(--ink); font:700 13px/1 var(--mono); cursor:pointer; }
+  .vw-prev, .vw-next { flex:0 0 24px; border:1px solid var(--line); background:#fff; color:var(--ink); font:700 13px/1 var(--mono); cursor:pointer; }
   .vw-prev:disabled, .vw-next:disabled { opacity:.35; cursor:default; }
   .vw-prev:not(:disabled):hover, .vw-next:not(:disabled):hover { background:var(--ink); color:#fff; }
 
@@ -354,14 +373,14 @@
   .ts-scale b:last-of-type { transform:translateX(-100%); }
   .ts-scale b.on { color:var(--ink); font-weight:800 !important; }
   .ts-num { display:inline-flex; align-items:center; gap:3px; white-space:nowrap; font:600 9.5px var(--mono) !important; color:var(--muted); }
-  .ts-num input { width:50px; height:var(--ctl-h-dense,22px) !important; min-height:0 !important; padding:1px 4px !important; font:800 11px var(--mono) !important; letter-spacing:0 !important; text-align:right; border:1px solid var(--line); background:#fff; }
+  .ts-num input { width:50px !important; text-align:right; border:1px solid var(--line); background:#fff; }
   .ts-scope { font:700 8px/1.3 var(--mono) !important; letter-spacing:.06em !important; padding:2px 5px; background:var(--ink); color:#fff; white-space:nowrap; }
   .ts-scope.some { background:var(--red); }
   .check-bar { display:flex; align-items:center; gap:4px; padding:5px 10px 6px; border-top:1px dashed var(--line); }
   .check-bar[hidden] { display:none; }
   .check-bar b { font:800 9.5px/1 var(--mono) !important; letter-spacing:.05em !important; color:var(--red); }
   .check-bar .grow { flex:1; }
-  .check-bar button { min-height:0 !important; padding:3px 7px !important; font-size:9.5px !important; }
+
   .pg-ghost.copying::after { content:"+ COPY"; position:absolute; left:4px; top:4px; padding:1px 4px; background:var(--red); color:#fff; font:800 8.5px var(--mono); }
   .pg-ghost .pg-count { position:absolute; right:-6px; top:-6px; min-width:18px; height:18px; padding:0 4px; background:var(--ink); color:#fff; font:800 10px/18px var(--mono); text-align:center; }
   .doc-row.drop-into { outline:2px dashed var(--red); outline-offset:-2px; background:rgba(163,14,24,.07); }
@@ -424,6 +443,44 @@
     html.app-screen .preview-toolbar-v2 > #previewMeta { flex:1 1 0; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     html.app-screen .preview-toolbar-v2 > .grow { display:none; }
   }
+  /* ── ONE CONTROL SIZE ────────────────────────────────────────────────
+     Everything that is pressed or picked in the workspace and its dialogs is
+     24 px high — the design system's dense size (.btn-xs) — and a button that
+     holds only a symbol is a 24 × 24 square. The skin (calc-skin.css) makes
+     every button in a .container 30 px with !important, and the few that had
+     their own size came out at five heights side by side. */
+  :is(.workspace-v2,.modal) :is(button,.btn,select,input[type=number],input[type=text]) {
+    height:24px !important; min-height:0 !important; box-sizing:border-box !important;
+    padding:0 8px !important; line-height:22px !important; gap:4px !important;
+    font:700 10px/22px var(--display) !important; letter-spacing:.06em !important;
+  }
+  :is(.workspace-v2,.modal) :is(input[type=number],input[type=text]) { font:700 11px/22px var(--mono) !important; letter-spacing:0 !important; padding:0 6px !important; }
+  :is(.workspace-v2,.modal) select { padding:0 4px !important; }
+  :is(.workspace-v2,.modal) :is(.ico,.vw-lay,.vw-prev,.vw-next,.doc-tog,.merge-list button,#previewFs,#previewZoomIn,#previewZoomOut) {
+    width:24px !important; min-width:24px !important; padding:0 !important; font:700 12px/1 var(--mono) !important; letter-spacing:0 !important;
+  }
+  :is(.workspace-v2,.modal) .pg-acts button { width:20px !important; height:20px !important; min-width:0 !important; padding:0 !important; font:700 11px/1 var(--mono) !important; }
+  .vw-lay svg { width:14px !important; height:11px !important; }
+  #mergeName { font:600 12px/22px var(--sans,sans-serif) !important; letter-spacing:0 !important; }
+  #previewZoomLabel { min-width:38px; text-align:center; font:700 10.5px var(--mono) !important; }
+  /* the file row: checkbox, +/−, type, the name (as wide as it can be), actions */
+  .doc-row { align-items:center !important; gap:6px !important; padding:6px 8px !important; }
+  .doc.active .doc-row { padding-left:5px !important; }
+  .doc-row .chk { margin:0; }
+  .doc-type { flex:0 0 30px; height:24px; display:grid; place-items:center; border:1px solid var(--line); background:var(--bg-soft,#E4E0D6); font:800 8px var(--mono) !important; letter-spacing:.02em; color:var(--ink); }
+  .doc-main { min-width:0; flex:1 1 auto; }
+  .doc-name { font-size:12px; line-height:1.25; }
+  .doc-meta { font-size:9.5px !important; line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px; }
+  .doc-acts { flex:0 0 auto; flex-wrap:nowrap !important; gap:3px !important; }
+  .doc-acts .doc-dl { padding:0 7px !important; }
+  /* toolbars and heads: one line of 24 px controls */
+  .preview-toolbar-v2 { min-height:0 !important; padding:5px 8px !important; gap:5px !important; }
+  .vw-lays { gap:2px; padding-right:5px; }
+  .frame-tools { gap:4px !important; padding-right:5px !important; }
+  .frame-tools select { height:24px !important; }
+  .section-head .head-btn { height:24px !important; padding:0 8px !important; margin-right:8px; }
+  .check-bar { gap:4px; }
+  .vw-head { height:30px; }
   #appTitle { font:800 15px/1.2 var(--display); letter-spacing:.1em; text-transform:uppercase; color:var(--ink,#2E2B25); white-space:nowrap; margin-right:4px; }
   #appTitle span { color:var(--ink-4,#A29C8E); margin-left:8px; letter-spacing:.06em; }
   @media (max-width:760px) { #appTitle { display:none; } }
@@ -472,7 +529,7 @@
 
   <div class="workspace-v2">
     <aside class="pane tree-pane">
-      <div class="section-head"><label class="chk" title="Check all files"><input id="checkAll" type="checkbox" aria-label="Check all files"><span></span></label><b>/ FILES &amp; PAGES</b><span id="docCount" class="count">0 FILES</span></div>
+      <div class="section-head"><label class="chk" title="Check all files"><input id="checkAll" type="checkbox" aria-label="Check all files"><span></span></label><b>/ FILES &amp; PAGES</b><span class="grow"></span><button id="mergeBtn" class="btn btn-ghost head-btn" title="Merge files into one new file" disabled>⊕ MERGE FILES</button><span id="docCount" class="count">0 FILES</span></div>
       <div class="tree-tools">
         <div class="thumb-size">
           <span class="ts-label">Thumbnails</span>
@@ -534,13 +591,18 @@
 
 <div id="mergeModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="mergeTitle">
   <div class="modal-box merge-box">
-    <div class="modal-head"><b id="mergeTitle">MERGE FILES — ORDER</b><span class="grow"></span><button id="mergeCancelX" class="btn btn-ghost" aria-label="Cancel">✕</button></div>
+    <div class="modal-head"><b id="mergeTitle">MERGE FILES INTO ONE</b><span class="grow"></span><button id="mergeCancelX" class="btn btn-ghost" aria-label="Cancel">✕</button></div>
     <div class="merge-body">
-      <div class="merge-note">The files go into one PDF in this order. Pages keep their order inside each file.</div>
+      <div class="merge-note">Tick the files to merge and set their order — drag a row by ⋮⋮ or use the arrows. Pages keep their order inside each file. The result is a new file in the list; the files it is made from stay unless you choose otherwise.</div>
+      <div class="merge-all"><label class="chk" title="All files"><input id="mergeAll" type="checkbox" aria-label="All files"><span></span></label><span>ALL FILES</span></div>
       <ol id="mergeList" class="merge-list"></ol>
-      <label class="merge-name">Name of the merged document<input id="mergeName" type="text" autocomplete="off"></label>
+      <div class="merge-opts">
+        <label><span class="chk"><input id="mergeWithOut" type="checkbox"><span></span></span>Also take the pages that are not in the PDF (Model Space, removed pages, empty layouts)</label>
+        <label><span class="chk"><input id="mergeRemove" type="checkbox"><span></span></span>Remove the merged files from the list afterwards</label>
+      </div>
+      <label class="merge-name">Name of the merged file<input id="mergeName" type="text" autocomplete="off"></label>
     </div>
-    <div class="merge-foot"><button id="mergeCancel" class="btn btn-ghost">CANCEL</button><button id="mergeOk" class="btn btn-primary">MERGE</button></div>
+    <div class="merge-foot"><span id="mergeSum" class="merge-sum"></span><span class="grow"></span><button id="mergeCancel" class="btn btn-ghost">CANCEL</button><button id="mergeOk" class="btn btn-primary">CREATE MERGED FILE</button></div>
   </div>
 </div>
 
@@ -785,7 +847,7 @@ function docMeta(d){
   const n=d.pages.length+" page"+(d.pages.length===1?"":"s")+" in PDF";
   if(d.merged) return "merged · "+d.parts+" files · "+n;
   const s=srcs[0]; if(!s) return n;
-  return bytes(s.size)+" · "+s.type.toUpperCase()+" · "+(s.status==="ready"?n+" · ":"")+s.statusText;
+  return bytes(s.size)+" · "+(s.status==="ready"?n+" · ":"")+s.statusText;
 }
 function docIcon(d){
   if(d.merged) return "∑";
@@ -812,16 +874,16 @@ function pagesHtml(d){
 }
 function docHtml(d){
   const s=d.merged?null:source(d.sourceIds[0]);
-  const acts=(s?.type==="dwg"?'<button class="btn btn-ghost" data-act="reload" title="Read the drawing again">RELOAD</button>':'')+
-    '<button class="btn btn-ghost" data-act="remove" title="Remove from the list">✕</button>'+
-    '<button class="btn btn-primary doc-dl" data-act="dl" title="Download this document as one PDF"'+(d.pages.length?"":" disabled")+'>⤓ PDF</button>';
+  const acts=(s?.type==="dwg"?'<button class="btn btn-ghost ico" data-act="reload" title="Read the drawing again" aria-label="Reload">↻</button>':'')+
+    '<button class="btn btn-ghost ico" data-act="remove" title="Remove from the list" aria-label="Remove">✕</button>'+
+    '<button class="btn btn-primary doc-dl" data-act="dl" title="Download this file as one PDF"'+(d.pages.length?"":" disabled")+'>⤓ PDF</button>';
   return '<div class="doc'+(d.id===state.activeDocId?" active":"")+(state.checked.has(d.id)?" checked":"")+'" data-doc="'+d.id+'">'+
     '<div class="doc-row">'+
       '<label class="chk doc-chk" title="Check this file"><input type="checkbox" data-chk="'+d.id+'"'+(state.checked.has(d.id)?" checked":"")+' aria-label="Check '+esc(d.name)+'"><span></span></label>'+
       '<button class="doc-tog" data-act="toggle" title="'+(d.open?"Hide pages":"Show pages")+'" aria-expanded="'+d.open+'">'+(d.open?"−":"+")+'</button>'+
-      '<div class="source-icon">'+docIcon(d)+'</div>'+
+      '<span class="doc-type">'+docIcon(d)+'</span>'+
       '<div class="doc-main"><div class="doc-name" title="'+esc(d.name)+'">'+esc(d.name)+'</div>'+
-        '<div class="doc-meta'+(s?.status==="error"?" status error":"")+'">'+esc(docMeta(d))+'</div></div>'+
+        '<div class="doc-meta'+(s?.status==="error"?" status error":"")+'" title="'+esc(docMeta(d))+'">'+esc(docMeta(d))+'</div></div>'+
       '<div class="doc-acts">'+acts+'</div>'+
     '</div>'+
     (d.open?'<div class="pg-list" data-doc="'+d.id+'"'+(d.thumbW?' style="--thumb-w:'+d.thumbW+'px"':'')+'>'+pagesHtml(d)+'</div>':"")+
@@ -946,6 +1008,7 @@ function syncChecks(){
   all.checked=!!n&&n===state.docs.length; all.indeterminate=!!n&&n<state.docs.length; all.disabled=!state.docs.length;
   $("#checkBar").hidden=!n; $("#checkN").textContent=n+" CHECKED";
   $("#checkMerge").disabled=n<2;
+  $("#mergeBtn").disabled=state.docs.length<2;
   const sc=$("#thumbScope"); sc.textContent=n?(n===1?"1 FILE":n+" FILES"):"ALL FILES"; sc.classList.toggle("some",!!n);
   const first=checkedDocs()[0]; setSlider(n?(first?.thumbW||state.thumbW):state.thumbW);
   document.querySelectorAll("#tree .doc").forEach(el=>{
@@ -1006,48 +1069,100 @@ function applyThumbW(v,save){
   }
 }
 /* ── merging ───────────────────────────────────────────────────────────── */
+/* The merge dialog lists every file of the list: the ones to merge are
+   ticked (those offered — the checked files, a file dropped on another, or
+   all when nothing is checked), the order is set by dragging a row by its
+   grip or with the arrows. The merged file is a new entry in the list, made of
+   copies of the pages (each keeps a link to its original, whose thumbnail and
+   drawing it shares), so rotating or removing a page in it leaves the files it
+   came from alone — unless those files are removed from the list on the way. */
 let merge=null;
 function openMerge(dragged,target){ openMergeOf([target,dragged]); }
 function openMergeOf(list){
-  merge={order:[...list],auto:true};
+  const on=list&&list.length?list:state.docs;
+  merge={ items:[...on.map(d=>({d,on:true})), ...state.docs.filter(d=>!on.includes(d)).map(d=>({d,on:false}))], auto:true };
+  $("#mergeWithOut").checked=false; $("#mergeRemove").checked=false;
   drawMerge(); $("#mergeModal").classList.add("on"); $("#mergeOk").focus();
 }
-// the name follows the order until the user types one of their own
-const autoName=()=>merge.order.map(d=>d.name.replace(/\.[^.]+$/,"")).join(" + ");
+const mergeOn=()=>merge.items.filter(x=>x.on).map(x=>x.d);
+const mergePages=d=>$("#mergeWithOut").checked?[...d.pages,...outPages(d)]:d.pages;
+// the name follows the files until the user types one of their own
+const autoName=()=>mergeOn().map(d=>d.name.replace(/\.[^.]+$/,"")).join(" + ");
 function drawMerge(){
   if(merge.auto) $("#mergeName").value=autoName();
-  $("#mergeList").innerHTML=merge.order.map((d,i)=>'<li><span class="m-name" title="'+esc(d.name)+'">'+esc(d.name)+'</span><span class="m-n">'+d.pages.length+' p.</span>'+
-    '<button class="btn btn-ghost" data-mv="-1" data-i="'+i+'" '+(i===0?"disabled":"")+' title="Earlier">↑</button>'+
-    '<button class="btn btn-ghost" data-mv="1" data-i="'+i+'" '+(i===merge.order.length-1?"disabled":"")+' title="Later">↓</button></li>').join("");
+  let k=0;
+  $("#mergeList").innerHTML=merge.items.map((x,i)=>{
+    const d=x.d, n=mergePages(d).length;
+    return '<li class="'+(x.on?"":"off")+'" data-i="'+i+'">'+
+      '<span class="m-grip" title="Drag to reorder" aria-hidden="true">⋮⋮</span>'+
+      '<label class="chk" title="Merge this file"><input type="checkbox" data-on="'+i+'"'+(x.on?" checked":"")+' aria-label="Merge '+esc(d.name)+'"><span></span></label>'+
+      '<span class="m-no">'+(x.on?++k:"")+'</span>'+
+      '<span class="m-name" title="'+esc(d.name)+'">'+esc(d.name)+'</span><span class="m-n">'+n+' p.</span>'+
+      '<button class="btn btn-ghost" data-mv="-1" data-i="'+i+'" '+(i===0?"disabled":"")+' title="Earlier">↑</button>'+
+      '<button class="btn btn-ghost" data-mv="1" data-i="'+i+'" '+(i===merge.items.length-1?"disabled":"")+' title="Later">↓</button></li>';
+  }).join("");
+  const on=mergeOn(), pages=on.reduce((t,d)=>t+mergePages(d).length,0);
+  const all=$("#mergeAll"); all.checked=on.length===merge.items.length; all.indeterminate=!!on.length&&on.length<merge.items.length;
+  $("#mergeSum").textContent=on.length+" file"+(on.length===1?"":"s")+" · "+pages+" page"+(pages===1?"":"s");
+  $("#mergeOk").disabled=on.length<2||!pages;
+  $("#mergeOk").textContent=on.length<2?"TICK 2 OR MORE FILES":"CREATE MERGED FILE";
 }
 $("#mergeList").addEventListener("click",ev=>{
   const b=ev.target.closest("button[data-mv]"); if(!b||!merge) return;
-  const i=+b.dataset.i, j=i+(+b.dataset.mv); const o=merge.order; [o[i],o[j]]=[o[j],o[i]]; drawMerge();
+  const i=+b.dataset.i, j=i+(+b.dataset.mv), o=merge.items; [o[i],o[j]]=[o[j],o[i]]; drawMerge();
+});
+$("#mergeList").addEventListener("change",ev=>{
+  const b=ev.target.closest("input[data-on]"); if(!b||!merge) return;
+  merge.items[+b.dataset.on].on=b.checked; drawMerge();
+});
+$("#mergeAll").addEventListener("change",ev=>{ if(!merge) return; merge.items.forEach(x=>{ x.on=ev.target.checked; }); drawMerge(); });
+$("#mergeWithOut").addEventListener("change",()=>{ if(merge) drawMerge(); });
+/* a row dragged by its grip: it moves live among the others */
+$("#mergeList").addEventListener("pointerdown",ev=>{
+  const grip=ev.target.closest(".m-grip"); if(!grip||!merge) return;
+  ev.preventDefault();
+  const list=$("#mergeList"), li=grip.closest("li"); li.classList.add("dragging");
+  const move=e=>{
+    const over=document.elementFromPoint(e.clientX,e.clientY)?.closest?.("#mergeList li");
+    if(!over||over===li) return;
+    const r=over.getBoundingClientRect();
+    if(e.clientY<r.top+r.height/2) list.insertBefore(li,over); else over.after(li);
+  };
+  const up=()=>{
+    window.removeEventListener("pointermove",move); window.removeEventListener("pointerup",up); window.removeEventListener("pointercancel",up);
+    const order=[...list.children].map(x=>merge.items[+x.dataset.i]); merge.items=order; drawMerge();
+  };
+  window.addEventListener("pointermove",move); window.addEventListener("pointerup",up); window.addEventListener("pointercancel",up);
 });
 function closeMerge(){ merge=null; $("#mergeModal").classList.remove("on"); }
 $("#mergeName").addEventListener("input",()=>{ if(merge) merge.auto=false; });
 $("#mergeCancel").onclick=closeMerge; $("#mergeCancelX").onclick=closeMerge;
-$("#mergeModal").addEventListener("keydown",ev=>{ if(ev.key==="Escape") closeMerge(); if(ev.key==="Enter"&&ev.target.id==="mergeName") $("#mergeOk").click(); });
+$("#mergeModal").addEventListener("keydown",ev=>{ if(ev.key==="Escape") closeMerge(); if(ev.key==="Enter"&&ev.target.id==="mergeName"&&!$("#mergeOk").disabled) $("#mergeOk").click(); });
+$("#mergeBtn").onclick=()=>{ const c=checkedDocs(); openMergeOf(c.length>=2?c:null); };
 $("#mergeOk").onclick=()=>{
   if(!merge) return;
-  /* The merged document is a new entry in the list, right after the lower of
-     the two; the files it was made from stay as they are. */
-  const at=Math.max(...merge.order.map(d=>state.docs.indexOf(d)))+1;
-  const m={id:uid("doc"),name:$("#mergeName").value.trim()||merge.order.map(d=>d.name).join(" + "),
-    sourceIds:[...new Set(merge.order.flatMap(d=>d.sourceIds))],all:[],pages:[],open:true,merged:true,
-    parts:merge.order.reduce((k,d)=>k+(d.merged?d.parts:1),0)};
-  for(const d of merge.order){
+  const used=mergeOn(); if(used.length<2) return;
+  const withOut=$("#mergeWithOut").checked, drop=$("#mergeRemove").checked;
+  /* the new file goes right after the lowest of the files it is made of */
+  const at=Math.max(...used.map(d=>state.docs.indexOf(d)))+1;
+  const m={id:uid("doc"),name:$("#mergeName").value.trim()||used.map(d=>d.name).join(" + "),
+    sourceIds:[...new Set(used.flatMap(d=>d.sourceIds))],all:[],pages:[],open:true,merged:true,
+    parts:used.reduce((k,d)=>k+(d.merged?d.parts:1),0)};
+  for(const d of used){
     const copy=new Map();
-    for(const p of d.all){
-      const {id,docId,_rot,_rotPending,_svgUrl,pngDataUrl,thumb,...rest}=p;
-      const q=newPage({...rest,docId:m.id,orig:p.orig||p}); copy.set(p,q); m.all.push(q);
-    }
-    for(const p of d.pages) m.pages.push(copy.get(p));
+    for(const p of d.all){ const q=copyPage(p,m); copy.set(p,q); m.all.push(q); }
+    for(const p of (withOut?[...d.pages,...outPages(d)]:d.pages)) m.pages.push(copy.get(p));
   }
   state.docs.splice(at,0,m);
-  for(const d of merge.order) d.open=false;
+  for(const d of used) d.open=false;
+  closeMerge();
+  if(drop) for(const d of used) removeDoc(d);
+  state.checked.clear();
   state.activeDocId=m.id; state.selected.clear(); state.activePageId=m.pages[0]?.id||null;
-  closeMerge(); renderTree(); renderPreview();
+  renderTree(); renderPreview();
+  // the new file, brought into view and lit for a moment
+  const el=$('#tree .doc[data-doc="'+m.id+'"]');
+  if(el){ el.scrollIntoView({block:"nearest",behavior:"smooth"}); el.classList.add("fresh"); setTimeout(()=>el.classList.remove("fresh"),2300); }
 };
 
 /* ── dragging ─────────────────────────────────────────────────────────────
